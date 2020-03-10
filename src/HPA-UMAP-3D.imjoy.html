@@ -20,7 +20,7 @@ a localization pattern.
     "type": "window",
     "tags": [],
     "ui": "Explore protein localization patterns in HPA images.",
-    "version": "0.1.2",
+    "version": "0.1.3",
     "api_version": "0.1.2",
     "description": "Explore protein localization patterns in HPA images.",
     "icon": "photo",
@@ -99,231 +99,235 @@ class ImJoyPlugin {
         const self = this
         this.store = {images: [], current_index: 0, loading: true, thumbnail: null, search_text: ''}
         this.app = new Vue({
-        el: '#app',
-        data: this.store,
-        methods: {
-            openImage(url){
-                api.utils.openUrl(url)
-            },
-            openHPA(meta){
-                const url = 'https://www.proteinatlas.org/'+meta.gene_ensembl_id+'-'+meta.gene+'/cell/' 
-                api.utils.openUrl(url)
-            },
-            showImage(obj){
-                this.images.push(obj)
-                if(this.images.length>5){
-                    this.images.shift()
-                }
-                this.current_index = this.images.length -1
-            },
-            showThumbnail(obj){
-                this.thumbnail = obj
-            },
-            search(text){
-                self.updateUmap(self.umap_data, text)
-            },
-            async export_image(){
-                await api.showStatus('exporting as image...')
-                let url = await Plotly.toImage(self.umap_chart, {format:'png', height:2048, width:2048})
-                await api.exportFile(convertBase64ToFile(url), 'HPA_V18_UMAP_densenet121.png')
+            el: '#app',
+            data: this.store,
+            methods: {
+                openImage(url){
+                    api.utils.openUrl(url)
+                },
+                openHPA(meta){
+                    const url = 'https://www.proteinatlas.org/'+meta.gene_ensembl_id+'-'+meta.gene+'/cell/' 
+                    api.utils.openUrl(url)
+                },
+                showImage(obj){
+                    this.images.push(obj)
+                    if(this.images.length>5){
+                        this.images.shift()
+                    }
+                    this.current_index = this.images.length -1
+                },
+                showThumbnail(obj){
+                    this.thumbnail = obj
+                },
+                search(text){
+                    self.updateUmap(self.umap_data, text)
+                },
+                async export_image(){
+                    await api.showStatus('exporting as image...')
+                    let url = await Plotly.toImage(self.umap_chart, {format:'png', height:2048, width:2048})
+                    await api.exportFile(convertBase64ToFile(url), 'HPA_V18_UMAP_densenet121.png')
 
-                url = await Plotly.toImage(self.umap_chart, {format:'svg', height:1024, width: 1024})
-                await api.exportFile(convertBase64ToFile(url), 'HPA_V18_UMAP_densenet121.svg')
-                await api.showStatus('done')
+                    url = await Plotly.toImage(self.umap_chart, {format:'svg', height:1024, width: 1024})
+                    await api.exportFile(convertBase64ToFile(url), 'HPA_V18_UMAP_densenet121.svg')
+                    await api.showStatus('done')
+                },
+                async export_csv(){
+                    console.log('Filtered data: ', self.filtered_table)
+                }
             }
-        }
-    })
+        })
     }
 
     async plot(data){
-    document.getElementById('chart').innerHTML = ''
-    const updatemenus =[
-            {
-        buttons: [
-            {
-                args: [{'marker.size': 0.1}],
-                label:'marker size: 0.1',
-                method:'restyle'
-            },
-            {
-                args: [{'marker.size': 0.5}],
-                label:'marker size: 0.5',
-                method:'restyle'
-            },
-            {
-                args: [{'marker.size': 1}],
-                label:'marker size: 1',
-                method:'restyle'
-            },
-            {
-                args: [{'marker.size': 2}],
-                label:'marker size: 2',
-                method:'restyle'
-            },
-            {
-                args: [{'marker.size': 4}],
-                label:'marker size: 4',
-                method:'restyle'
-            },
-            {
-                args: [{'marker.size': 8}],
-                label:'marker size: 8',
-                method:'restyle'
-            },
-            {
-                args: [{'marker.size': 16}],
-                label:'marker size: 16',
-                method:'restyle'
+        document.getElementById('chart').innerHTML = ''
+        const updatemenus =[
+                {
+            buttons: [
+                {
+                    args: [{'marker.size': 0.1}],
+                    label:'marker size: 0.1',
+                    method:'restyle'
+                },
+                {
+                    args: [{'marker.size': 0.5}],
+                    label:'marker size: 0.5',
+                    method:'restyle'
+                },
+                {
+                    args: [{'marker.size': 1}],
+                    label:'marker size: 1',
+                    method:'restyle'
+                },
+                {
+                    args: [{'marker.size': 2}],
+                    label:'marker size: 2',
+                    method:'restyle'
+                },
+                {
+                    args: [{'marker.size': 4}],
+                    label:'marker size: 4',
+                    method:'restyle'
+                },
+                {
+                    args: [{'marker.size': 8}],
+                    label:'marker size: 8',
+                    method:'restyle'
+                },
+                {
+                    args: [{'marker.size': 16}],
+                    label:'marker size: 16',
+                    method:'restyle'
+                }
+            ],
+            direction: 'down',
+            pad: {'r': 0, 't': 0},
+            active: 1,
+            showactive: true,
+            type: 'dropdown',
+            x: 0.8,
+            xanchor: 'left',
+            y: 1.05,
+            yanchor: 'top'
             }
-        ],
-        direction: 'down',
-        pad: {'r': 0, 't': 0},
-        active: 1,
-        showactive: true,
-        type: 'dropdown',
-        x: 0.8,
-        xanchor: 'left',
-        y: 1.05,
-        yanchor: 'top'
+        ]
+        
+        const layout = {
+            hovermode:'closest',
+            title:'HPAv18 UMAP (model: densenet121, images: '+data[0].x.length+')', 
+            xaxis: {
+                showticklabels: false,
+                nticks: 10,
+                domain: [-10, 10],
+                range: [-10, 10],
+                zeroline: false
+            },
+            yaxis: {
+                showticklabels: false,
+                nticks: 10,
+                domain: [-10, 10],
+                range: [-10, 10],
+                zeroline: false
+            },
+            updatemenus: updatemenus
         }
-    ]
-    
-    const layout = {
-        hovermode:'closest',
-        title:'HPAv18 UMAP (model: densenet121, images: '+data[0].x.length+')', 
-        xaxis: {
-            showticklabels: false,
-            nticks: 10,
-            domain: [-10, 10],
-            range: [-10, 10],
-            zeroline: false
-        },
-        yaxis: {
-            showticklabels: false,
-            nticks: 10,
-            domain: [-10, 10],
-            range: [-10, 10],
-            zeroline: false
-        },
-        updatemenus: updatemenus
-    }
-    this.umap_chart = await Plotly.newPlot('chart', data, layout,{responsive: true})
-    // Plotly.relayout('chart', {
-    //     width: document.getElementById('chart').clientWidth,
-    //     height: document.getElementById('chart').clientHeight
-    // })
-    
-    // let win=null;
-    document.getElementById('chart').on('plotly_click', async (data) => {
+        this.umap_chart = await Plotly.newPlot('chart', data, layout,{responsive: true})
         // Plotly.relayout('chart', {
         //     width: document.getElementById('chart').clientWidth,
         //     height: document.getElementById('chart').clientHeight
         // })
-        for(var i=0; i < data.points.length; i++){
-            console.log('====>', data.points[i].customdata)
-            const id = data.points[i].customdata.id
-            //pts = data.points[i].customdata.gene+'\n';
-            const image_base_url = 'https://images.proteinatlas.org/' + id.split('_')[0] + '/' + id.split('_')[1] +'_' + id.split('_')[2] + '_'+ id.split('_')[3]
-            this.app.showImage({url: image_base_url+'_blue.jpg', meta: data.points[i].customdata})
-            this.app.showImage({url: image_base_url+'_red.jpg', meta: data.points[i].customdata})
-            this.app.showImage({url: image_base_url+'_green.jpg', meta: data.points[i].customdata})
-            this.app.showImage({url: image_base_url+'_yellow.jpg', meta: data.points[i].customdata})
-            this.app.showImage({url: image_base_url+'_blue_red_green.jpg', meta: data.points[i].customdata})
-            
-            const thumbnail_url = 'https://images.proteinatlas.org/' + id.split('_')[0] + '/' + id.split('_')[1] +'_' + id.split('_')[2] + '_'+ id.split('_')[3]+ '_blue_red_green_yellow_thumb.jpg'
-            this.app.showThumbnail({url: thumbnail_url, meta: data.points[i].customdata})
+        
+        // let win=null;
+        document.getElementById('chart').on('plotly_click', async (data) => {
+            // Plotly.relayout('chart', {
+            //     width: document.getElementById('chart').clientWidth,
+            //     height: document.getElementById('chart').clientHeight
+            // })
+            for(var i=0; i < data.points.length; i++){
+                console.log('====>', data.points[i].customdata)
+                const id = data.points[i].customdata.id
+                //pts = data.points[i].customdata.gene+'\n';
+                const image_base_url = 'https://images.proteinatlas.org/' + id.split('_')[0] + '/' + id.split('_')[1] +'_' + id.split('_')[2] + '_'+ id.split('_')[3]
+                this.app.showImage({url: image_base_url+'_blue.jpg', meta: data.points[i].customdata})
+                this.app.showImage({url: image_base_url+'_red.jpg', meta: data.points[i].customdata})
+                this.app.showImage({url: image_base_url+'_green.jpg', meta: data.points[i].customdata})
+                this.app.showImage({url: image_base_url+'_yellow.jpg', meta: data.points[i].customdata})
+                this.app.showImage({url: image_base_url+'_blue_red_green.jpg', meta: data.points[i].customdata})
+                
+                const thumbnail_url = 'https://images.proteinatlas.org/' + id.split('_')[0] + '/' + id.split('_')[1] +'_' + id.split('_')[2] + '_'+ id.split('_')[3]+ '_blue_red_green_yellow_thumb.jpg'
+                this.app.showThumbnail({url: thumbnail_url, meta: data.points[i].customdata})
 
-            await api.showStatus(data.points[i].customdata.gene+', '+ data.points[i].customdata['cell_line'] + ', ' + data.points[i].customdata.location+ ', '+data.points[i].customdata.id)
-            const screen_width = window.innerWidth
-                || document.documentElement.clientWidth
-                || document.body.clientWidth;
-            if(screen_width<1024) window.scrollTo(0,document.body.scrollHeight);
-        }
-        //api.alert('Closest point clicked:\n\n'+pts);
-    });
-    document.getElementById('chart').on('plotly_hover', async (data) => {
-        for(var i=0; i < data.points.length; i++){
-            const id = data.points[i].customdata.id
-            const thumbnail_url = 'https://images.proteinatlas.org/' + id.split('_')[0] + '/' + id.split('_')[1] +'_' + id.split('_')[2] + '_'+ id.split('_')[3]+ '_blue_red_green_yellow_thumb.jpg'
-            this.app.showThumbnail({url: thumbnail_url, meta: data.points[i].customdata})
-        }
-    });
+                await api.showStatus(data.points[i].customdata.gene+', '+ data.points[i].customdata['cell_line'] + ', ' + data.points[i].customdata.location+ ', '+data.points[i].customdata.id)
+                const screen_width = window.innerWidth
+                    || document.documentElement.clientWidth
+                    || document.body.clientWidth;
+                if(screen_width<1024) window.scrollTo(0,document.body.scrollHeight);
+            }
+            //api.alert('Closest point clicked:\n\n'+pts);
+        });
+        document.getElementById('chart').on('plotly_hover', async (data) => {
+            for(var i=0; i < data.points.length; i++){
+                const id = data.points[i].customdata.id
+                const thumbnail_url = 'https://images.proteinatlas.org/' + id.split('_')[0] + '/' + id.split('_')[1] +'_' + id.split('_')[2] + '_'+ id.split('_')[3]+ '_blue_red_green_yellow_thumb.jpg'
+                this.app.showThumbnail({url: thumbnail_url, meta: data.points[i].customdata})
+            }
+        });
     }
 
     async generateFakeData(){
-    const Xs = [], Ys = [], Zs = [], Meta=[], n = 100000;
+        const Xs = [], Ys = [], Zs = [], Meta=[], n = 100000;
 
-    for (let i = 0; i < n; i += 1) {
-        Xs.push(gaussianRand());
-        Ys.push(gaussianRand());
-        Zs.push(gaussianRand());
-        Meta.push('index: '+i)
-    }
+        for (let i = 0; i < n; i += 1) {
+            Xs.push(gaussianRand());
+            Ys.push(gaussianRand());
+            Zs.push(gaussianRand());
+            Meta.push('index: '+i)
+        }
 
-    const data = [{
-        type: "scatter3d",
-        mode: "markers",
-        marker: {
-            line: {
-                width: 1,
-                color: '#404040'}
-        },
-        x: Xs,
-        y: Ys,
-        z: Zs,
-        customdata: Meta
-    }]
-    return data
+        const data = [{
+            type: "scatter3d",
+            mode: "markers",
+            marker: {
+                line: {
+                    width: 1,
+                    color: '#404040'}
+            },
+            x: Xs,
+            y: Ys,
+            z: Zs,
+            customdata: Meta
+        }]
+        return data
     }
     async updateUmap(table, filter){
-    filter = (filter || '') && filter.trim()
-    const filters = filter.split(' ')
-    
-    table = table.filter((row)=>{
-        let ret = false
-        for(let filter of filters){
-            ret = ret || (!filter || row.gene === filter || row['gene_ensembl_id'] === filter || row['cell_line'] === filter || row['id'] === filter || row['location'].includes(filter) )
+        filter = (filter || '') && filter.trim()
+        const filters = filter.split(' ')
+        
+        table = table.filter((row)=>{
+            let ret = false
+            for(let filter of filters){
+                ret = ret || (!filter || row.gene === filter || row['gene_ensembl_id'] === filter || row['cell_line'] === filter || row['id'] === filter || row['location'].includes(filter) )
 
+            }
+            return row.gene && ret
+        })
+        this.filtered_table = table;
+        console.log('filtered: ', this.filtered_table)
+        
+        if(table.length<=0){
+            await api.alert('No image found.')
+            return
         }
-        return row.gene && ret
-    })
-    console.log('filtered: ', table)
-    
-    if(table.length<=0){
-        await api.alert('No image found.')
-        return
-    }
-    await api.showMessage(table.length + ' images found.')
+        await api.showMessage(table.length + ' images found.')
 
-    const dataObj = transpose(table)
-    
-    const color_map = {}
-    for(let i=0; i<COLORS.length; i++){
-        color_map[i] = COLORS[i]
-    }
-    
-    const data = [{
-        type: "scatter3d",
-        mode: "markers",
-        marker: {
-            size: 2,
-            color: dataObj.location_code.map((index)=>{
-                if(typeof index === 'string'){
-                    // return '#e0e0e0d5'
-                    return '#c6c6c6'
-                }
-                else{
-                    return color_map[index]
-                }
-            })
-            //colorscale: 'Viridis'
-        },
-        x: dataObj.x,
-        y: dataObj.y,
-        z: dataObj.z,
-        customdata: table
-    }]
-    this.plot(data)
+        const dataObj = transpose(table)
+        
+        const color_map = {}
+        for(let i=0; i<COLORS.length; i++){
+            color_map[i] = COLORS[i]
+        }
+        
+        const data = [{
+            type: "scatter3d",
+            mode: "markers",
+            marker: {
+                size: 2,
+                color: dataObj.location_code.map((index)=>{
+                    if(typeof index === 'string'){
+                        // return '#e0e0e0d5'
+                        return '#c6c6c6'
+                    }
+                    else{
+                        return color_map[index]
+                    }
+                })
+                //colorscale: 'Viridis'
+            },
+            x: dataObj.x,
+            y: dataObj.y,
+            z: dataObj.z,
+            customdata: table
+        }]
+        this.plot(data)
     }
     async run(my) {
     // const url = "https://dl.dropbox.com/s/k9ekd4ff3fyjbfk/umap_results_fit_all_transform_all_sorted_20190422.csv"
@@ -359,7 +363,8 @@ api.export(new ImJoyPlugin())
         <header class="navbar">
         <section class="navbar-section">
             <a class="navbar-brand mr-2">HPA UMAP</a>
-            <button @click="export_image()" class="btn btn-link">Export</button>
+            <button @click="export_image()" class="btn btn-link">Download Plot</button>
+            <button @click="export_csv()" class="btn btn-link">Export CSV</button>
         </section>
         <section class="navbar-section">
             <div class="input-group input-inline">
