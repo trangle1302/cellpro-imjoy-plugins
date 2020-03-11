@@ -20,7 +20,7 @@ a localization pattern.
     "type": "window",
     "tags": [],
     "ui": "Explore protein localization patterns in HPA images.",
-    "version": "0.1.3",
+    "version": "0.1.4",
     "api_version": "0.1.2",
     "description": "Explore protein localization patterns in HPA images.",
     "icon": "photo",
@@ -132,7 +132,8 @@ class ImJoyPlugin {
                     await api.showStatus('done')
                 },
                 async export_csv(){
-                    var export_string = "ID,X,Y,Z,GENE,LOCATIONS,HPA_URL\n"
+                    api.showMessage("Exporting as csv. This may take some time")
+                    let export_string = "ID,X,Y,Z,GENE,LOCATIONS,HPA_URL\n"
                     for (var current_index in self.filtered_table) {
                         var current_data = self.filtered_table[current_index]
                         export_string += current_data["id"] + ","
