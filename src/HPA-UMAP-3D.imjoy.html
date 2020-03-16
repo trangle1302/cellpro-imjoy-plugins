@@ -20,7 +20,7 @@ a localization pattern.
     "type": "window",
     "tags": [],
     "ui": "Explore protein localization patterns in HPA images.",
-    "version": "0.1.4",
+    "version": "0.1.5",
     "api_version": "0.1.2",
     "description": "Explore protein localization patterns in HPA images.",
     "icon": "photo",
@@ -97,11 +97,42 @@ const COLORS = [
 class ImJoyPlugin {
     async setup() {
         const self = this
-        this.store = {images: [], current_index: 0, loading: true, thumbnail: null, search_text: ''}
+        this.store = {
+            images: [], current_index: 0, loading: true, thumbnail: null, search_text: '',
+            tables:  {
+                "Default": "https://dl.dropbox.com/s/s4m2iysupy8gwj0/umap_results_fit_all_transform_all.csv",
+                "Nucleoli": "https://dl.dropbox.com/s/yr3sh6806ppxtjo/umap_results_fit_all_transform_all_nucleoli.csv"
+            }     // const url = "https://dl.dropbox.com/s/k9ekd4ff3fyjbfk/umap_results_fit_all_transform_all_sorted_20190422.csv"
+        }
         this.app = new Vue({
             el: '#app',
             data: this.store,
             methods: {
+                loadTable(url){
+                    return new Promise((resolve, reject)=>{
+                        Papa.parse(url, {
+                            download: true,
+                            header: true,
+                            dynamicTyping: true,
+                            skipEmptyLines: true,
+                            error: (err, file, inputElem, reason)=> {
+                                api.alert('Falied to load the table: ' + reason.toString())
+                                this.loading = false
+                                this.$forceUpdate()
+                                reject('Falied to load the table: ' + reason.toString())
+                            },
+                            complete: (results) => {
+                                this.loading = false
+                                this.$forceUpdate()
+                                console.log('===============>', results)
+                                self.umap_data = results.data
+                                self.updateUmap(self.umap_data)
+                                resolve()
+                            }
+                        })
+                    })
+                
+                },
                 openImage(url){
                     api.utils.openUrl(url)
                 },
@@ -142,6 +173,7 @@ class ImJoyPlugin {
                         export_string += current_data["z"] + ","
                         export_string += current_data["gene"] + ","
                         export_string += "\"" + current_data["location"] + "\","
+                        export_string += current_data["x"] + "," 
                         export_string += 'https://www.proteinatlas.org/'+current_data["gene_ensembl_id"]+'-'+current_data["gene"]+'/cell/'
                         export_string += "\n"
                     }
@@ -342,29 +374,9 @@ class ImJoyPlugin {
         }]
         this.plot(data)
     }
-    async run(my) {
-    // const url = "https://dl.dropbox.com/s/k9ekd4ff3fyjbfk/umap_results_fit_all_transform_all_sorted_20190422.csv"
-    const url = "https://dl.dropbox.com/s/s4m2iysupy8gwj0/umap_results_fit_all_transform_all.csv"
-    Papa.parse(url, {
-        download: true,
-        header: true,
-        dynamicTyping: true,
-        skipEmptyLines: true,
-        error: (err, file, inputElem, reason)=> {
-            api.alert('Falied to load the table: ' + reason.toString())
-            this.app.loading = false
-            this.app.$forceUpdate()
-        },
-        complete: (results) => {
-
-            this.app.loading = false
-            this.app.$forceUpdate()
-            console.log('===============>', results)
-            this.umap_data = results.data
-            this.updateUmap(this.umap_data)
-        }
-    })
     
+    async run(my) {
+        await this.app.loadTable(this.app.tables['Default'])
     }
 }
 
@@ -376,8 +388,24 @@ api.export(new ImJoyPlugin())
         <header class="navbar">
         <section class="navbar-section">
             <a class="navbar-brand mr-2">HPA UMAP</a>
+            <div class="dropdown">
+                <a href="#" class="btn btn-link dropdown-toggle" tabindex="0">
+                    <i class="fas fa-folder-plus icon-size-position"></i>
+                    <label class="hide-sm">File</label>  <i class="icon icon-caret hide-sm"></i>
+                </a>
+                <ul class="menu">
+                    <li v-for="url, name in tables" :key="name">
+                        <a href="#" @click="loadTable(url)"  class="btn btn-link">
+                            Load {{name}}
+                        </a>
+                    </li>
+                    <li>
+                        <a href="#" @click="export_csv()" class="btn btn-link">Export CSV</a>
+                    </li>
+                </ul>
+            </div>
             <button @click="export_image()" class="btn btn-link">Download Plot</button>
-            <button @click="export_csv()" class="btn btn-link">Export CSV</button>
+            
         </section>
         <section class="navbar-section">
             <div class="input-group input-inline">
