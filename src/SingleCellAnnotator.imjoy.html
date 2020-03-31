@@ -1,0 +1,106 @@
+﻿<docs lang="markdown">
+[TODO: write documentation for this plugin.]
+</docs>
+
+<config lang="json">
+{
+  "name": "SingleCellAnnotator",
+  "type": "window",
+  "tags": [],
+  "ui": "",
+  "version": "0.1.2",
+  "api_version": "0.1.5",
+  "description": "Annotate images for HPA single-cell image classification",
+  "icon": "extension",
+  "inputs": null,
+  "outputs": null,
+  "env": "",
+  "requirements": [
+      "https://cdnjs.cloudflare.com/ajax/libs/vue/2.5.22/vue.min.js",
+      "https://static.imjoy.io/spectre.css/spectre.min.css",
+      "https://static.imjoy.io/spectre.css/spectre-exp.min.css",
+      "https://static.imjoy.io/spectre.css/spectre-icons.min.css"
+  ],
+  "dependencies": [],
+  "defaults": {"w": 20, "h": 10},
+  "runnable": true
+}
+</config>
+
+<script lang="javascript">
+const base_url = 'https://da537231.ngrok.io'
+
+const app = new Vue({
+  el: '#app',
+  data: {
+    title: 'Hello World',
+    current_panel: 'login',
+    current_image: null,
+  },
+  methods: {
+    async sayHi(){
+      await api.alert('Hi')
+    },
+    async goToAnnotation(){
+      this.current_panel = 'annotation'
+    },
+    async showImage(){
+        this.current_image = "https://images.proteinatlas.org/115/672_E2_1_blue_red_green_medium.jpg";
+    }
+  }
+})
+
+class ImJoyPlugin {
+  async setup() {
+
+  }
+
+  async run(my) {
+
+  }
+}
+
+api.export(new ImJoyPlugin())
+</script>
+
+<window lang="html">
+  <div id="app">
+    <div class="panel" v-if="current_panel=='login'">
+      <div class="panel-header">
+        <div class="panel-title">Login</div>
+      </div>
+      <div class="panel-body">
+        <div class="form-group">
+          <label class="form-label" for="input-example-1">Name</label>
+          <input class="form-input" type="text" id="input-example-1" placeholder="Name">
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="input-example-1">Name</label>
+          <input class="form-input" type="text" id="input-example-1" placeholder="Name">
+        </div>
+
+        <button class="btn" @click="goToAnnotation()">Go To Annoation</button>
+      </div>
+    </div>
+
+    <div class="panel" v-if="current_panel=='annotation'">
+    <div class="panel-header">
+      <div class="panel-title">Annotation</div>
+      </div>
+      <div class="panel-nav">
+        <!-- navigation components: tabs, breadcrumbs or pagination -->
+      </div>
+      <div class="panel-body">
+        <button class="btn" @click="showImage()">Show Image</button>
+        <br>
+        <img :src="current_image"></img>
+      </div>
+      <div class="panel-footer">
+        <!-- buttons or inputs -->
+      </div>
+    </div>
+  </div>
+</window>
+
+<style lang="css">
+</style>
