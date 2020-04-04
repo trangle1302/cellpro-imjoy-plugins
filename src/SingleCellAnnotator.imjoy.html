@@ -29,8 +29,7 @@
   </config>
   
   <script lang="javascript">
-  const base_url = 'https://localhost:5000'
-  /*'https://weak-bat-32.telebit.io'*/
+  const base_url = 'http://localhost:5000'
   
   const app = new Vue({
     el: '#app',
@@ -59,7 +58,7 @@
     methods: {
       async postData () {
         // Default options are marked with *
-        const url = base_url;
+        const url = base_url + '/annotation/15';
         const data = this.user;
         const response = await fetch(url, {
             method: 'POST',
@@ -91,7 +90,7 @@
         if(response.status === 200){
             const res = await response.json()
             if(res.success){
-              this.postData();
+              this.ChooseAnnotation();
             }
             else{
               api.alert('Failed to logg in, error' + res.error);
@@ -156,6 +155,7 @@
             <input class="form-input" type="text" name="password" v-model ="user.password" placeholder="password">
           </div>
           <button class="btn" @click="login()">Login</button>
+          <button class="btn" @click="postData()">Post Data</button>
           <button class="btn" @click="goToAnnotation()">Go To Annoation</button>
           <button @click="goToMenu()">Go To Menu</button>
         </div>
@@ -169,7 +169,6 @@
           <div class="panel-title">Please choose a task</div>
         </div>
         <div class="panel-body">
-          <button class="btn" @click="postData()">Post Data</button>
           <button class="btn btn-primary" @click="goToAnnotation()">Single Protein Annotation</button>
           <button class="btn">Complete Protein Annotation</button>
         </div>
@@ -184,12 +183,11 @@
           <div class="panel-title"></div>
         </div>
         <section class="panel-body">
-  
-          <button class="btn btn-primary">Ajust Segmentation</button>
           <button class="btn">Yes</button>
           <button class="btn">No</button>
           <button class="btn">Protein Tag</button>
-  
+          <button class="btn btn-primary">Ajust Segmentation</button>
+          <button class="btn btn-primary" @click="postData()">Done</button>
           <button class="btn" @click="PreviousImage()">Previous Image</button>
           <br>
           <hr>
