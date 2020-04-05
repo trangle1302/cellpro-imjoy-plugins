@@ -24,7 +24,8 @@
         "https://oeway.github.io/itk-vtk-viewer/itkVtkViewerCDN.js",
         "https://cdn.jsdelivr.net/gh/openlayers/openlayers.github.io@master/en/v6.1.1/css/ol.css",
         "https://cdn.jsdelivr.net/gh/openlayers/openlayers.github.io@master/en/v6.1.1/build/ol.js",
-        "https://cdn.jsdelivr.net/gh/nicolaspanel/numjs@0.15.1/dist/numjs.min.js"
+        "https://cdn.jsdelivr.net/gh/nicolaspanel/numjs@0.15.1/dist/numjs.min.js",
+        "https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"
     ],
     "dependencies": [],
     "defaults": {"fullscreen": true},
@@ -155,6 +156,32 @@
       })
     }
 
+    function convertDataURIToBinary(dataURI) {
+      //var BASE64_MARKER = ';base64,';
+      //var base64Index = dataURI.indexOf(BASE64_MARKER) + BASE64_MARKER.length;
+      //var base64 = dataURI.substring(base64Index);
+      var base64 = dataURI
+      var raw = window.atob(base64);
+      var rawLength = raw.length;
+      var array = new Uint8Array(new ArrayBuffer(rawLength));
+
+      for(i = 0; i < rawLength; i++) {
+        array[i] = raw.charCodeAt(i);
+      }
+      return array;
+    }
+
+    function uri2array(uri, buffer) {
+      var marker = ';base64,',
+          raw = window.atob(uri.substring(uri.indexOf(marker) + marker.length)),
+          n = raw.length,
+          a = new Uint16Array(new ArrayBuffer(n));
+      for(var i = 0; i < n ; i++){
+          a[i] = raw.charCodeAt(i);
+      }
+      return buffer ? a.buffer : a;
+      }
+
     function convertVtkImage(data){
       if(data.__jailed_type__ === 'ndarray'){
         if(data.__shape__.length === 2 || (data.__shape__.length==3 && data.__shape__[2]<=3)){
@@ -224,6 +251,7 @@
         3: "https://images.proteinatlas.org/115/672_E2_1_blue_green.jpg",
         4: "https://images.proteinatlas.org/115/672_E2_1_green.jpg",
         5: "https://images.proteinatlas.org/115/672_E2_1_red.jpg",
+        6: "https://weak-bat-32.telebit.io/hao/personal_path" // not surpport base64 yet
       },
       image_url_index: 1
     },
@@ -249,17 +277,31 @@
         return imageData
       },
       async imageView (){
-        this.current_panel = 'imageviewer'
-        new_data = await this.generateimagedata();
-        //var numjs = new NumJs();
-        //this.testimagedata = nj.random([350, 350]);
-        //const data = JSON.stringify(this.testimageata) 
-        //const data = await convertVtkImage(a)
-        //api.alert(data)
-        /*await this.displayMap(null, imageData)*/
+        this.current_panel = 'imageviewer';
+        let show_data = await axios.get(this.image_url_list[6]);
+        var image_data = show_data.data;
+        //const real_data = 'data:image/png;base64,' + show_data.data;
+        image_data = await convertDataURIToBinary(image_data);
+        //alert(image_data.Length)
+        const imageData = itkVtkViewer.utils.vtkITKHelper.convertItkToVtkImage({
+          imageType: { dimension: 2, pixelType: 1, componentType: 'uint8_t', components: 1},
+          name: 'test image',
+          origin: [0,0],
+          spacing: [1,1],
+          direction:{data: [1,0,0,1]},
+          size: [3592, 1235],
+          data: image_data
+        })
+        //alert(imageData)
+
+        await this.displayMap(null, imageData)
+        //alert(uintArray)
+
+        // following works for image form url
+        /*new_data = await this.generateimagedata();
         this.image_data = await convertImageUrl2Itk(this.image_url_list[this.image_url_index])
         this.image_url_index = this.image_url_index + 1
-        await this.displayMap(null, this.image_data)
+        await this.displayMap(null, this.image_data)*/
       },
       async postData () {
         // Default options are marked with *
