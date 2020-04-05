@@ -208,10 +208,24 @@
           size: size,
           data: imgArray
         })*/
-        this.testimagedata = nj.random([350, 350]);
-        const data = await convertVtkImage(this.testimagedata)
+        const size = [300, 300]
+        const data = nj.random(size) * 50000;
+        //const data = nj.images.data.digit;
+        //const size = [28, 28]
+        const imgArray = data.tolist();
+        const imageData = itkVtkViewer.utils.vtkITKHelper.convertItkToVtkImage({
+        imageType: { dimension: 2, pixelType: 1, componentType: 'float', components: 1},
+        name: 'test image',
+        origin: [0,0],
+        spacing: [1,1],
+        direction:{data: [1,0,0,1]},
+        size: size,
+        data: imgArray
+      })
+
+        //const data = await convertVtkImage(this.testimagedata)
         //api.alert(this.testimagedata)
-        await this.displayMap(null, this.testimagedata)
+        await this.displayMap(null, imageData)
       },
       //end
       annotation_mode_changed(){

@@ -23,7 +23,8 @@
         "https://static.imjoy.io/spectre.css/spectre-icons.min.css",
         "https://oeway.github.io/itk-vtk-viewer/itkVtkViewerCDN.js",
         "https://cdn.jsdelivr.net/gh/openlayers/openlayers.github.io@master/en/v6.1.1/css/ol.css",
-        "https://cdn.jsdelivr.net/gh/openlayers/openlayers.github.io@master/en/v6.1.1/build/ol.js"
+        "https://cdn.jsdelivr.net/gh/openlayers/openlayers.github.io@master/en/v6.1.1/build/ol.js",
+        "https://cdn.jsdelivr.net/gh/nicolaspanel/numjs@0.15.1/dist/numjs.min.js"
     ],
     "dependencies": [],
     "defaults": {"fullscreen": true},
@@ -128,6 +129,32 @@
       'float64': {componentType: 'double', arrayType: Float64Array }
     }
     
+    function convertImageUrl2Itk(url){
+      return new Promise((resolve, reject)=>{
+          const canvas = document.createElement("canvas");
+          const ctx = canvas.getContext("2d");
+          const image = new Image();
+          image.onload = function() {
+            canvas.width=image.width;
+            canvas.height=image.height;
+            ctx.drawImage(image, 0, 0, image.width, image.height);
+            const imageData = ctx.getImageData(0, 0, image.width, image.height);
+            const vtkImage = itkVtkViewer.utils.vtkITKHelper.convertItkToVtkImage({
+              imageType: { dimension: 2, pixelType: 1, componentType: 'uint8_t', components: 4},
+              name: 'test image',
+              origin: [0,0],
+              spacing: [1,1],
+              direction:{data: [1,0,0,1]},
+              size: [image.width, image.height],
+              data: new Uint8Array(imageData.data.buffer)
+            })
+            resolve(vtkImage);
+          };
+          image.crossOrigin = "Anonymous";
+          image.src = url
+      })
+    }
+
     function convertVtkImage(data){
       if(data.__jailed_type__ === 'ndarray'){
         if(data.__shape__.length === 2 || (data.__shape__.length==3 && data.__shape__[2]<=3)){
@@ -159,6 +186,7 @@
           throw new Error(`Unsupported shape: ${arr.shape}`)
         }
       }
+      return data
     }
   
   const app = new Vue({
@@ -187,10 +215,51 @@
       previous_image: null,
       next_image: null,
       website_info: "",
+    // this is for imageviewer test
+      image_data: null,
+      testimageata: null,
+      image_url_list:{
+        1: "https://images.proteinatlas.org/115/672_E2_1_blue_red_green_medium.jpg",
+        2: "https://images.proteinatlas.org/115/672_E2_1_red_green.jpg",
+        3: "https://images.proteinatlas.org/115/672_E2_1_blue_green.jpg",
+        4: "https://images.proteinatlas.org/115/672_E2_1_green.jpg",
+        5: "https://images.proteinatlas.org/115/672_E2_1_red.jpg",
+      },
+      image_url_index: 1
     },
     methods: {
-      async imageView(){
+      async generateimagedata (){
+        //datatt = nj.random([350, 350])
+        //api.alert(datatt.__jailed_type__)
+        size = [500, 500] 
+        const imgArray = new Uint16Array(new ArrayBuffer(500*500*2));
+        for(let i=0;i<500*500;i++){
+          imgArray[i] = Math.floor(Math.random() * Math.floor(65535));
+        }
+        
+        const imageData = await itkVtkViewer.utils.vtkITKHelper.convertItkToVtkImage({
+          imageType: { dimension: 2, pixelType: 1, componentType: 'uint16_t', components: 1},
+          name: 'test image',
+          origin: [0,0],
+          spacing: [1,1],
+          direction:{data: [1,0,0,1]},
+          size: size,
+          data: imgArray
+        })
+        return imageData
+      },
+      async imageView (){
         this.current_panel = 'imageviewer'
+        new_data = await this.generateimagedata();
+        //var numjs = new NumJs();
+        //this.testimagedata = nj.random([350, 350]);
+        //const data = JSON.stringify(this.testimageata) 
+        //const data = await convertVtkImage(a)
+        //api.alert(data)
+        /*await this.displayMap(null, imageData)*/
+        this.image_data = await convertImageUrl2Itk(this.image_url_list[this.image_url_index])
+        this.image_url_index = this.image_url_index + 1
+        await this.displayMap(null, this.image_data)
       },
       async postData () {
         // Default options are marked with *
@@ -387,7 +456,8 @@
         let extent;
         document.getElementById('toolbar').innerHTML = '';
         if(!files && !image_array){
-          const imageData = this.generateData2D();
+          //const imageData = this.generateData2D();
+          const imageData = await convertImageUrl2Itk('https://images.proteinatlas.org/19661/221_G2_1_red_green.jpg');
           const extent_3d = imageData.getExtent();
           extent =  [extent_3d[0], extent_3d[2], extent_3d[1], extent_3d[3]];
           viewer = itkVtkViewer.createViewer(itk_layer.viewerElement, {
@@ -649,7 +719,7 @@
       </div>
   
       <div class="panel" v-if="current_panel=='imageviewer'">
-        <section class="navbar">
+        <p class="navbar">
         <section class="navbar-section">
           <a class="navbar-brand text-bold mr-2">ImageViewer</a>
           <!-- <a href="..." class="btn btn-link">Docs</a>
@@ -662,21 +732,21 @@
             <input type="checkbox" v-model="freehand_mode" @change="anntation_mode_changed">
             <i class="form-icon"></i> Freehand
           </label>
-  
+
           <div class="input-group input-inline">
             <button class="btn hide-on-mobile" @click="openFileDialog()">Load Local File</button>
+            <button class="btn" @click="imageView()">NewImage</button>
           <!-- <button class="btn input-group-btn" @click="readTestFile()">Load Example File</button> -->
-  
           </div>
-        </section>
-        </div>
-        <!-- <h4 >{{status}}</h4> -->
-        <input ref="file-input" @change="loadFiles" type="file" name="name" style="display: none;" />
-        <!-- <canvas ref="image_canvas" style="width:35%;" width="100" height="100"></canvas> -->
-        <div v-if="loading" class="loading loading-lg floating"></div>
-        <div id='toolbar'></div>
-        <div id="map"></div>
-        <section>
+        </p>
+      </div>
+      <!-- <h4 >{{status}}</h4> -->
+      <input ref="file-input" @change="loadFiles" type="file" name="name" style="display: none;" />
+
+      <!-- <canvas ref="image_canvas" style="width:35%;" width="100" height="100"></canvas> -->
+      <div v-if="loading" class="loading loading-lg floating"></div>
+      <div id='toolbar'></div>
+      <div id="map"></div>
       </div>
   
       <div class="panel" v-if="current_panel=='navigation'">
