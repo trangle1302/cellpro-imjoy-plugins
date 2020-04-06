@@ -163,6 +163,7 @@
       var base64 = dataURI
       var raw = window.atob(base64);
       var rawLength = raw.length;
+      alert(rawLength)
       var array = new Uint8Array(new ArrayBuffer(rawLength));
 
       for(i = 0; i < rawLength; i++) {
@@ -278,28 +279,17 @@
       },
       async imageView (){
         this.current_panel = 'imageviewer';
-        let show_data = await axios.get(this.image_url_list[6]);
-        var image_data = show_data.data;
-        //const real_data = 'data:image/png;base64,' + show_data.data;
-        image_data = await convertDataURIToBinary(image_data);
-        //alert(image_data.Length)
-        const imageData = itkVtkViewer.utils.vtkITKHelper.convertItkToVtkImage({
-          imageType: { dimension: 2, pixelType: 1, componentType: 'uint8_t', components: 1},
-          name: 'test image',
-          origin: [0,0],
-          spacing: [1,1],
-          direction:{data: [1,0,0,1]},
-          size: [3592, 1235],
-          data: image_data
-        })
-        //alert(imageData)
 
-        await this.displayMap(null, imageData)
-        //alert(uintArray)
+        //for base64
+        let show_data = await axios.get(this.image_url_list[6]);
+        const uri_data = 'data:image/png;base64,' + show_data.data;
+        this.image_data = await convertImageUrl2Itk(uri_data)
+        await this.displayMap(null, this.image_data)
+
 
         // following works for image form url
-        /*new_data = await this.generateimagedata();
-        this.image_data = await convertImageUrl2Itk(this.image_url_list[this.image_url_index])
+        //new_data = await this.generateimagedata();
+        /*this.image_data = await convertImageUrl2Itk(this.image_url_list[this.image_url_index])
         this.image_url_index = this.image_url_index + 1
         await this.displayMap(null, this.image_data)*/
       },
