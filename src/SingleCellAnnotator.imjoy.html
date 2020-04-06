@@ -232,21 +232,26 @@
       freehand_mode: false,
       vector_source: null,
       loading: false,
+      // develop image parsing
+      current_panel: 'login',
       user:{
         username: "HaoXu",
         password: "hao"
       },
     // from here this is communication to backend, to develop/activate
-      backend_url: 'null',
+      annotation_types: {
+        weak: "Weak Annotation",
+        precise: "Precise Annotation" 
+      },
+      chosen_annotation_type: null,
+      initial_loading: null,
+      batch_image_list: null,
+      backend_url: null,
       title: 'Hello World',
-      current_panel: 'login',
-      current_image: null,
-      previous_image: null,
-      next_image: null,
-      website_info: "",
     // this is for imageviewer test
-      image_data: null,
-      testimageata: null,
+      current_image_data: null,
+      previous_image_data: null,
+      next_image_data: null,
       image_url_list:{
         1: "https://images.proteinatlas.org/115/672_E2_1_blue_red_green_medium.jpg",
         2: "https://images.proteinatlas.org/115/672_E2_1_red_green.jpg",
@@ -258,53 +263,77 @@
       image_url_index: 1,
       current_image_uri: "https://weak-bat-32.telebit.io/hao/personal_path"
     },
+    /*
+            if (this.initial_loading){
+          this.initial_loading = false;
+          await this.imageAnnotate();
+        }else{
+          // fetch images
+        },
+    */
     methods: {
-      async generateimagedata (){
-        //datatt = nj.random([350, 350])
-        //api.alert(datatt.__jailed_type__)
-        size = [500, 500] 
-        const imgArray = new Uint16Array(new ArrayBuffer(500*500*2));
-        for(let i=0;i<500*500;i++){
-          imgArray[i] = Math.floor(Math.random() * Math.floor(65535));
-        }
-        
-        const imageData = await itkVtkViewer.utils.vtkITKHelper.convertItkToVtkImage({
-          imageType: { dimension: 2, pixelType: 1, componentType: 'uint16_t', components: 1},
-          name: 'test image',
-          origin: [0,0],
-          spacing: [1,1],
-          direction:{data: [1,0,0,1]},
-          size: size,
-          data: imgArray
+      // login
+      async login(){
+        const formData = new FormData();
+        formData.append('username', this.user.username);
+        formData.append('password', this.user.password);
+        const response = await fetch(base_url + "/login", {
+          method: 'POST',
+          mode: 'cors',
+          cache: 'no-cache',
+          body: formData
         })
-        return imageData
+        if(response.status === 200){
+            const res = await response.json()
+            if(res.success){
+              this.current_panel = 'annotation choice';
+            }
+            else{
+              api.alert('Failed to logg in, error' + res.error);
+            }
+          }
+      },
+      // choose annotation type
+      async weakAnnotationChosen (){
+        this.chosen_annotation_type = 'weak';
+        this.initial_loading = true;
+        await this.imageAnnotate();
+      },
+      async preciseAnnotationChosen (){
+        this.chosen_annotation_type = 'precise';
+        this.initial_loading = true;
+        await this.imageAnnotate();
       },
       // this function is to load image list and assign image
+      //loading image list
+      // parse image list to this.batch_image_list with index
+      // fetch the first item to this.current_image_data
+      // then give the image index to next 
+      async imageBatchLoading (){
+        await this.imageAnnotate()
+      },
       async assignImage (){
         // index
         this.current_image_uri = this.current_image_uri;
         // new index for next image, to const
         await imageAnnotate()
       },
+      // this is to master the image list loading
 
 
       async imageAnnotate (){
+        //for base64
         let show_data = await axios.get(this.current_image_uri);
         const uri_data = 'data:image/png;base64,' + show_data.data;
-        this.image_data = await convertImageUrl2Itk(uri_data);
+        this.current_image_data = await convertImageUrl2Itk(uri_data);
         
         this.current_panel = 'imageviewer';
-        await this.displayMap(null, this.image_data)
-
-        //for base64
-
-
+        await this.displayMap(null, this.current_image_data) 
 
         // following works for image form url
-        //new_data = await this.generateimagedata();
-        /*this.image_data = await convertImageUrl2Itk(this.image_url_list[this.image_url_index])
+        /*this.current_image_data = await convertImageUrl2Itk(this.image_url_list[this.image_url_index])
         this.image_url_index = this.image_url_index + 1
-        await this.displayMap(null, this.image_data)*/
+        await this.displayMap(null, this.current_image_data)*/
       },
       async postData (url_post) {
         // Default options are marked with *
@@ -326,29 +355,6 @@
         else{
         alert('failed');
         };
-      },
-      async login(){
-        const formData = new FormData();
-        formData.append('username', this.user.username);
-        formData.append('password', this.user.password);
-        const response = await fetch(base_url + "/login", {
-          method: 'POST',
-          mode: 'cors',
-          cache: 'no-cache',
-          body: formData
-        })
-        if(response.status === 200){
-            const res = await response.json()
-            if(res.success){
-              this.ChooseAnnotation();
-            }
-            else{
-              api.alert('Failed to logg in, error' + res.error);
-            }
-          }
-        },
-      async ChooseAnnotation(){
-        this.current_panel = 'annotation choice';
       },
       /*
       async goToAnnotation(){
@@ -725,8 +731,8 @@
           <div class="panel-title">Please choose a task</div>
         </div>
         <div class="panel-body">
-          <button class="btn btn-primary" @click="imageAnnotate()">Single Protein Annotation</button>
-          <button class="btn">Complete Protein Annotation</button>
+          <button class="btn btn-primary" @click="weakAnnotationChosen()">{{annotation_types.weak}}</button>
+          <button class="btn" @click="preciseAnnotationChosen()">{{annotation_types.precise}}</button>
         </div>
         <div class="panel-footer">
           <!-- buttons or inputs -->
