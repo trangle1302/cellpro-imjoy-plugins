@@ -232,11 +232,12 @@
       freehand_mode: false,
       vector_source: null,
       loading: false,
-  
       user:{
         username: "HaoXu",
         password: "hao"
       },
+    // from here this is communication to backend, to develop/activate
+      backend_url: 'null',
       title: 'Hello World',
       current_panel: 'login',
       current_image: null,
@@ -254,7 +255,8 @@
         5: "https://images.proteinatlas.org/115/672_E2_1_red.jpg",
         6: "https://weak-bat-32.telebit.io/hao/personal_path" // not surpport base64 yet
       },
-      image_url_index: 1
+      image_url_index: 1,
+      current_image_uri: "https://weak-bat-32.telebit.io/hao/personal_path"
     },
     methods: {
       async generateimagedata (){
@@ -277,14 +279,25 @@
         })
         return imageData
       },
-      async imageView (){
+      // this function is to load image list and assign image
+      async assignImage (){
+        // index
+        this.current_image_uri = this.current_image_uri;
+        // new index for next image, to const
+        await imageAnnotate()
+      },
+
+
+      async imageAnnotate (){
+        let show_data = await axios.get(this.current_image_uri);
+        const uri_data = 'data:image/png;base64,' + show_data.data;
+        this.image_data = await convertImageUrl2Itk(uri_data);
+        
         this.current_panel = 'imageviewer';
+        await this.displayMap(null, this.image_data)
 
         //for base64
-        let show_data = await axios.get(this.image_url_list[6]);
-        const uri_data = 'data:image/png;base64,' + show_data.data;
-        this.image_data = await convertImageUrl2Itk(uri_data)
-        await this.displayMap(null, this.image_data)
+
 
 
         // following works for image form url
@@ -293,11 +306,11 @@
         this.image_url_index = this.image_url_index + 1
         await this.displayMap(null, this.image_data)*/
       },
-      async postData () {
+      async postData (url_post) {
         // Default options are marked with *
-        const url = base_url + '/annotation/15';
+        //const url = base_url + '/annotation/15';
         const data = this.user;
-        const response = await fetch(url, {
+        const response = await fetch(url_post, {
             method: 'POST',
             mode: 'cors',
             cache: 'no-cache',
@@ -337,6 +350,7 @@
       async ChooseAnnotation(){
         this.current_panel = 'annotation choice';
       },
+      /*
       async goToAnnotation(){
         this.current_panel = 'annotation'
         this.current_image = "https://images.proteinatlas.org/115/672_E2_1_blue_red_green_medium.jpg";
@@ -356,7 +370,7 @@
       async PreviousImage(){
         this.current_panel = 'annotation'
         this.current_image = "https://images.proteinatlas.org/30741/800_A6_1_blue_red_green_medium.jpg";
-      },
+      },*/
       /* following is for imageviewer*/
       anntation_mode_changed(){
         if(this.anntation_mode){
@@ -700,9 +714,6 @@
             <input class="form-input" type="text" name="password" v-model ="user.password" placeholder="password">
           </div>
           <button class="btn" @click="login()">Login</button>
-          <button class="btn" @click="postData()">Post Data</button>
-          <button class="btn" @click="goToAnnotation()">Go To Annoation</button>
-          <button @click="goToMenu()">Go To Menu</button>
         </div>
         <div class="panel-footer">
           <!-- buttons or inputs -->
@@ -714,37 +725,9 @@
           <div class="panel-title">Please choose a task</div>
         </div>
         <div class="panel-body">
-          <button class="btn btn-primary" @click="goToAnnotation()">Single Protein Annotation</button>
+          <button class="btn btn-primary" @click="imageAnnotate()">Single Protein Annotation</button>
           <button class="btn">Complete Protein Annotation</button>
         </div>
-        <div class="panel-footer">
-          <!-- buttons or inputs -->
-        </div>
-      </div>
-  
-  
-      <div class="panel" v-if="current_panel=='annotation'">
-        <div class="panel-header">
-          <div class="panel-title"></div>
-        </div>
-        <section class="panel-body">
-          <button class="btn">Yes</button>
-          <button class="btn">No</button>
-          <button class="btn">Protein Tag</button>
-          <button class="btn btn-primary">Ajust Segmentation</button>
-          <button class="btn btn-primary" @click="postData()">Done</button>
-          <button class="btn btn-primary" @click="imageView()">ViewImage</button>
-          <button class="btn" @click="PreviousImage()">Previous Image</button>
-          <br>
-          <hr>
-          <br>
-          <div>
-          <button class="btn btn-primary">Bad Cell</button>
-  
-          <button class="btn">Comment</button>
-          <img :src="current_image"></img>
-          </div>
-        </section>
         <div class="panel-footer">
           <!-- buttons or inputs -->
         </div>
@@ -753,7 +736,7 @@
       <div class="panel" v-if="current_panel=='imageviewer'">
         <p class="navbar">
         <section class="navbar-section">
-          <a class="navbar-brand text-bold mr-2">ImageViewer</a>
+          <a class="navbar-brand text-bold mr-2">Image Annotation</a>
           <!-- <a href="..." class="btn btn-link">Docs</a>
           <a href="..." class="btn btn-link">GitHub</a> -->
           <label class="form-switch">
@@ -766,8 +749,13 @@
           </label>
 
           <div class="input-group input-inline">
-            <button class="btn hide-on-mobile" @click="openFileDialog()">Load Local File</button>
-            <button class="btn" @click="imageView()">NewImage</button>
+            <!--<button class="btn hide-on-mobile" @click="openFileDialog()">Load Local File</button>-->
+            <button class="btn" @click="assignImage()">NextImage</button>
+            <button class="btn">Yes</button>
+            <button class="btn">No</button>
+            <button class="btn">Protein Tag</button>
+            <button class="btn btn-primary">Ajust Segmentation</button>
+            <button class="btn btn-primary" @click="postData()">Done</button>
           <!-- <button class="btn input-group-btn" @click="readTestFile()">Load Example File</button> -->
           </div>
         </p>
@@ -807,6 +795,7 @@
             </div>
           </nav>
         </div>
+
       </div>
     </div>
   
