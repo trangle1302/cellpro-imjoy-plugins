@@ -1,4 +1,4 @@
-﻿<docs lang="markdown">
+<docs lang="markdown">
   [TODO: write documentation for this plugin.]
   </docs>
   
@@ -8,7 +8,7 @@
     "type": "window",
     "tags": [],
     "ui": "",
-    "version": "0.1.2",
+    "version": "0.1.3",
     "api_version": "0.1.7",
     "description": "Annotate images for HPA single-cell image classification",
     "icon": "extension",
@@ -286,6 +286,19 @@
         if(response.status === 200){
             const res = await response.json()
             if(res.success){
+              const response2 = await fetch(base_url + "/list-tasks", {
+                method: 'GET',
+                credentials: 'include'
+              })
+              const res2 = await response2.json()
+              if(res.success){
+                //TODO: display the tasks
+                this.tasks = res2.tasks
+                debugger
+              }
+              else{
+                 api.alert('Failed to get tasks' + res.error);
+              }
               this.current_panel = 'annotation choice';
             }
             else{
