@@ -250,6 +250,7 @@
       backend_url: null,
       title: 'Hello World',
     // this is for imageviewer test
+      record_annotation: null,
       current_image_data: null,
       previous_image_data: null,
       next_image_data: null,
@@ -527,6 +528,23 @@
         this.vector_source.addFeatures(features)
         this.updateFeatureStyle()
       },
+      async reshowAnnotation (){
+        features = (new GeoJSON()).readFeatures(this.record_annotation)
+        this.vector_source.addFeatures(features)
+        alert(await JSON.stringify(this.record_annotation))
+      },
+      // save annotations
+      async saveAnnotation(features){
+        const allFeatures = features || this.vector_source.getFeatures();
+        const format = new ol.format.GeoJSON();
+        const routeFeatures = format.writeFeaturesObject(allFeatures, {decimals: 1});
+        //await writeFile(annotationPath, JSON.stringify(routeFeatures))
+        //await this.saveConfig()
+        routeFeatures['bbox'] = [0, 0, 359, 359]
+        feature_string = JSON.stringify(routeFeatures)
+        alert(feature_string)
+        this.record_annotation = routeFeatures
+      },
       //let features = this.vector_source.getFeatures()
       async exportAnnotation() {
         const allFeatures = this.vector_source.getFeatures();
@@ -696,38 +714,33 @@
       },
       // add for interaction by hao
       async deleteAnnotation() {
-            if (this.vector_source) {
-                const features = this.select.getFeatures()
-                if(features.getLength()>0){
-                    features.forEach((feature)=>{
-                        console.log('removing ', feature)
-                        this.vector_source.removeFeature(feature);
-                        this.select.getFeatures().remove(feature);
+        if (this.vector_source) {
+          const features = this.select.getFeatures()
+          if(features.getLength()>0){
+              features.forEach((feature)=>{
+                  console.log('removing ', feature)
+                  this.vector_source.removeFeature(feature);
+                  this.select.getFeatures().remove(feature);
+              });
+          }
+          else{
+              try {
+                  const answer = await api.confirm({content: "Do you really want to delete all the visible annotations?", confirm_text: 'Yes, delete all.'})
+                  if (answer) {
+                    const features = this.vector_source.getFeatures();
+                    features.forEach((feature) => {
+                      const ann = this.annotation_types[feature.get('label')]
+                      this.vector_source.removeFeature(feature);
                     });
-                }
-                else{
-                    try {
-                        const answer = await api.confirm({content: "Do you really want to delete all the visible annotations?", confirm_text: 'Yes, delete all.'})
-                        if (answer) {
-                            const features = this.vector_source.getFeatures();
-                            features.forEach((feature) => {
-                                const ann = this.annotation_types[feature.get('label')]
-                      
-                                    this.vector_source.removeFeature(feature);
-  
-                            });
-                            this.undo_button_flag = false
-                        }
-                        else{
-                            return
-                        }
-                    } catch (err) {
-                        return;
-                    }
-                }
-                await this.saveAnnotation()
-            }
-        },
+                    this.undo_button_flag = false
+                  }else{return}
+              } catch (err) {
+                return;
+              }
+          }
+        //await this.saveAnnotation()
+        }
+      },
       // till here
       enableItkInteraction(){	
         this.itkInteraction = new ol.interaction.Pointer();	
@@ -896,8 +909,9 @@
             <button class="btn">Protein Tag</button>
             <button class="btn btn-primary">Ajust Segmentation</button>
             <button class="btn btn-primary" @click="postData()">Done</button>
-            <button class="btn btn-primary" @click="exportAnnotation()">showAnnotation</button>
-            <button class="btn btn-primary" @click="deleteAnnotation()">deleteAnnotation</button>
+            <button class="btn btn-primary" @click="saveAnnotation()">showAnnotation</button>
+            <button class="btn btn-sm" title="delete" @Click="deleteAnnotation()"><i class="icon icon-delete"></i></button>
+            <button class="btn btn-primary" @click="reshowAnnotation()">ReshowAnnotation</button>
 
           <!-- <button class="btn input-group-btn" @click="readTestFile()">Load Example File</button> -->
           </div>
