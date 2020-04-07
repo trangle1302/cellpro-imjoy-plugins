@@ -316,10 +316,17 @@
       // fetch the first item to this.current_image_data
       // then give the image index to next
       async getImageList (){
-        const response = await axios.get(
-          base_url + "/user",
-          {headers: {"Content-Type": "application/json"}
-          })
+        //const token = Buffer.from(`{this.user.username}:{this.user.password}`, 'utf8').toString('base64'),
+        //api.alert(token)
+        //axios.defaults.baseURL = this.base_url;
+        axios.defaults.headers.common['Authorization'] = {'username': this.user.username,
+        'password': this.user.password};
+        axios.defaults.headers.post['Access-Control-Allow-Origin'] = '*';
+        axios.defaults.headers.post['Content-Type'] = 'application/x-www-form-urlencoded';
+        const response = await axios.get(base_url + "/user", {
+          method: 'get',
+          url: base_url + "/user",}
+        )
         api.alert(response.data)
         /*var config = {
             headers: {'Access-Control-Allow-Origin': '*'}
