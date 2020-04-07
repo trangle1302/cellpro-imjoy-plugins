@@ -34,7 +34,7 @@
   </config>
   
   <script lang="javascript">
-    const base_url = 'http://localhost:5000';
+    const base_url = 'https://5a77da59.ngrok.io';
     const Map = ol.Map;
     const View = ol.View;
     const Draw = ol.interaction.Draw;
@@ -235,13 +235,13 @@
       // develop image parsing
       current_panel: 'login',
       user:{
-        username: "HaoXu",
-        password: "hao"
+        username: "AnnaMC",
+        password: "anna"
       },
     // from here this is communication to backend, to develop/activate
-      annotation_types: {
-        weak: "Weak Annotation",
-        precise: "Precise Annotation" 
+      task_names: {
+        weak: "Weak-Annotation",
+        precise: "Precise-Annotation" 
       },
       chosen_annotation_type: null,
       initial_loading: null,
@@ -260,8 +260,8 @@
         5: "https://images.proteinatlas.org/115/672_E2_1_red.jpg",
         6: "https://weak-bat-32.telebit.io/hao/personal_path" // not surpport base64 yet
       },
-      image_url_index: 1,
-      current_image_uri: "https://weak-bat-32.telebit.io/hao/personal_path"
+      current_image_index: 1,
+      image_sample_uri: "https://weak-bat-32.telebit.io/hao/personal_path"
     },
     /*
             if (this.initial_loading){
@@ -297,42 +297,75 @@
       async weakAnnotationChosen (){
         this.chosen_annotation_type = 'weak';
         this.initial_loading = true;
+        await this.imageBatchLoading();
+        await this.getImageList();
+        await this.assignImage();
         await this.imageAnnotate();
       },
+
       async preciseAnnotationChosen (){
         this.chosen_annotation_type = 'precise';
         this.initial_loading = true;
+        await this.imageBatchLoading();
+        await this.assignImage();
         await this.imageAnnotate();
       },
       // this function is to load image list and assign image
       //loading image list
       // parse image list to this.batch_image_list with index
       // fetch the first item to this.current_image_data
-      // then give the image index to next 
+      // then give the image index to next
+      async getImageList (){
+        const response = await axios.get(
+          base_url + "/user",
+          {headers: {"Content-Type": "application/json"}
+          })
+        api.alert(response.data)
+        /*var config = {
+            headers: {'Access-Control-Allow-Origin': '*'}
+        }
+        const response = await axios.get(
+          base_url + "/task/" + this.task_names[this.chosen_annotation_type], config)
+        //api.alert(base_url + "/task/" + this.task_names[this.chosen_annotation_type], config)*/
+        },
+
       async imageBatchLoading (){
-        await this.imageAnnotate()
+        if (this.initial_loading){
+          // get the image list
+          // set this.batch_image_list
+          this.current_image_index = 1;
+          this.current_image_data = this.image_sample_uri;
+          this.initial_loading = false; //set it to true, if the this.batch_image_list comes to the end
+          // set this.current_image_index
+        }else{
+          // load a few more image data
+        }
       },
       async assignImage (){
+        // managing loading images
         // index
-        this.current_image_uri = this.current_image_uri;
+        this.current_image_data = await convertImageUrl2Itk(this.image_url_list[this.current_image_index])
+        this.current_image_index = this.current_image_index + 1
+        await this.displayMap(null, this.current_image_data)
+
         // new index for next image, to const
-        await imageAnnotate()
+        //await imageAnnotate()
       },
       // this is to master the image list loading
 
 
       async imageAnnotate (){
         //for base64
-        let show_data = await axios.get(this.current_image_uri);
-        const uri_data = 'data:image/png;base64,' + show_data.data;
-        this.current_image_data = await convertImageUrl2Itk(uri_data);
+        //let show_data = await axios.get(this.current_image_data);
+        //const uri_data = 'data:image/png;base64,' + show_data.data;
+        //this.current_image_data = await convertImageUrl2Itk(uri_data);
         
         this.current_panel = 'imageviewer';
-        await this.displayMap(null, this.current_image_data) 
+        await this.displayMap(null, this.current_image_data)
 
         // following works for image form url
-        /*this.current_image_data = await convertImageUrl2Itk(this.image_url_list[this.image_url_index])
-        this.image_url_index = this.image_url_index + 1
+        /*this.current_image_data = await convertImageUrl2Itk(this.image_url_list[this.current_image_index])
+        this.current_image_index = this.current_image_index + 1
         await this.displayMap(null, this.current_image_data)*/
       },
       async postData (url_post) {
@@ -731,8 +764,8 @@
           <div class="panel-title">Please choose a task</div>
         </div>
         <div class="panel-body">
-          <button class="btn btn-primary" @click="weakAnnotationChosen()">{{annotation_types.weak}}</button>
-          <button class="btn" @click="preciseAnnotationChosen()">{{annotation_types.precise}}</button>
+          <button class="btn btn-primary" @click="weakAnnotationChosen()">{{task_names.weak}}</button>
+          <button class="btn" @click="preciseAnnotationChosen()">{{task_names.precise}}</button>
         </div>
         <div class="panel-footer">
           <!-- buttons or inputs -->
