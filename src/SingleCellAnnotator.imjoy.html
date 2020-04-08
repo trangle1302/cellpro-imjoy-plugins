@@ -198,10 +198,10 @@ const app = new Vue({
         if (res.success){
           return res
         }else{
-          api.alert('Failed to logg in, error' + res.error);
+          api.alert('Internal server error: ' + res.error);
         }
       }else{
-        api.alert('Response Status' + response.status)
+        api.alert('Response Status:' + response.status)
       }
     },
     // choose task type
@@ -214,7 +214,7 @@ const app = new Vue({
     // this function is to load image list and assign image
     //loading image list
     async getImageList (){
-      const response = await this.fetchURLData("/tasks/weak-annotation?cell_num=" + this.cell_num);
+      const response = await this.fetchURLData("/tasks/" + this.current_task_name + "?cell_num=" + this.cell_num);
       this.current_image_index = 0; // index starts from 0
       this.loaded_image_list  =response.cells;
     },
