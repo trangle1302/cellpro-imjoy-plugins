@@ -161,33 +161,6 @@
       })
     }
 
-    function convertDataURIToBinary(dataURI) {
-      //var BASE64_MARKER = ';base64,';
-      //var base64Index = dataURI.indexOf(BASE64_MARKER) + BASE64_MARKER.length;
-      //var base64 = dataURI.substring(base64Index);
-      var base64 = dataURI
-      var raw = window.atob(base64);
-      var rawLength = raw.length;
-      alert(rawLength)
-      var array = new Uint8Array(new ArrayBuffer(rawLength));
-
-      for(i = 0; i < rawLength; i++) {
-        array[i] = raw.charCodeAt(i);
-      }
-      return array;
-    }
-
-    function uri2array(uri, buffer) {
-      var marker = ';base64,',
-          raw = window.atob(uri.substring(uri.indexOf(marker) + marker.length)),
-          n = raw.length,
-          a = new Uint16Array(new ArrayBuffer(n));
-      for(var i = 0; i < n ; i++){
-          a[i] = raw.charCodeAt(i);
-      }
-      return buffer ? a.buffer : a;
-      }
-
     function convertVtkImage(data){
       if(data.__jailed_type__ === 'ndarray'){
         if(data.__shape__.length === 2 || (data.__shape__.length==3 && data.__shape__[2]<=3)){
@@ -261,29 +234,15 @@
       },
       current_task_name: null,
       cell_num: '20',
-      cell_image_list: null,
-      current_cell_image_index: null,
-      chosen_annotation_type: null,
-      initial_loading: null,
-      batch_image_list: null,
-      backend_url: null,
-      title: 'Hello World',
-    // this is for imageviewer test
-      record_annotation: null,
-      current_image_data: null,
-      previous_image_data: null,
-      next_image_data: null,
-      image_url_list:{
-        1: "https://images.proteinatlas.org/115/672_E2_1_blue_red_green_medium.jpg",
-        2: "https://images.proteinatlas.org/115/672_E2_1_red_green.jpg",
-        3: "https://images.proteinatlas.org/115/672_E2_1_blue_green.jpg",
-        4: "https://images.proteinatlas.org/115/672_E2_1_green.jpg",
-        5: "https://images.proteinatlas.org/115/672_E2_1_red.jpg",
-        6: "https://weak-bat-32.telebit.io/hao/personal_path" // not surpport base64 yet
-      },
+      loaded_image_list: null,
       current_image_index: 1,
       current_image_bbox: null,
       current_image_uri: null,
+      image_to_annotate: null,
+      backend_url: null,
+    // this is for imageviewer test
+      record_annotation: null,
+      vtk_image_data: null,
       current_image_geojson:{
         'type':'FeatureCollection',
         'features':[
@@ -297,7 +256,6 @@
         }],
         'bbox':null
       },
-      image_sample_uri: "https://weak-bat-32.telebit.io/hao/personal_path"
     },
     mounted(){
       this.selected_server_url = this.servers['production']
@@ -329,11 +287,6 @@
               this.tasks[key_index].finished = data[key].finished
               this.tasks[key_index].total = data[key].total
               key_index = key_index + 1
-              
-              //alert(key)
-              //if (data.hasOwnProperty(key)) { // this will check if key is owned by data object and not by any of it's ancestors
-              //alert(key+': '+data[key]); // this will show each key with it's value
-              //}
             }
             this.current_panel = 'annotation choice';
           }else{
@@ -360,79 +313,45 @@
           api.alert('Response Status' + response.status)
         }
       },
-
-      async showMe (){
-        const response = await this.fetchURLData("/images/weak-annotation/1767_1032_G9_1/12")
-        this.current_image_geojson.bbox = response.bbox;
-        this.current_image_geojson.features[0].geometry.coordinates = response.mask.geometry.coordinates;
-        this.current_image_uri = response.image;            
-        //alert(this.current_image_geojson.features[0].geometry.coordinates)
-
-
-
-      },
       // choose annotation type
       async chooseAnnotation (task_name){
         this.current_task_name = task_name;
         this.initial_loading = true;
-        //await this.imageBatchLoading();
         await this.getImageList();
         await this.assignImage();
-        await this.imageAnnotate();
       },
       // this function is to load image list and assign image
       //loading image list
-      // parse image list to this.batch_image_list with index
-      // fetch the first item to this.current_image_data
-      // then give the image index to next
       async getImageList (){
         const response = await this.fetchURLData("/tasks/weak-annotation?cell_num=" + this.cell_num);
-        this.current_cell_image_index = 0; // index starts from 0
-        this.cell_image_list  =response.cells;
+        this.current_image_index = 0; // index starts from 0
+        this.loaded_image_list  =response.cells;
         },
-
+      // should add out of range check for image list
+      // fetch the first item to this.current_image_data
+      // then give the image index to next
       async assignImage (){
+        this.image_to_annotate = this.loaded_image_list[this.current_image_index];
+        this.current_image_index = this.current_image_index + 1; // for the next image
+        // get the data from server
+        const response = await this.fetchURLData("/images/" + this.current_task_name + "/" + this.image_to_annotate)
+        this.current_image_geojson.bbox = response.bbox;
+        this.current_image_bbox = response.bbox;
+        this.current_image_geojson.features[0].geometry.coordinates = response.mask.geometry.coordinates;
+        this.current_image_uri = response.image; 
+
         // managing loading images
-        // index
-        this.current_image_data = await convertImageUrl2Itk(this.image_url_list[this.current_image_index])
-        this.current_image_index = this.current_image_index + 1
-        await this.displayMap(null, this.current_image_data)
+        this.vtk_image_data = await convertImageUrl2Itk(this.current_image_uri)
+        this.current_panel = 'imageviewer';
+        await this.displayMap(null, this.vtk_image_data);
+        this.showAnnotation()
 
         // new index for next image, to const
         //await imageAnnotate()
       },
-      async imageBatchLoading (){
-        if (this.initial_loading){
-          // get the image list
-          // set this.batch_image_list
-          this.current_image_index = 1;
-          this.current_image_data = this.image_sample_uri;
-          this.initial_loading = false; //set it to true, if the this.batch_image_list comes to the end
-          // set this.current_image_index
-        }else{
-          // load a few more image data
-        }
-      },
-      // this is to master the image list loading
 
-
-      async imageAnnotate (){
-        //for base64
-        //let show_data = await axios.get(this.current_image_data);
-        //const uri_data = 'data:image/png;base64,' + show_data.data;
-        //this.current_image_data = await convertImageUrl2Itk(uri_data);
-        
-        this.current_panel = 'imageviewer';
-        await this.displayMap(null, this.current_image_data)
-
-        // following works for image form url
-        /*this.current_image_data = await convertImageUrl2Itk(this.image_url_list[this.current_image_index])
-        this.current_image_index = this.current_image_index + 1
-        await this.displayMap(null, this.current_image_data)*/
-      },
       async postData (url_post) {
         // Default options are marked with *
-        //const url = this.selected_server_url + '/annotation/15';
         const data = this.user;
         const response = await fetch(url_post, {
             method: 'POST',
@@ -451,28 +370,7 @@
         alert('failed');
         };
       },
-      /*
-      async goToAnnotation(){
-        this.current_panel = 'annotation'
-        this.current_image = "https://images.proteinatlas.org/115/672_E2_1_blue_red_green_medium.jpg";
-      },
-      async goToMenu(){
-        this.current_panel = 'navigation'
-      },
-      async CurrentImage(){
-        this.current_panel = 'annotation'
-        this.current_image = "https://images.proteinatlas.org/115/672_E2_1_blue_red_green_medium.jpg";
-      },
-      
-      async NextImage(){
-        this.current_panel = 'annotation'
-        this.current_image = "https://images.proteinatlas.org/30741/845_A6_1_blue_red_green_medium.jpg";
-      },
-      async PreviousImage(){
-        this.current_panel = 'annotation'
-        this.current_image = "https://images.proteinatlas.org/30741/800_A6_1_blue_red_green_medium.jpg";
-      },*/
-      /* following is for imageviewer*/
+
       anntation_mode_changed(){
         if(this.anntation_mode){
           this.startAnnotation(this.vector_source, this.freehand_mode)
@@ -565,10 +463,10 @@
         this.vector_source.addFeatures(features)
         this.updateFeatureStyle()
       },
-      async reshowAnnotation (){
-        features = (new GeoJSON()).readFeatures(this.record_annotation)
+      async showAnnotation (){
+        features = (new GeoJSON()).readFeatures(this.current_image_geojson)
         this.vector_source.addFeatures(features)
-        alert(await JSON.stringify(this.record_annotation))
+        //alert(await JSON.stringify(this.current_image_geojson))
       },
       // save annotations
       async saveAnnotation(features){
@@ -577,10 +475,9 @@
         const routeFeatures = format.writeFeaturesObject(allFeatures, {decimals: 1});
         //await writeFile(annotationPath, JSON.stringify(routeFeatures))
         //await this.saveConfig()
-        routeFeatures['bbox'] = [0, 0, 359, 359]
-        feature_string = JSON.stringify(routeFeatures)
-        alert(feature_string)
-        this.record_annotation = routeFeatures
+        routeFeatures['bbox'] = this.current_image_bbox;
+        feature_string = JSON.stringify(routeFeatures);
+        this.current_image_geojson = routeFeatures;
       },
       //let features = this.vector_source.getFeatures()
       async exportAnnotation() {
@@ -588,7 +485,7 @@
 
         const format = new ol.format.GeoJSON();
         const routeFeatures = format.writeFeaturesObject(allFeatures, {decimals: 1});
-        //routeFeatures['bbox'] = this.bbox;
+        routeFeatures['bbox'] = this.current_image_bbox;
         const blob = new Blob([JSON.stringify(routeFeatures)], {
             type: "text/plain;charset=utf-8"
         });
@@ -927,7 +824,6 @@
             <br>
             <progress class="progress-bar" arial-valuenow= 'tasks[1].finished' aria-valuemin="0" arial-valuemax='tasks[1].total' style="width:10"></progress>&nbsp;&nbsp;
           </div>-->
-          <button class="btn btn-primary" @click="showMe()">showMe</button>
         </div>
         <div class="panel-footer">
           <!-- buttons or inputs -->
@@ -958,9 +854,9 @@
             <button class="btn">Protein Tag</button>
             <button class="btn btn-primary">Ajust Segmentation</button>
             <button class="btn btn-primary" @click="postData()">Done</button>
-            <button class="btn btn-primary" @click="saveAnnotation()">showAnnotation</button>&nbsp;&nbsp;
+            <button class="btn btn-primary" @click="saveAnnotation()">saveAnnotation</button>&nbsp;&nbsp;
             <button class="btn btn-sm" title="delete" @Click="deleteAnnotation()"><i class="icon icon-delete"></i></button>&nbsp;&nbsp;
-            <button class="btn btn-primary" @click="reshowAnnotation()">ReshowAnnotation</button>
+            <button class="btn btn-primary" @click="showAnnotation()">showAnnotation</button>
 
           <!-- <button class="btn input-group-btn" @click="readTestFile()">Load Example File</button> -->
           </div>
