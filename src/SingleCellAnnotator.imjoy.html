@@ -208,7 +208,7 @@ const app = new Vue({
     async chooseTask (task_name){
       this.current_task_name = task_name;
       this.initial_loading = true;
-      // await this.getImageList();
+      await this.getImageList();
       await this.assignImage();
     },
     // this function is to load image list and assign image
@@ -217,7 +217,7 @@ const app = new Vue({
       const response = await this.fetchURLData("/tasks/weak-annotation?cell_num=" + this.cell_num);
       this.current_image_index = 0; // index starts from 0
       this.loaded_image_list  =response.cells;
-      },
+    },
     // should add out of range check for image list
     // fetch the first item to this.current_image_data
     // then give the image index to next
@@ -340,7 +340,8 @@ const app = new Vue({
         projection: projection,
         imageExtent: extent
       })
-
+      // clear map
+      document.getElementById('map').innerHTML = ""
       this.map = new Map({
         interactions: ol.interaction.defaults({altShiftDragRotate:false, pinchRotate:false}),
         controls: defaultControls(),
