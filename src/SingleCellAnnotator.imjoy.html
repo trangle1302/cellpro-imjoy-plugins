@@ -240,10 +240,19 @@
         password: "anna"
       },
     // from here this is communication to backend, to develop/activate
-      task_names: {
-        weak: "Weak-Annotation",
-        precise: "Precise-Annotation" 
+      tasks: {
+        1:{
+          name: null,
+          finished: null,
+          total: null
+        },
+        2:{
+          name: null,
+          finished: null,
+          total: null
+        },
       },
+      current_task_name: null,
       chosen_annotation_type: null,
       initial_loading: null,
       batch_image_list: null,
@@ -288,49 +297,45 @@
         if(response.status === 200){
             const res = await response.json()
             if(res.success){
-                /*const response2 = await fetch(base_url + "/user", {
+                const response2 = await fetch(base_url + "/tasks", {
                 method: 'GET',
                 credentials: 'include'
               })
               const res2 = await response2.json()
-              if(res.success){
-                //TODO: display the tasks
-                api.alert(res2)
+              data = res2.tasks
+              key_index = 1
+              for (var key in data) {
+                this.tasks[key_index].name = key
+                this.tasks[key_index].finished = data[key].finished
+                this.tasks[key_index].total = data[key].total
+                key_index = key_index + 1
+                
+                //alert(key)
+                //if (data.hasOwnProperty(key)) { // this will check if key is owned by data object and not by any of it's ancestors
+                //alert(key+': '+data[key]); // this will show each key with it's value
+                //}
               }
-              else{
-                 api.alert('Failed to get tasks' + res.error);
-              }*/
-              this.current_panel = 'annotation choice';
-            }
-            else{
+            this.current_panel = 'annotation choice';
+            }}else{
               api.alert('Failed to logg in, error' + res.error);
             }
-          }
       },
 
       async showMe (){
-        const response2 = await fetch(base_url + "/user", {
+        const response = await fetch(base_url + "/tasks", {
                 method: 'GET',
                 credentials: 'include'
               })
           
-        res = await response2.json()
-        api.alert(res)
+        res = await response.json()
+        api.alert(res.role)
       },
       // choose annotation type
-      async weakAnnotationChosen (){
-        this.chosen_annotation_type = 'weak';
+      async chooseAnnotation (task_name){
+        this.current_task_name = task_name;
         this.initial_loading = true;
         await this.imageBatchLoading();
         //await this.getImageList();
-        await this.assignImage();
-        await this.imageAnnotate();
-      },
-
-      async preciseAnnotationChosen (){
-        this.chosen_annotation_type = 'precise';
-        this.initial_loading = true;
-        await this.imageBatchLoading();
         await this.assignImage();
         await this.imageAnnotate();
       },
@@ -560,9 +565,7 @@
 
 
       async displayMap(files, image_array){
-        this.vector_source = new VectorSource({
-                wrapX: false
-            });
+        this.vector_source = new VectorSource();
         var vector_layer = new VectorLayer({
           source: this.vector_source,
           style: new Style({
@@ -876,9 +879,16 @@
           <div class="panel-title">Please choose a task</div>
         </div>
         <div class="panel-body">
-          <button class="btn btn-primary" @click="weakAnnotationChosen()">{{task_names.weak}}</button>
-          <button class="btn" @click="preciseAnnotationChosen()">{{task_names.precise}}</button>
-          <button class="btn btn-primary" @click="showMe()">showAnnotator</button>
+          <button class="button_long" @click="chooseAnnotation(tasks[1].name)">{{tasks[1].name}}</button>&nbsp;&nbsp;
+          <button class="button_long" @click="chooseAnnotation(tasks[2].name)">{{tasks[2].name}}</button>&nbsp;&nbsp;
+          <br>
+          <br>
+          <!--<div class="progress">
+            <progress class="progress-bar" arial-valuenow= 'tasks[1].finished' aria-valuemin="0" arial-valuemax='tasks[1].total' style="width:10"></progress>&nbsp;&nbsp;
+            <br>
+            <progress class="progress-bar" arial-valuenow= 'tasks[1].finished' aria-valuemin="0" arial-valuemax='tasks[1].total' style="width:10"></progress>&nbsp;&nbsp;
+          </div>-->
+          <button class="btn btn-primary" @click="showMe()">showMe</button>
         </div>
         <div class="panel-footer">
           <!-- buttons or inputs -->
@@ -909,8 +919,8 @@
             <button class="btn">Protein Tag</button>
             <button class="btn btn-primary">Ajust Segmentation</button>
             <button class="btn btn-primary" @click="postData()">Done</button>
-            <button class="btn btn-primary" @click="saveAnnotation()">showAnnotation</button>
-            <button class="btn btn-sm" title="delete" @Click="deleteAnnotation()"><i class="icon icon-delete"></i></button>
+            <button class="btn btn-primary" @click="saveAnnotation()">showAnnotation</button>&nbsp;&nbsp;
+            <button class="btn btn-sm" title="delete" @Click="deleteAnnotation()"><i class="icon icon-delete"></i></button>&nbsp;&nbsp;
             <button class="btn btn-primary" @click="reshowAnnotation()">ReshowAnnotation</button>
 
           <!-- <button class="btn input-group-btn" @click="readTestFile()">Load Example File</button> -->
@@ -1008,5 +1018,36 @@
       .hide-on-mobile {
           display: none;
       }
+    }
+
+    .button_long {
+      background-color: #4CAF50; /* Green */
+      border: none;
+      color: white;
+      padding: 15px 70px;
+      text-align: center;
+      text-decoration: none;
+      display: inline-block;
+      font-size: 16px;
+    }
+    .button_long {
+      background-color: #0000FF; /* Green */
+      border: none;
+      color: white;
+      padding: 10px 70px;
+      text-align: center;
+      text-decoration: none;
+      display: inline-block;
+      font-size: 20px;
+    }
+    .progress-bar {
+      background-color: #00FF00; /* Green */
+      border: none;
+      color: white;
+      padding: 10px 100px;
+      text-align: center;
+      text-decoration: none;
+      display: inline-block;
+      font-size: 17px;
     }
   </style>
