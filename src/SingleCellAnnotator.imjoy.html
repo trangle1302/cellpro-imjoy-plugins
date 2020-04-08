@@ -198,10 +198,10 @@ const app = new Vue({
         if (res.success){
           return res
         }else{
-          api.alert('Failed to logg in, error' + res.error);
+          api.alert('Internal server error: ' + res.error);
         }
       }else{
-        api.alert('Response Status' + response.status)
+        api.alert('Response Status:' + response.status)
       }
     },
     // choose task type
