@@ -100,7 +100,7 @@ const app = new Vue({
     snapInteraction: null,
     itkInteraction: null,
     anntation_mode: false,
-    freehand_mode: false,
+    freehand_mode: true,
     vector_source: null,
     loading: false,
     // develop image parsing
@@ -510,7 +510,7 @@ api.export(new ImJoyPlugin())
         <a href="..." class="btn btn-link">GitHub</a> -->
         <label class="form-switch">
           <input type="checkbox" v-model="anntation_mode" @change="anntation_mode_changed">
-          <i class="form-icon"></i> Annotation
+          <i class="form-icon"></i> Adjust Segmentation
         </label>
         <label class="form-switch" v-if="anntation_mode">
           <input type="checkbox" v-model="freehand_mode" @change="anntation_mode_changed">
