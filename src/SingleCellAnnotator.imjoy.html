@@ -254,26 +254,7 @@
       },
       current_task_name: null,
       cell_num: '20',
-      cell_image_list: null,
-      current_cell_image_index: null,
-      chosen_annotation_type: null,
-      initial_loading: null,
-      batch_image_list: null,
-      backend_url: null,
-      title: 'Hello World',
-    // this is for imageviewer test
-      record_annotation: null,
-      current_image_data: null,
-      previous_image_data: null,
-      next_image_data: null,
-      image_url_list:{
-        1: "https://images.proteinatlas.org/115/672_E2_1_blue_red_green_medium.jpg",
-        2: "https://images.proteinatlas.org/115/672_E2_1_red_green.jpg",
-        3: "https://images.proteinatlas.org/115/672_E2_1_blue_green.jpg",
-        4: "https://images.proteinatlas.org/115/672_E2_1_green.jpg",
-        5: "https://images.proteinatlas.org/115/672_E2_1_red.jpg",
-        6: "https://weak-bat-32.telebit.io/hao/personal_path" // not surpport base64 yet
-      },
+      loaded_image_list: null,
       current_image_index: 1,
       current_image_bbox: null,
       current_image_uri: null,
@@ -290,6 +271,28 @@
         }],
         'bbox':null
       },
+      image_to_annotate: null,
+
+
+      chosen_annotation_type: null,
+      initial_loading: null,
+      batch_image_list: null,
+      backend_url: null,
+      title: 'Hello World',
+    // this is for imageviewer test
+      record_annotation: null,
+      vtk_image_data: null,
+      previous_image_data: null,
+      next_image_data: null,
+      image_url_list:{
+        1: "https://images.proteinatlas.org/115/672_E2_1_blue_red_green_medium.jpg",
+        2: "https://images.proteinatlas.org/115/672_E2_1_red_green.jpg",
+        3: "https://images.proteinatlas.org/115/672_E2_1_blue_green.jpg",
+        4: "https://images.proteinatlas.org/115/672_E2_1_green.jpg",
+        5: "https://images.proteinatlas.org/115/672_E2_1_red.jpg",
+        6: "https://weak-bat-32.telebit.io/hao/personal_path" // not surpport base64 yet
+      },
+      
     image_sample_uri: "https://weak-bat-32.telebit.io/hao/personal_path"
     },
     /*
@@ -376,7 +379,7 @@
         //await this.imageBatchLoading();
         await this.getImageList();
         await this.assignImage();
-        await this.imageAnnotate();
+        //await this.imageAnnotate();
       },
       // this function is to load image list and assign image
       //loading image list
@@ -385,16 +388,25 @@
       // then give the image index to next
       async getImageList (){
         const response = await this.fetchURLData("/tasks/weak-annotation?cell_num=" + this.cell_num);
-        this.current_cell_image_index = 0; // index starts from 0
-        this.cell_image_list  =response.cells;
+        this.current_image_index = 0; // index starts from 0
+        this.loaded_image_list  =response.cells;
         },
-
+      // should add out of range check for image list
       async assignImage (){
+        this.image_to_annotate = this.loaded_image_list[this.current_image_index];
+        this.current_image_index = this.current_image_index + 1; // for the next image
+        // get the data from server
+        const response = await this.fetchURLData("/images/" + this.current_task_name + "/" + this.image_to_annotate)
+        this.current_image_geojson.bbox = response.bbox;
+        this.current_image_geojson.features[0].geometry.coordinates = response.mask.geometry.coordinates;
+        this.current_image_uri = response.image; 
+
         // managing loading images
-        // index
-        this.current_image_data = await convertImageUrl2Itk(this.image_url_list[this.current_image_index])
-        this.current_image_index = this.current_image_index + 1
-        await this.displayMap(null, this.current_image_data)
+        this.vtk_image_data = await convertImageUrl2Itk(this.current_image_uri)
+        this.current_panel = 'imageviewer';
+        this.record_annotation = this.current_image_geojson;
+        await this.displayMap(null, this.vtk_image_data);
+        this.reshowAnnotation()
 
         // new index for next image, to const
         //await imageAnnotate()
