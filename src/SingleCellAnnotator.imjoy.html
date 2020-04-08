@@ -311,7 +311,7 @@
         const response = await fetch(this.selected_server_url + "/login", {
           method: 'POST',
           mode: 'cors',
-          cache: 'no-cache',
+          credentials: 'include',
           body: formData
         })
         if(response.status === 200){
