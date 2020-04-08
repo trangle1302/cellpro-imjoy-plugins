@@ -313,19 +313,6 @@
           api.alert('Response Status' + response.status)
         }
       },
-
-      async showMe (){
-        const response = await this.fetchURLData("/images/weak-annotation/1767_1032_G9_1/12")
-        this.current_image_geojson.bbox = response.bbox;
-        this.current_image_bbox = response.bbox;
-        this.current_image_geojson.features[0].geometry.coordinates = response.mask.geometry.coordinates;
-        this.current_image_uri = response.image;
-        alert(this_current_image_bbox)            
-        //alert(this.current_image_geojson.features[0].geometry.coordinates)
-
-
-
-      },
       // choose annotation type
       async chooseAnnotation (task_name){
         this.current_task_name = task_name;
