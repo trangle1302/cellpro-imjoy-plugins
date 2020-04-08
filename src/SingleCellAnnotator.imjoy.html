@@ -34,7 +34,7 @@
   </config>
   
   <script lang="javascript">
-    const base_url = 'http://localhost:5000';
+    const base_url = 'https://wet-grasshopper-41.telebit.io/';
     const Map = ol.Map;
     const View = ol.View;
     const Draw = ol.interaction.Draw;
@@ -253,8 +253,9 @@
         },
       },
       current_task_name: null,
-      cell_num: 20,
-
+      cell_num: '20',
+      cell_image_list: null,
+      current_cell_image_index: null,
       chosen_annotation_type: null,
       initial_loading: null,
       batch_image_list: null,
@@ -274,7 +275,22 @@
         6: "https://weak-bat-32.telebit.io/hao/personal_path" // not surpport base64 yet
       },
       current_image_index: 1,
-      image_sample_uri: "https://weak-bat-32.telebit.io/hao/personal_path"
+      current_image_bbox: null,
+      current_image_uri: null,
+      current_image_geojson:{
+        'type':'FeatureCollection',
+        'features':[
+          {
+            'type':'Feature',
+            'geometry':{
+            'type':'Polygon',
+            'coordinates':null
+          },
+          'properties':null
+        }],
+        'bbox':null
+      },
+    image_sample_uri: "https://weak-bat-32.telebit.io/hao/personal_path"
     },
     /*
             if (this.initial_loading){
@@ -327,7 +343,7 @@
       },
 
       async fetchURLData (sub_url){
-        const response = await fetch(base_url + "/tasks/weak-annotation", {
+        const response = await fetch(base_url + sub_url, {
           method: 'GET',
           credentials: 'include'
         })
@@ -344,15 +360,21 @@
       },
 
       async showMe (){
-        const response = await this.fetchURLData()
-        api.alert(response.success)
+        const response = await this.fetchURLData("/images/weak-annotation/1767_1032_G9_1/12")
+        this.current_image_geojson.bbox = response.bbox;
+        this.current_image_geojson.features[0].geometry.coordinates = response.mask.geometry.coordinates;
+        this.current_image_uri = response.image;            
+        //alert(this.current_image_geojson.features[0].geometry.coordinates)
+
+
+
       },
       // choose annotation type
       async chooseAnnotation (task_name){
         this.current_task_name = task_name;
         this.initial_loading = true;
-        await this.imageBatchLoading();
-        //await this.getImageList();
+        //await this.imageBatchLoading();
+        await this.getImageList();
         await this.assignImage();
         await this.imageAnnotate();
       },
@@ -362,20 +384,21 @@
       // fetch the first item to this.current_image_data
       // then give the image index to next
       async getImageList (){
-        const response = await fetch(base_url + "/user", {
-          method: 'GET',
-          credentials: 'include'
-            })
-        const res2 = await response.json()
-        api.alert(response.status)
-        /*var config = {
-            headers: {'Access-Control-Allow-Origin': '*'}
-        }
-        const response = await axios.get(
-          base_url + "/task/" + this.task_names[this.chosen_annotation_type], config)
-        //api.alert(base_url + "/task/" + this.task_names[this.chosen_annotation_type], config)*/
+        const response = await this.fetchURLData("/tasks/weak-annotation?cell_num=" + this.cell_num);
+        this.current_cell_image_index = 0; // index starts from 0
+        this.cell_image_list  =response.cells;
         },
 
+      async assignImage (){
+        // managing loading images
+        // index
+        this.current_image_data = await convertImageUrl2Itk(this.image_url_list[this.current_image_index])
+        this.current_image_index = this.current_image_index + 1
+        await this.displayMap(null, this.current_image_data)
+
+        // new index for next image, to const
+        //await imageAnnotate()
+      },
       async imageBatchLoading (){
         if (this.initial_loading){
           // get the image list
@@ -387,16 +410,6 @@
         }else{
           // load a few more image data
         }
-      },
-      async assignImage (){
-        // managing loading images
-        // index
-        this.current_image_data = await convertImageUrl2Itk(this.image_url_list[this.current_image_index])
-        this.current_image_index = this.current_image_index + 1
-        await this.displayMap(null, this.current_image_data)
-
-        // new index for next image, to const
-        //await imageAnnotate()
       },
       // this is to master the image list loading
 
