@@ -109,8 +109,8 @@ const app = new Vue({
     select: null,
     current_panel: 'login',
     user:{
-      username: "AnnaMC",
-      password: "anna"
+      username: "anna",
+      password: "xPBXc2o2FnkUYllDpCD5"
     },
   // from here this is communication to backend, to develop/activate
     tasks: {
@@ -134,7 +134,6 @@ const app = new Vue({
     image_to_annotate: null,
     backend_url: null,
   // this is for imageviewer test
-    record_annotation: null,
     current_image_geojson:{
       'type':'FeatureCollection',
       'features':[
@@ -218,6 +217,25 @@ const app = new Vue({
       this.current_image_index = 0; // index starts from 0
       this.loaded_image_list  =response.cells;
     },
+    async processCoordinates (coordinates){
+      // in priniciple, bbox should pass the crop starting points, and do this processing
+      //alert(JSON.stringify(coordinates))
+      var new_coordinates = coordinates[0]
+      const length = new_coordinates.length - 1;
+      var minx = new_coordinates[length][0];
+      var miny = new_coordinates[length][1];
+      for (index = 0; index < new_coordinates.length; index++){
+        if (minx > new_coordinates[index][0]){minx = new_coordinates[index][0]}
+        if (miny > new_coordinates[index][1]){miny = new_coordinates[index][1]}
+      };
+
+      for (index = 0; index < new_coordinates.length; index++){
+        new_coordinates[index][0] = new_coordinates[index][0] - minx;
+        new_coordinates[index][1] = new_coordinates[index][1] - miny;
+      };
+      //alert(JSON.stringify(new_coordinates))
+      return [new_coordinates]
+    },
     // should add out of range check for image list
     // fetch the first item to this.current_image_data
     // then give the image index to next
@@ -228,7 +246,11 @@ const app = new Vue({
       const response = await this.fetchURLData("/images/" + this.current_task_name + "/" + this.image_to_annotate)
       this.current_image_geojson.bbox = response.bbox;
       this.current_image_bbox = response.bbox;
-      this.current_image_geojson.features[0].geometry.coordinates = response.mask.geometry.coordinates;
+      //alert(this.current_image_bbox)
+      //const image_coordinates = response.mask.geometry.coordinates;
+      // use above for processing
+      const image_coordinates = await this.processCoordinates(response.mask.geometry.coordinates);
+      this.current_image_geojson.features[0].geometry.coordinates = image_coordinates;
       this.current_image_uri = response.image; 
 
       // managing loading images
@@ -277,6 +299,7 @@ const app = new Vue({
       features = (new GeoJSON()).readFeatures(this.current_image_geojson)
       this.vector_source.addFeatures(features)
       //alert(await JSON.stringify(this.current_image_geojson))
+      //alert(await JSON.stringify(this.current_image_bbox))
     },
     // save annotations
     async saveAnnotation(features){
