@@ -892,6 +892,7 @@
         </div>
         <div class="panel-body">
           <div class="form-group">
+            <label class="form-label" for="server">Server</label>
             <select class="form-select" v-model="selected_server_url">
               <option>Choose an option</option>
               <option v-for="(url, k) in servers" :value="url">{{k}}</option>
