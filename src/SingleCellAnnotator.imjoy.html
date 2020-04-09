@@ -372,6 +372,7 @@ const app = new Vue({
         }
         // pass the data to this.current_image_data
         this.current_image_data = image_sample_data
+
         }else{
           this.current_image_data = this.cached_image_data[0];
           this.cached_image_data.splice(0,1); //pop the image data from the list
