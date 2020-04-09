@@ -127,9 +127,37 @@ const app = new Vue({
     },
     current_task_name: null,
     cell_num: '20',
+    // image format
+    image_data_sample:{
+      image_id: null,
+      bbox: null,
+      mask_geojson:{
+      'type':'FeatureCollection',
+      'features':[
+        {
+          'type':'Feature',
+          'geometry':{
+          'type':'Polygon',
+          'coordinates':null
+          },
+          'properties':null
+        }],
+        'bbox':null
+      },
+      uri: null,
+      location: null
+    },
     loaded_image_list: null,
+    // this is to store annotated images.
+    cached_annotation_data_num: 10,
+    cached_annotation_data: null,
+    // this is a list of image data chached to annotate
+    cached_image_data_num: 10,
+    cached_image_data: null,
+    // this is about current image
+    // this is the index of image in loaded_image_list to load to annotate
+    load_index: 0, 
     current_image_data:{
-      index: 1,
       image_id: null,
       bbox: null,
       mask_geojson:{
@@ -237,7 +265,7 @@ const app = new Vue({
     //loading image list
     async getImageList (){
       const response = await this.fetchURLData("/tasks/" + this.current_task_name + "?cell_num=" + this.cell_num);
-      this.current_image_data.index = 0; // index starts from 0
+      this.load_index = 0; // index starts from 0
       this.loaded_image_list  =response.cells;
     },
     async previousImage(){
@@ -251,8 +279,8 @@ const app = new Vue({
     // fetch the first item to this.current_image_data
     // then give the image index to next
     async assignImage (){
-      this.current_image_data.image_id = this.loaded_image_list[this.current_image_data.index];
-      this.current_image_data.index = this.current_image_data.index + 1; // for the next image
+      this.current_image_data.image_id = this.loaded_image_list[this.load_index];
+      this.load_index = this.load_index + 1; // for the next image
       // get the data from server
       const response = await this.fetchURLData("/images/" + this.current_task_name + "/" + this.current_image_data.image_id)
       this.current_image_data.mask_geojson.bbox = response.bbox;
