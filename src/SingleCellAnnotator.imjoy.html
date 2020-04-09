@@ -129,26 +129,6 @@ const app = new Vue({
     current_task_name: null,
     cell_num: '20',
     // image format
-    image_sample_data:{
-      image_id: null,
-      bbox: null,
-      mask_geojson:{
-      'type':'FeatureCollection',
-      'features':[
-        {
-          'type':'Feature',
-          'geometry':{
-          'type':'Polygon',
-          'coordinates':null
-          },
-          'properties':null
-        }],
-        'bbox':null
-      },
-      uri: null,
-      location: null,
-      location_selected: null
-    },
     loaded_image_list: null,
     // this is to store annotated images.
     cached_annotated_data_num: 10,
@@ -248,7 +228,7 @@ const app = new Vue({
     },
     // this function is to cache image data to annotate
     async cacheImageData(){
-      image_sample_data = {
+      const image_sample_data = {
         image_id: null,
         bbox: null,
         mask_geojson:{
@@ -328,7 +308,7 @@ const app = new Vue({
     // fetch the first item to this.current_image_data
     // then give the image index to next
     async assignImage(){
-      image_sample_data = {
+      const image_sample_data = {
         image_id: null,
         bbox: null,
         mask_geojson:{
