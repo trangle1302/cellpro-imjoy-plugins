@@ -620,7 +620,8 @@ api.export(new ImJoyPlugin())
           <i class="form-icon"></i> Adjust Mask
         </label>
         <button class="btn transparent-btn" v-if="anntation_mode" @click="saveAnnotation()">Save</button>&nbsp;&nbsp;
-        <button class="btn transparent-btn" title="delete" v-if="anntation_mode" @Click="removeMaskAnnotation()"><i class="icon icon-delete"></i></button>&nbsp;&nbsp;
+        <button class="btn transparent-btn" title="annotation mode" v-if="anntation_mode" @click="removeMaskAnnotation()"><i class="icon icon-delete"></i></button>&nbsp;&nbsp;
+        <button class="btn transparent-btn btn-action s-circle" title="home" @click="current_panel='task_selection'"><i class="icon icon-cross"></i></button>&nbsp;&nbsp;
       </div>
       <div v-if="loading" class="loading loading-lg floating"></div>
       <div id="map"></div>
