@@ -298,6 +298,24 @@ const app = new Vue({
       await this.assignImage();
       //api.alert('Not implemented.')
     },
+    async processCoordinates (coordinates){
+      // in priniciple, bbox should pass the crop starting points, and do this processing
+      //alert(JSON.stringify(coordinates))
+      var new_coordinates = coordinates[0]
+      const length = new_coordinates.length - 1;
+      var minx = new_coordinates[length][0];
+      var miny = new_coordinates[length][1];
+      for (index = 0; index < new_coordinates.length; index++){
+        if (minx > new_coordinates[index][0]){minx = new_coordinates[index][0]}
+        if (miny > new_coordinates[index][1]){miny = new_coordinates[index][1]}
+      };
+      for (index = 0; index < new_coordinates.length; index++){
+        new_coordinates[index][0] = new_coordinates[index][0] - minx;
+        new_coordinates[index][1] = new_coordinates[index][1] - miny;
+      };
+      //alert(JSON.stringify(new_coordinates))
+      return [new_coordinates]
+    },
     async nextImage(){
       this.next_or_previous = 'next';
       // await this.uploadAnnotation();
@@ -322,7 +340,7 @@ const app = new Vue({
         if(locations.length==1){
           this.label_display_mode = 'single'
           this.image_sample_data.location = locations[0];
-          this.current_location_selected = null;
+          this.current_image_data.location_selected = null;
         }
         else
         { 
@@ -335,7 +353,7 @@ const app = new Vue({
           this.current_image_data = this.cached_image_data[0];
           this.cached_image_data.splice(0,1); //pop the image data from the list
         }
-      }else if(this.next_or_previous == 'previous'){
+      }else if(this.next_or_previous === 'previous'){
         if (this.cached_annotated_data.length > 0){
           this.current_image_data = this.cached_annotated_data[0]
         }else{
@@ -530,11 +548,11 @@ const app = new Vue({
       this.map.removeInteraction(this.modifyInteraction);
     },
     toggleLocation(k){
-      if(this.current_location[k]){
-        this.current_location[k]=false
+      if(this.current_image_data.location[k]){
+        this.current_image_data.location[k]=false
       }
       else{
-        this.current_location[k]=true
+        this.current_image_data.location[k]=true
       }
       
     }
@@ -621,7 +639,7 @@ api.export(new ImJoyPlugin())
           </div>
           <br>
           <div class="columns">
-            <button v-for="(loc, k) in current_location" @click="toggleLocation(k)" class="column btn location-btn" :class="{'selected-location-btn': loc}">{{k.slice(0,12)+(k.length>12?'.': '')}}</button>
+            <button v-for="(loc, k) in current_image_data.location" @click="toggleLocation(k)" class="column btn location-btn" :class="{'selected-location-btn': loc}">{{k.slice(0,12)+(k.length>12?'.': '')}}</button>
           </div>
         </div>
       </template>
