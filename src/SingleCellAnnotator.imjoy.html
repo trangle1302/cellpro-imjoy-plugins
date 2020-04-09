@@ -8,7 +8,7 @@
   "type": "window",
   "tags": [],
   "ui": "",
-  "version": "0.1.7",
+  "version": "0.1.8",
   "api_version": "0.1.7",
   "description": "Annotate images for HPA single-cell image classification",
   "icon": "extension",
@@ -109,8 +109,8 @@ const app = new Vue({
     select: null,
     current_panel: 'login',
     user:{
-      username: "hao",
-      password: "GshQvF3GPzeoPAWBpalq"
+      username: "wei",
+      password: "GPq2VZgRg2lq5lYPNh9v"
     },
   // from here this is communication to backend, to develop/activate
     tasks: {
@@ -125,6 +125,7 @@ const app = new Vue({
         total: null
       },
     },
+    label_display_mode: null,
     current_task_name: null,
     cell_num: '20',
     loaded_image_list: null,
@@ -238,8 +239,16 @@ const app = new Vue({
       this.current_image_bbox = response.bbox;
       this.current_image_geojson.features[0].geometry.coordinates = response.mask.geometry.coordinates;
       this.current_image_uri = response.image;
-      this.current_location = Object.keys(response.location)[0];
-
+      const locations =  Object.keys(response.location);
+      if(locations.length==1){
+        this.label_display_mode = 'single'
+        this.current_location = locations[0];
+      }
+      else
+      { 
+        this.label_display_mode = 'multiple'
+        this.current_location = locations;//response.location;
+      }
       // managing loading images
       this.current_panel = 'imageviewer';
       await this.displayMap(this.current_image_uri);
@@ -519,56 +528,38 @@ api.export(new ImJoyPlugin())
     </div>
 
     <div class="panel" v-if="current_panel=='imageviewer'">
-      <div class="btn-group floating-btn">
-        <button class="btn transparent-btn" @click="previousImage()"><i class="icon icon-back"></i>&nbsp;Back</button>
-        <button class="btn transparent-btn"><i class="icon icon-check"></i>&nbsp;Yes</button>
-        <button class="btn transparent-btn"><i class="icon icon-cross"></i>&nbsp;No</button>
-        <button class="btn transparent-btn" @click="nextImage()">Next&nbsp;<i class="icon icon-forward"></i></button>
-      </div>
-      <span class="h1 floating-label">{{current_location}}</span>
+      <template v-if="label_display_mode==='multiple'">
+        <div class="floating-right-btn">
+          <div class="btn-group">
+            <button class="btn transparent-btn" @click="previousImage()"><i class="icon icon-back"></i>&nbsp;Back</button>
+            <button class="btn transparent-btn" @click="nextImage()">Next&nbsp;<i class="icon icon-forward"></i></button>
+          </div>
+          <br>
+          <div class="columns">
+            <button v-for="(loc, k) in current_location" class="column btn location-btn" :class="{'btn-primary': loc}">{{k}}</button>
+          </div>
+        </div>
+      </template>
+      <template v-if="label_display_mode==='single'">
+        <div class="btn-group floating-bottom-btn">
+          <button class="btn transparent-btn" @click="previousImage()"><i class="icon icon-back"></i>&nbsp;Back</button>
+          <button class="btn transparent-btn"><i class="icon icon-check"></i>&nbsp;Yes</button>
+          <button class="btn transparent-btn"><i class="icon icon-cross"></i>&nbsp;No</button>
+          <button class="btn transparent-btn" @click="nextImage()">Next&nbsp;<i class="icon icon-forward"></i></button>
+        </div>
+        <span class="h1 floating-label">{{current_location}}</span>
+      </template>
       <div class="input-group floating-switch">
         <label class="form-switch">
           <input type="checkbox" v-model="anntation_mode" @change="anntation_mode_changed">
           <i class="form-icon"></i> Adjust Mask
         </label>
-        <!-- <label class="form-switch" v-if="anntation_mode">
-          <input type="checkbox" v-model="freehand_mode" @change="anntation_mode_changed">
-          <i class="form-icon"></i> Freehand
-        </label> -->
         <button class="btn transparent-btn" v-if="anntation_mode" @click="saveAnnotation()">Save</button>&nbsp;&nbsp;
         <button class="btn transparent-btn" title="delete" v-if="anntation_mode" @Click="deleteAnnotation()"><i class="icon icon-delete"></i></button>&nbsp;&nbsp;
       </div>
       <div v-if="loading" class="loading loading-lg floating"></div>
       <div id="map"></div>
     </div>
-
-    <div class="panel" v-if="current_panel=='navigation'">
-      <div class="navigation" style="width:200px">
-        <nav class="slds-nav-vertical" aria-label="Sub page">
-          <div class="slds-nav-vertical__section">
-            <h2 id="entity-header" class="slds-nav-vertical__title">Home</h2>
-            <ul aria-describedby="entity-header">
-              <li class="slds-nav-vertical__item slds-is-active">
-                <!--<a href="javascript:void(0);" class="slds-nav-vertical__action">Login</a>-->
-                <a @click="Login()">Login</a>
-              </li>
-              <li class="slds-nav-vertical__item">
-                <a href="javascript:void(0);" class="slds-nav-vertical__action">Progress</a>
-              </li>
-              <li class="slds-nav-vertical__item">
-                <a href="javascript:void(0);" class="slds-nav-vertical__action">Message</a>
-              </li>
-              <li class="slds-nav-vertical__item">
-                <a href="javascript:void(0);" class="slds-nav-vertical__action">Close</a>
-              </li>
-              <li class="slds-nav-vertical__item">
-                <a href="javascript:void(0);" class="slds-nav-vertical__action">All Reports</a>
-              </li>
-            </ul>
-          </div>
-        </nav>
-      </div>
-
     </div>
   </div>
 
@@ -590,11 +581,7 @@ api.export(new ImJoyPlugin())
   .ol-layers:first-child{
     background-color: black;
   }
-  .navigation { 
-      background-color: FAFAFB; 
-      color: white; 
-      padding: 8px; 
-  }
+
   .floating-label{
     color:#ffefdb96;
     position: absolute;
@@ -611,15 +598,29 @@ api.export(new ImJoyPlugin())
     z-index: 999;
     top: 30px;
   }
-  .floating-btn {
+  .floating-right-btn{
+    position: absolute;
+    right: 3px;
+    top: 80px;
+    width: 280px;
+    z-index: 999;
+  }
+  .floating-bottom-btn {
     position: absolute;
     left: calc(50% - 180px);
     top: 90%;
     z-index: 999;
   }
+  .location-btn {
+    margin-left: 0px;
+    height: 30px;
+    flex: none;
+    width: 90px;
+    background-color:#fff3!important;
+  }
   .transparent-btn {
     width: 90px;
-    background-color:#fff3;
+    background-color:#fff3!important;
   }
   .floating {
     position: absolute;
