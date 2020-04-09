@@ -146,7 +146,8 @@ const app = new Vue({
         'bbox':null
       },
       uri: null,
-      location: null
+      location: null,
+      location_selected: null
     },
     loaded_image_list: null,
     // this is to store annotated images.
@@ -176,30 +177,11 @@ const app = new Vue({
         'bbox':null
       },
       uri: null,
-      location: null
+      location: null,
+      location_selected: null
     },
     next_or_previous: null,
-    //current_image_index: 1, // to be replaced
-    //current_image_bbox: null, // to be replaced
-    //current_image_uri: null, // to be replaced
-    //current_location: null, // to be replaced
-    //image_to_annotate: null,
     backend_url: null,
-    // this is for imageviewer test
-    //record_annotation: null,
-    //current_image_geojson_geojson:{
-    //'type':'FeatureCollection',
-    //'features':[
-    //  {
-    //    'type':'Feature',
-    //    'geometry':{
-    //    'type':'Polygon',
-    //    'coordinates':null
-    //  },
-    //  'properties':null
-    //}],
-    //'bbox':null
-  //},
   },
   mounted(){
     this.selected_server_url = this.servers['production']
@@ -266,20 +248,40 @@ const app = new Vue({
     },
     // this function is to cache image data to annotate
     async cacheImageData(){
+      image_sample_data = {
+        image_id: null,
+        bbox: null,
+        mask_geojson:{
+        'type':'FeatureCollection',
+        'features':[
+          {
+            'type':'Feature',
+            'geometry':{
+            'type':'Polygon',
+            'coordinates':null
+            },
+            'properties':null
+          }],
+          'bbox':null
+        },
+        uri: null,
+        location: null,
+        location_selected: null
+      };
       if (this.cached_image_data.length < this.cached_image_data_num){
         if (this.load_index < this.cell_num - 1){
           // load all the data to image_sample_data
-          this.image_sample_data.image_id = this.loaded_image_list[this.load_index];
+          image_sample_data.image_id = this.loaded_image_list[this.load_index];
           this.load_index = this.load_index + 1; // for the next image
           // get the data from server
-          const response = await this.fetchURLData("/images/" + this.current_task_name + "/" + this.image_sample_data.image_id)
-          this.image_sample_data.mask_geojson.bbox = response.bbox;
-          this.image_sample_data.bbox = response.bbox;
-          this.image_sample_data.mask_geojson.features[0].geometry.coordinates = response.mask.geometry.coordinates;
-          this.image_sample_data.uri = response.image;
-          this.image_sample_data.location = Object.keys(response.location)[0];
+          const response = await this.fetchURLData("/images/" + this.current_task_name + "/" + image_sample_data.image_id)
+          image_sample_data.mask_geojson.bbox = response.bbox;
+          image_sample_data.bbox = response.bbox;
+          image_sample_data.mask_geojson.features[0].geometry.coordinates = response.mask.geometry.coordinates;
+          image_sample_data.uri = response.image;
+          image_sample_data.location = Object.keys(response.location)[0];
           // pass the data to cached_image_data
-          this.cached_image_data.push(this.image_sample_data)
+          this.cached_image_data.push(image_sample_data)
         }else{
           await getImageList()
         }
@@ -326,30 +328,50 @@ const app = new Vue({
     // fetch the first item to this.current_image_data
     // then give the image index to next
     async assignImage(){
+      image_sample_data = {
+        image_id: null,
+        bbox: null,
+        mask_geojson:{
+        'type':'FeatureCollection',
+        'features':[
+          {
+            'type':'Feature',
+            'geometry':{
+            'type':'Polygon',
+            'coordinates':null
+            },
+            'properties':null
+          }],
+          'bbox':null
+        },
+        uri: null,
+        location: null,
+        location_selected: null
+      };
       if (this.next_or_previous === 'next'){
         if (this.cached_image_data.length===0){
-        this.image_sample_data.image_id = this.loaded_image_list[this.load_index];
+        image_sample_data.image_id = this.loaded_image_list[this.load_index];
         this.load_index = this.load_index + 1; // for the next image
         // get the data from server
-        const response = await this.fetchURLData("images/" + this.current_task_name + "/" + this.image_sample_data.image_id)
-        this.image_sample_data.mask_geojson.bbox = response.bbox;
-        this.image_sample_data.bbox = response.bbox;
+        const response = await this.fetchURLData("images/" + this.current_task_name + "/" + image_sample_data.image_id)
+        image_sample_data.mask_geojson.bbox = response.bbox;
+        image_sample_data.bbox = response.bbox;
         const image_coordinates = await this.processCoordinates(response.mask.geometry.coordinates);
-        this.image_sample_data.mask_geojson.features[0].geometry.coordinates = image_coordinates;
-        this.image_sample_data.uri = response.image;
+        image_sample_data.mask_geojson.features[0].geometry.coordinates = image_coordinates;
+        image_sample_data.uri = response.image;
         const locations =  Object.keys(response.location);
         if(locations.length==1){
           this.label_display_mode = 'single'
-          this.image_sample_data.location = locations[0];
-          this.current_image_data.location_selected = null;
+          image_sample_data.location = locations[0];
+          image_sample_data.location_selected = null;
         }
         else
         { 
           this.label_display_mode = 'multiple'
-          this.image_sample_data.location = response.location;
+          image_sample_data.location = response.location;
         }
         // pass the data to this.current_image_data
-        this.current_image_data = this.image_sample_data
+        this.current_image_data = image_sample_data
         }else{
           this.current_image_data = this.cached_image_data[0];
           this.cached_image_data.splice(0,1); //pop the image data from the list
