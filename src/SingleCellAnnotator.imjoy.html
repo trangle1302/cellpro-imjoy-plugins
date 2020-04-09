@@ -79,14 +79,35 @@ function mobileAndTabletcheck() {
 };
 
 async function getImageMeta(url) {
-    return new Promise((resolve, reject) => {
-        let img = new Image();
-        img.onload = () => resolve(img);
-        img.onerror = reject;
-        img.crossOrigin = "Anonymous";
-        img.src = url;
-    });
-}
+  return new Promise((resolve, reject) => {
+      let img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = reject;
+      img.crossOrigin = "Anonymous";
+      img.src = url;
+  });
+};
+const imageDataTemplate = {
+  image_id: null,
+  bbox: null,
+  mask_geojson:{
+  'type':'FeatureCollection',
+  'features':[
+    {
+      'type':'Feature',
+      'geometry':{
+      'type':'Polygon',
+      'coordinates':null
+      },
+      'properties':null
+    }],
+  'bbox':null,
+  },
+  label_display_mode: null,
+  uri: null,
+  location: null,
+  location_selected: null
+};
 
 const app = new Vue({
   el: '#app',
@@ -125,29 +146,9 @@ const app = new Vue({
         total: null
       },
     },
-    label_display_mode: null,
     current_task_name: null,
     cell_num: '20',
     // image format
-    image_sample_data:{
-      image_id: null,
-      bbox: null,
-      mask_geojson:{
-      'type':'FeatureCollection',
-      'features':[
-        {
-          'type':'Feature',
-          'geometry':{
-          'type':'Polygon',
-          'coordinates':null
-          },
-          'properties':null
-        }],
-        'bbox':null
-      },
-      uri: null,
-      location: null
-    },
     loaded_image_list: null,
     // this is to store annotated images.
     cached_annotated_data_num: 10,
@@ -159,47 +160,9 @@ const app = new Vue({
     // this is the index of image in loaded_image_list to load to annotate
     load_index: 0,
     current_location_selected: null, 
-    current_image_data:{
-      image_id: null,
-      bbox: null,
-      mask_geojson:{
-      'type':'FeatureCollection',
-      'features':[
-        {
-          'type':'Feature',
-          'geometry':{
-          'type':'Polygon',
-          'coordinates':null
-          },
-          'properties':null
-        }],
-        'bbox':null
-      },
-      uri: null,
-      location: null
-    },
+    current_image_data:null,
     next_or_previous: null,
-    //current_image_index: 1, // to be replaced
-    //current_image_bbox: null, // to be replaced
-    //current_image_uri: null, // to be replaced
-    //current_location: null, // to be replaced
-    //image_to_annotate: null,
     backend_url: null,
-    // this is for imageviewer test
-    //record_annotation: null,
-    //current_image_geojson_geojson:{
-    //'type':'FeatureCollection',
-    //'features':[
-    //  {
-    //    'type':'Feature',
-    //    'geometry':{
-    //    'type':'Polygon',
-    //    'coordinates':null
-    //  },
-    //  'properties':null
-    //}],
-    //'bbox':null
-  //},
   },
   mounted(){
     this.selected_server_url = this.servers['production']
@@ -264,24 +227,39 @@ const app = new Vue({
       this.next_or_previous = 'next';
       await this.assignImage();
     },
+    async fetchCellImage(load_index){
+      const image_sample_data = Object.assign({}, imageDataTemplate);
+      image_sample_data.image_id = this.loaded_image_list[load_index];
+      const response = await this.fetchURLData("/images/" + this.current_task_name + "/" + image_sample_data.image_id)
+      image_sample_data.mask_geojson.bbox = response.bbox;
+      const image_coordinates = await this.processCoordinates(response.mask.geometry.coordinates);
+      image_sample_data.mask_geojson.features[0].geometry.coordinates = image_coordinates;
+      image_sample_data.uri = response.image;
+      locations = Object.keys(response.location);
+      if(locations.length==1){
+        image_sample_data.label_display_mode = 'single'
+        image_sample_data.location = locations[0];
+        image_sample_data.location_selected = null;
+      }
+      else
+      { 
+        image_sample_data.label_display_mode = 'multiple'
+        image_sample_data.location = response.location;
+      }
+      return image_sample_data
+    },
     // this function is to cache image data to annotate
     async cacheImageData(){
       if (this.cached_image_data.length < this.cached_image_data_num){
         if (this.load_index < this.cell_num - 1){
           // load all the data to image_sample_data
-          this.image_sample_data.image_id = this.loaded_image_list[this.load_index];
+          const image_sample_data = await this.fetchCellImage(this.load_index)
           this.load_index = this.load_index + 1; // for the next image
           // get the data from server
-          const response = await this.fetchURLData("/images/" + this.current_task_name + "/" + this.image_sample_data.image_id)
-          this.image_sample_data.mask_geojson.bbox = response.bbox;
-          this.image_sample_data.bbox = response.bbox;
-          this.image_sample_data.mask_geojson.features[0].geometry.coordinates = response.mask.geometry.coordinates;
-          this.image_sample_data.uri = response.image;
-          this.image_sample_data.location = Object.keys(response.location)[0];
           // pass the data to cached_image_data
-          this.cached_image_data.push(this.image_sample_data)
+          this.cached_image_data.push(image_sample_data)
         }else{
-          await getImageList()
+          await this.getImageList()
         }
       };
     },
@@ -326,30 +304,13 @@ const app = new Vue({
     // fetch the first item to this.current_image_data
     // then give the image index to next
     async assignImage(){
+      const image_sample_data = Object.assign({}, imageDataTemplate);
       if (this.next_or_previous === 'next'){
         if (this.cached_image_data.length===0){
-        this.image_sample_data.image_id = this.loaded_image_list[this.load_index];
-        this.load_index = this.load_index + 1; // for the next image
-        // get the data from server
-        const response = await this.fetchURLData("images/" + this.current_task_name + "/" + this.image_sample_data.image_id)
-        this.image_sample_data.mask_geojson.bbox = response.bbox;
-        this.image_sample_data.bbox = response.bbox;
-        const image_coordinates = await this.processCoordinates(response.mask.geometry.coordinates);
-        this.image_sample_data.mask_geojson.features[0].geometry.coordinates = image_coordinates;
-        this.image_sample_data.uri = response.image;
-        const locations =  Object.keys(response.location);
-        if(locations.length==1){
-          this.label_display_mode = 'single'
-          this.image_sample_data.location = locations[0];
-          this.current_image_data.location_selected = null;
-        }
-        else
-        { 
-          this.label_display_mode = 'multiple'
-          this.image_sample_data.location = response.location;
-        }
         // pass the data to this.current_image_data
-        this.current_image_data = this.image_sample_data
+        this.current_image_data = await this.fetchCellImage(this.load_index);
+        this.load_index = this.load_index + 1; // for the next image
+          // get the data from server
         }else{
           this.current_image_data = this.cached_image_data[0];
           this.cached_image_data.splice(0,1); //pop the image data from the list
@@ -631,8 +592,8 @@ api.export(new ImJoyPlugin())
 
     </div>
 
-    <div class="panel" v-if="current_panel=='imageviewer'">
-      <template v-if="label_display_mode==='multiple'">
+    <div class="panel" v-if="current_panel=='imageviewer'&&current_image_data">
+      <template v-if="current_image_data.label_display_mode==='multiple'">
         <div class="floating-right-btn">
           <div class="btn-group">
             <button class="btn transparent-btn" @click="previousImage()"><i class="icon icon-back"></i>&nbsp;Back</button>
@@ -644,7 +605,7 @@ api.export(new ImJoyPlugin())
           </div>
         </div>
       </template>
-      <template v-if="label_display_mode==='single'">
+      <template v-if="current_image_data.label_display_mode==='single'">
         <div class="btn-group floating-bottom-btn">
           <button class="btn transparent-btn" @click="previousImage()"><i class="icon icon-back"></i>&nbsp;Back</button>
           <button class="btn transparent-btn" @click="current_location_selected=true" :class="{'selected-location-btn': current_location_selected===true}"><i class="icon icon-check"></i>&nbsp;Yes</button>
