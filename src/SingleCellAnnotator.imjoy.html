@@ -149,8 +149,8 @@ const app = new Vue({
     },
     loaded_image_list: null,
     // this is to store annotated images.
-    cached_annotation_data_num: 10,
-    cached_annotation_data: [],
+    cached_annotated_data_num: 10,
+    cached_annotated_data: [],
     // this is a list of image data chached to annotate
     cached_image_data_num: 10,
     cached_image_data: [],
@@ -176,7 +176,7 @@ const app = new Vue({
       uri: null,
       location: null
     },
-
+    next_or_previous: null,
     //current_image_index: 1, // to be replaced
     //current_image_bbox: null, // to be replaced
     //current_image_uri: null, // to be replaced
@@ -259,6 +259,7 @@ const app = new Vue({
       this.current_task_name = task_name;
       this.initial_loading = true;
       await this.getImageList();
+      this.next_or_previous = 'next';
       await this.assignImage();
     },
     // this function is to cache image data to annotate
@@ -282,6 +283,7 @@ const app = new Vue({
         }
       };
     },
+    // save annotated data at number of this.cached_annotated_data
     // this function is to load image list and assign image
     //loading image list
     async getImageList(){
@@ -290,21 +292,26 @@ const app = new Vue({
       this.loaded_image_list  =response.cells;
     },
     async previousImage(){
-      api.alert('Not implemented.')
+      this.next_or_previous = 'previous';
+      await this.assignImage();
+      //api.alert('Not implemented.')
     },
     async nextImage(){
-      // await this.uploadAnnotation()
-      await this.assignImage()
+      this.next_or_previous = 'next';
+      // await this.uploadAnnotation();
+      await this.cached_annotated_data.push(this.current_image_data);
+      await this.assignImage();
     },
     // should add out of range check for image list
     // fetch the first item to this.current_image_data
     // then give the image index to next
     async assignImage(){
-      if (this.cached_image_data.length===0){
+      if (this.next_or_previous === 'next'){
+        if (this.cached_image_data.length===0){
         this.image_sample_data.image_id = this.loaded_image_list[this.load_index];
         this.load_index = this.load_index + 1; // for the next image
         // get the data from server
-        const response = await this.fetchURLData("/images/" + this.current_task_name + "/" + this.image_sample_data.image_id)
+        const response = await this.fetchURLData("images/" + this.current_task_name + "/" + this.image_sample_data.image_id)
         this.image_sample_data.mask_geojson.bbox = response.bbox;
         this.image_sample_data.bbox = response.bbox;
         this.image_sample_data.mask_geojson.features[0].geometry.coordinates = response.mask.geometry.coordinates;
@@ -312,9 +319,18 @@ const app = new Vue({
         this.image_sample_data.location = Object.keys(response.location)[0];
         // pass the data to this.current_image_data
         this.current_image_data = this.image_sample_data
+        }else{
+          this.current_image_data = this.cached_image_data[0];
+          this.cached_image_data.splice(0,1); //pop the image data from the list
+        }
+      }else if(this.next_or_previous == 'previous'){
+        if (this.cached_annotated_data.length > 0){
+          this.current_image_data = this.cached_annotated_data[0]
+        }else{
+          api.alert('Wrong operation, there is no previous image')
+        }
       }else{
-        this.current_image_data = this.cached_image_data[0];
-        this.cached_image_data.splice(0,1); //pop the image data from the list 
+        api.alert('Frontend parameter choice is wrong for next_or_previous')
       }
       // managing loading images
       this.current_panel = 'imageviewer';
