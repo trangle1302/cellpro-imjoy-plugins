@@ -288,7 +288,6 @@ const app = new Vue({
       let features = (new GeoJSON()).readFeatures(geojsonObject)
 
       this.draw_feature_list = [...this.draw_feature_list, ...features]
-      this.undo_button_flag = true
       this.vector_source.addFeatures(features)
       this.updateFeatureStyle()
     },
@@ -392,33 +391,12 @@ const app = new Vue({
       });
       this.select = select
     },
-    // add for interaction by hao
-    async deleteAnnotation() {
+    async removeMaskAnnotation() {
       if (this.vector_source) {
-        const features = this.select.getFeatures()
-        if(features.getLength()>0){
-            features.forEach((feature)=>{
-                console.log('removing ', feature)
-                this.vector_source.removeFeature(feature);
-                this.select.getFeatures().remove(feature);
-            });
-        }
-        else{
-            try {
-                const answer = await api.confirm({content: "Do you really want to delete the annotations?", confirm_text: 'Yes, delete it.'})
-                if (answer) {
-                  const features = this.vector_source.getFeatures();
-                  features.forEach((feature) => {
-                    const ann = this.annotation_types[feature.get('label')]
-                    this.vector_source.removeFeature(feature);
-                  });
-                  this.undo_button_flag = false
-                }else{return}
-            } catch (err) {
-              return;
-            }
-        }
-      //await this.saveAnnotation()
+          const features = this.vector_source.getFeatures();
+          features.forEach((feature) => {
+            this.vector_source.removeFeature(feature);
+          });
       }
     },
     startAnnotation(source, freehand){
@@ -567,7 +545,7 @@ api.export(new ImJoyPlugin())
           <i class="form-icon"></i> Adjust Mask
         </label>
         <button class="btn transparent-btn" v-if="anntation_mode" @click="saveAnnotation()">Save</button>&nbsp;&nbsp;
-        <button class="btn transparent-btn" title="delete" v-if="anntation_mode" @Click="deleteAnnotation()"><i class="icon icon-delete"></i></button>&nbsp;&nbsp;
+        <button class="btn transparent-btn" title="delete" v-if="anntation_mode" @Click="removeMaskAnnotation()"><i class="icon icon-delete"></i></button>&nbsp;&nbsp;
       </div>
       <div v-if="loading" class="loading loading-lg floating"></div>
       <div id="map"></div>
@@ -643,6 +621,9 @@ api.export(new ImJoyPlugin())
   .transparent-btn {
     width: 90px;
     background-color:#fff3;
+  }
+  .transparent-btn:hover, .transparent-btn:focus{
+    background-color:rgba(255, 255, 255, 0.42);
   }
   .floating {
     position: absolute;
