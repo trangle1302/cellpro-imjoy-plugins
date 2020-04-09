@@ -224,6 +224,24 @@ const app = new Vue({
     async previousImage(){
       api.alert('Not implemented.')
     },
+    async processCoordinates (coordinates){
+      // in priniciple, bbox should pass the crop starting points, and do this processing
+      //alert(JSON.stringify(coordinates))
+      var new_coordinates = coordinates[0]
+      const length = new_coordinates.length - 1;
+      var minx = new_coordinates[length][0];
+      var miny = new_coordinates[length][1];
+      for (index = 0; index < new_coordinates.length; index++){
+        if (minx > new_coordinates[index][0]){minx = new_coordinates[index][0]}
+        if (miny > new_coordinates[index][1]){miny = new_coordinates[index][1]}
+      };
+      for (index = 0; index < new_coordinates.length; index++){
+        new_coordinates[index][0] = new_coordinates[index][0] - minx;
+        new_coordinates[index][1] = new_coordinates[index][1] - miny;
+      };
+      //alert(JSON.stringify(new_coordinates))
+      return [new_coordinates]
+    },
     async nextImage(){
       // await this.uploadAnnotation()
       await this.assignImage()
@@ -238,7 +256,8 @@ const app = new Vue({
       const response = await this.fetchURLData("/images/" + this.current_task_name + "/" + this.image_to_annotate)
       this.current_image_geojson.bbox = response.bbox;
       this.current_image_bbox = response.bbox;
-      this.current_image_geojson.features[0].geometry.coordinates = response.mask.geometry.coordinates;
+      const image_coordinates = await this.processCoordinates(response.mask.geometry.coordinates);
+      this.current_image_geojson.features[0].geometry.coordinates = image_coordinates;
       this.current_image_uri = response.image;
       const locations =  Object.keys(response.location);
       if(locations.length==1){
