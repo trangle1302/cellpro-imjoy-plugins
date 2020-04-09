@@ -257,8 +257,8 @@ const app = new Vue({
           // get the data from server
           const response = await this.fetchURLData("/images/" + this.current_task_name + "/" + image_sample_data.image_id)
           image_sample_data.mask_geojson.bbox = response.bbox;
-          image_sample_data.bbox = response.bbox;
-          image_sample_data.mask_geojson.features[0].geometry.coordinates = response.mask.geometry.coordinates;
+          const image_coordinates = await this.processCoordinates(response.mask.geometry.coordinates);
+          image_sample_data.mask_geojson.features[0].geometry.coordinates = image_coordinates;
           image_sample_data.uri = response.image;
           image_sample_data.location = Object.keys(response.location)[0];
           // pass the data to cached_image_data
