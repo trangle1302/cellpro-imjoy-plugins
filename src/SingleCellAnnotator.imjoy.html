@@ -157,7 +157,7 @@ const app = new Vue({
       const formData = new FormData();
       formData.append('username', this.user.username);
       formData.append('password', this.user.password);
-      const response = await fetch(this.selected_server_url + "/login", {
+      const response = await fetch(this.selected_server_url + "login", {
         method: 'POST',
         mode: 'cors',
         credentials: 'include',
@@ -166,7 +166,7 @@ const app = new Vue({
       if(response.status === 200){
         const res = await response.json()
         if(res.success){
-            const response2 = await fetch(this.selected_server_url + "/tasks", {
+            const response2 = await fetch(this.selected_server_url + "tasks", {
             method: 'GET',
             credentials: 'include'
           })
@@ -214,7 +214,7 @@ const app = new Vue({
     // this function is to load image list and assign image
     //loading image list
     async getImageList (){
-      const response = await this.fetchURLData("/tasks/" + this.current_task_name + "?cell_num=" + this.cell_num);
+      const response = await this.fetchURLData("tasks/" + this.current_task_name + "?cell_num=" + this.cell_num);
       this.current_image_index = 0; // index starts from 0
       this.loaded_image_list  =response.cells;
     },
@@ -251,7 +251,7 @@ const app = new Vue({
       this.image_to_annotate = this.loaded_image_list[this.current_image_index];
       this.current_image_index = this.current_image_index + 1; // for the next image
       // get the data from server
-      const response = await this.fetchURLData("/images/" + this.current_task_name + "/" + this.image_to_annotate)
+      const response = await this.fetchURLData("images/" + this.current_task_name + "/" + this.image_to_annotate)
       this.current_image_geojson.bbox = response.bbox;
       this.current_image_bbox = response.bbox;
       //alert(this.current_image_bbox)
