@@ -334,7 +334,8 @@ const app = new Vue({
         const response = await this.fetchURLData("images/" + this.current_task_name + "/" + this.image_sample_data.image_id)
         this.image_sample_data.mask_geojson.bbox = response.bbox;
         this.image_sample_data.bbox = response.bbox;
-        this.image_sample_data.mask_geojson.features[0].geometry.coordinates = response.mask.geometry.coordinates;
+        const image_coordinates = await this.processCoordinates(response.mask.geometry.coordinates);
+        this.image_sample_data.mask_geojson.features[0].geometry.coordinates = image_coordinates;
         this.image_sample_data.uri = response.image;
         const locations =  Object.keys(response.location);
         if(locations.length==1){
