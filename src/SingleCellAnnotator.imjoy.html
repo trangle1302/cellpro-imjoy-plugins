@@ -251,6 +251,7 @@ const app = new Vue({
         this.label_display_mode = 'multiple'
         this.current_location = response.location;
       }
+
       // managing loading images
       this.current_panel = 'imageviewer';
       await this.displayMap(this.current_image_uri);
