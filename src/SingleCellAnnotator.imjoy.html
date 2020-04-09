@@ -128,7 +128,7 @@ const app = new Vue({
     current_task_name: null,
     cell_num: '20',
     // image format
-    image_data_sample:{
+    image_sample_data:{
       image_id: null,
       bbox: null,
       mask_geojson:{
@@ -261,9 +261,30 @@ const app = new Vue({
       await this.getImageList();
       await this.assignImage();
     },
+    // this function is to cache image data to annotate
+    async cacheImageData(){
+      if (this.cached_image_data.length < this.cached_image_data_num){
+        if (this.load_index < this.cell_num - 1){
+          // load all the data to image_sample_data
+          this.image_sample_data.image_id = this.loaded_image_list[this.load_index];
+          this.load_index = this.load_index + 1; // for the next image
+          // get the data from server
+          const response = await this.fetchURLData("/images/" + this.current_task_name + "/" + this.image_sample_data.image_id)
+          this.image_sample_data.mask_geojson.bbox = response.bbox;
+          this.image_sample_data.bbox = response.bbox;
+          this.image_sample_data.mask_geojson.features[0].geometry.coordinates = response.mask.geometry.coordinates;
+          this.image_sample_data.uri = response.image;
+          this.image_sample_data.location = Object.keys(response.location)[0];
+          // pass the data to cached_image_data
+          this.cached_image_data.push(this.image_sample_data)
+        }else{
+          await getImageList()
+        }
+      };
+    },
     // this function is to load image list and assign image
     //loading image list
-    async getImageList (){
+    async getImageList(){
       const response = await this.fetchURLData("/tasks/" + this.current_task_name + "?cell_num=" + this.cell_num);
       this.load_index = 0; // index starts from 0
       this.loaded_image_list  =response.cells;
