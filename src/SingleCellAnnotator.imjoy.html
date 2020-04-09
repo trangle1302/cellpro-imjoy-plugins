@@ -109,8 +109,8 @@ const app = new Vue({
     select: null,
     current_panel: 'login',
     user:{
-      username: "wei",
-      password: "OS0jVzc5P7mMuiiUeDYj"
+      username: "hao",
+      password: "GshQvF3GPzeoPAWBpalq"
     },
   // from here this is communication to backend, to develop/activate
     tasks: {
@@ -223,8 +223,8 @@ const app = new Vue({
       api.alert('Not implemented.')
     },
     async nextImage(){
-      await uploadAnnotation()
-      await assignImage()
+      //await this.uploadAnnotation()
+      await this.assignImage()
     },
     // should add out of range check for image list
     // fetch the first item to this.current_image_data
