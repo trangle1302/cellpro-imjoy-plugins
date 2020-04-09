@@ -133,6 +133,7 @@ const app = new Vue({
     current_image_bbox: null,
     current_image_uri: null,
     current_location: null,
+    current_location_selected: null,
     image_to_annotate: null,
     backend_url: null,
   // this is for imageviewer test
@@ -243,11 +244,12 @@ const app = new Vue({
       if(locations.length==1){
         this.label_display_mode = 'single'
         this.current_location = locations[0];
+        this.current_location_selected = null;
       }
       else
       { 
         this.label_display_mode = 'multiple'
-        this.current_location = locations;//response.location;
+        this.current_location = response.location;
       }
       // managing loading images
       this.current_panel = 'imageviewer';
@@ -452,6 +454,15 @@ const app = new Vue({
       this.map.removeInteraction(this.snapInteraction);
       if(this.modifyInteraction)
       this.map.removeInteraction(this.modifyInteraction);
+    },
+    toggleLocation(k){
+      if(this.current_location[k]){
+        this.current_location[k]=false
+      }
+      else{
+        this.current_location[k]=true
+      }
+      
     }
   }
 })
@@ -536,15 +547,15 @@ api.export(new ImJoyPlugin())
           </div>
           <br>
           <div class="columns">
-            <button v-for="(loc, k) in current_location" class="column btn location-btn" :class="{'btn-primary': loc}">{{k}}</button>
+            <button v-for="(loc, k) in current_location" @click="toggleLocation(k)" class="column btn location-btn" :class="{'selected-location-btn': loc}">{{k.slice(0,12)+(k.length>12?'.': '')}}</button>
           </div>
         </div>
       </template>
       <template v-if="label_display_mode==='single'">
         <div class="btn-group floating-bottom-btn">
           <button class="btn transparent-btn" @click="previousImage()"><i class="icon icon-back"></i>&nbsp;Back</button>
-          <button class="btn transparent-btn"><i class="icon icon-check"></i>&nbsp;Yes</button>
-          <button class="btn transparent-btn"><i class="icon icon-cross"></i>&nbsp;No</button>
+          <button class="btn transparent-btn" @click="current_location_selected=true" :class="{'selected-location-btn': current_location_selected===true}"><i class="icon icon-check"></i>&nbsp;Yes</button>
+          <button class="btn transparent-btn" @click="current_location_selected=false" :class="{'selected-location-btn': current_location_selected===false}"><i class="icon icon-cross"></i>&nbsp;No</button>
           <button class="btn transparent-btn" @click="nextImage()">Next&nbsp;<i class="icon icon-forward"></i></button>
         </div>
         <span class="h1 floating-label">{{current_location}}</span>
@@ -598,29 +609,39 @@ api.export(new ImJoyPlugin())
     z-index: 999;
     top: 30px;
   }
-  .floating-right-btn{
-    position: absolute;
-    right: 3px;
-    top: 80px;
-    width: 280px;
-    z-index: 999;
-  }
+
   .floating-bottom-btn {
     position: absolute;
     left: calc(50% - 180px);
     top: 90%;
     z-index: 999;
   }
+  .floating-right-btn{
+    position: absolute;
+    right: 3px;
+    top: 80px;
+    width: 330px;
+    z-index: 999;
+  }
   .location-btn {
+    padding-top: 0px;
+    font-size: small;
     margin-left: 0px;
-    height: 30px;
+    height: 26px;
     flex: none;
-    width: 90px;
-    background-color:#fff3!important;
+    width: 110px;
+    background-color:#fff3;
+  }
+  .location-btn:hover, .location-btn:focus{
+    background-color:rgba(255, 255, 255, 0.42);
+  }
+  .selected-location-btn{
+    background-color: #3580ff7d!important;
+    color: white!important;
   }
   .transparent-btn {
     width: 90px;
-    background-color:#fff3!important;
+    background-color:#fff3;
   }
   .floating {
     position: absolute;
