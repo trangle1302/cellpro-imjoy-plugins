@@ -8,7 +8,7 @@
   "type": "window",
   "tags": [],
   "ui": "",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "api_version": "0.1.7",
   "description": "Annotate images for HPA single-cell image classification",
   "icon": "extension",
@@ -244,7 +244,7 @@ const app = new Vue({
       api.alert('Not implemented.')
     },
     async nextImage(){
-      //await this.uploadAnnotation()
+      // await this.uploadAnnotation()
       await this.assignImage()
     },
     // should add out of range check for image list
@@ -259,14 +259,14 @@ const app = new Vue({
       this.current_image_data.bbox = response.bbox;
       this.current_image_data.mask_geojson.features[0].geometry.coordinates = response.mask.geometry.coordinates;
       this.current_image_data.uri = response.image;
-      this.current_image_data.location = "Nucleoplasm?"; //response.location;
+      this.current_image_data.location = Object.keys(response.location)[0];
 
       // managing loading images
       this.current_panel = 'imageviewer';
       await this.displayMap(this.current_image_data.uri);
       this.showAnnotation()
     },
-    async uploadAnnotation (url_post) {
+    async uploadAnnotation(url_post) {
       // Default options are marked with *
       const data = this.user;
       const response = await fetch(url_post, {
@@ -335,7 +335,7 @@ const app = new Vue({
         source: this.vector_source,
         style: new Style({
           fill: new Fill({
-            color: 'rgba(255, 255, 255, 0.2)'
+            color: 'rgba(255, 255, 255, 0)'
           }),
           stroke: new Stroke({
             color: '#ffcc33',
