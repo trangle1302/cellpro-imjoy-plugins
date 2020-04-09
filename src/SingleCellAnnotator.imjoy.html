@@ -128,15 +128,11 @@ const app = new Vue({
     current_task_name: null,
     cell_num: '20',
     loaded_image_list: null,
-    current_image_index: 1,
-    current_image_bbox: null,
-    current_image_uri: null,
-    current_location: null,
-    image_to_annotate: null,
-    backend_url: null,
-  // this is for imageviewer test
-    record_annotation: null,
-    current_image_geojson:{
+    current_image_data:{
+      index: 1,
+      image_id: null,
+      bbox: null,
+      mask_geojson:{
       'type':'FeatureCollection',
       'features':[
         {
@@ -144,11 +140,36 @@ const app = new Vue({
           'geometry':{
           'type':'Polygon',
           'coordinates':null
-        },
-        'properties':null
-      }],
-      'bbox':null
+          },
+          'properties':null
+        }],
+        'bbox':null
+      },
+      uri: null,
+      location: null
     },
+
+    //current_image_index: 1, // to be replaced
+    //current_image_bbox: null, // to be replaced
+    //current_image_uri: null, // to be replaced
+    //current_location: null, // to be replaced
+    //image_to_annotate: null,
+    backend_url: null,
+  // this is for imageviewer test
+    record_annotation: null,
+    //current_image_geojson_geojson:{
+    //'type':'FeatureCollection',
+    //'features':[
+    //  {
+    //    'type':'Feature',
+    //    'geometry':{
+    //    'type':'Polygon',
+    //    'coordinates':null
+    //  },
+    //  'properties':null
+    //}],
+    //'bbox':null
+  //},
   },
   mounted(){
     this.selected_server_url = this.servers['production']
@@ -216,7 +237,7 @@ const app = new Vue({
     //loading image list
     async getImageList (){
       const response = await this.fetchURLData("/tasks/" + this.current_task_name + "?cell_num=" + this.cell_num);
-      this.current_image_index = 0; // index starts from 0
+      this.current_image_data.index = 0; // index starts from 0
       this.loaded_image_list  =response.cells;
     },
     async previousImage(){
@@ -230,19 +251,19 @@ const app = new Vue({
     // fetch the first item to this.current_image_data
     // then give the image index to next
     async assignImage (){
-      this.image_to_annotate = this.loaded_image_list[this.current_image_index];
-      this.current_image_index = this.current_image_index + 1; // for the next image
+      this.current_image_data.image_id = this.loaded_image_list[this.current_image_data.index];
+      this.current_image_data.index = this.current_image_data.index + 1; // for the next image
       // get the data from server
-      const response = await this.fetchURLData("/images/" + this.current_task_name + "/" + this.image_to_annotate)
-      this.current_image_geojson.bbox = response.bbox;
-      this.current_image_bbox = response.bbox;
-      this.current_image_geojson.features[0].geometry.coordinates = response.mask.geometry.coordinates;
-      this.current_image_uri = response.image;
-      this.current_location = "Nucleoplasm?"; //response.location;
+      const response = await this.fetchURLData("/images/" + this.current_task_name + "/" + this.current_image_data.image_id)
+      this.current_image_data.mask_geojson.bbox = response.bbox;
+      this.current_image_data.bbox = response.bbox;
+      this.current_image_data.mask_geojson.features[0].geometry.coordinates = response.mask.geometry.coordinates;
+      this.current_image_data.uri = response.image;
+      this.current_image_data.location = "Nucleoplasm?"; //response.location;
 
       // managing loading images
       this.current_panel = 'imageviewer';
-      await this.displayMap(this.current_image_uri);
+      await this.displayMap(this.current_image_data.uri);
       this.showAnnotation()
     },
     async uploadAnnotation (url_post) {
@@ -281,9 +302,9 @@ const app = new Vue({
       this.updateFeatureStyle()
     },
     async showAnnotation (){
-      features = (new GeoJSON()).readFeatures(this.current_image_geojson)
+      features = (new GeoJSON()).readFeatures(this.current_image_data.mask_geojson)
       this.vector_source.addFeatures(features)
-      //alert(await JSON.stringify(this.current_image_geojson))
+      //alert(await JSON.stringify(this.current_image_data.mask_geojson))
     },
     // save annotations
     async saveAnnotation(features){
@@ -292,9 +313,9 @@ const app = new Vue({
       const routeFeatures = format.writeFeaturesObject(allFeatures, {decimals: 1});
       //await writeFile(annotationPath, JSON.stringify(routeFeatures))
       //await this.saveConfig()
-      routeFeatures['bbox'] = this.current_image_bbox;
+      routeFeatures['bbox'] = this.current_image_data.bbox;
       feature_string = JSON.stringify(routeFeatures);
-      this.current_image_geojson = routeFeatures;
+      this.current_image_data.mask_geojson = routeFeatures;
     },
     //let features = this.vector_source.getFeatures()
     async exportAnnotation() {
@@ -302,7 +323,7 @@ const app = new Vue({
 
       const format = new ol.format.GeoJSON();
       const routeFeatures = format.writeFeaturesObject(allFeatures, {decimals: 1});
-      routeFeatures['bbox'] = this.current_image_bbox;
+      routeFeatures['bbox'] = this.current_image_data.bbox;
       const blob = new Blob([JSON.stringify(routeFeatures)], {
           type: "text/plain;charset=utf-8"
       });
@@ -525,7 +546,7 @@ api.export(new ImJoyPlugin())
         <button class="btn transparent-btn"><i class="icon icon-cross"></i>&nbsp;No</button>
         <button class="btn transparent-btn" @click="nextImage()">Next&nbsp;<i class="icon icon-forward"></i></button>
       </div>
-      <span class="h1 floating-label">{{current_location}}</span>
+      <span class="h1 floating-label">{{current_image_data.location}}</span>
       <div class="input-group floating-switch">
         <label class="form-switch">
           <input type="checkbox" v-model="anntation_mode" @change="anntation_mode_changed">
