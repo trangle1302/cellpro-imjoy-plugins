@@ -8,7 +8,7 @@
   "type": "window",
   "tags": [],
   "ui": "",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "api_version": "0.1.7",
   "description": "Annotate images for HPA single-cell image classification",
   "icon": "extension",
@@ -131,6 +131,7 @@ const app = new Vue({
     current_image_index: 1,
     current_image_bbox: null,
     current_image_uri: null,
+    current_location: null,
     image_to_annotate: null,
     backend_url: null,
   // this is for imageviewer test
@@ -178,9 +179,9 @@ const app = new Vue({
             this.tasks[key_index].total = data[key].total
             key_index = key_index + 1
           }
-          this.current_panel = 'annotation choice';
+          this.current_panel = 'task_selection';
         }else{
-          api.alert('Failed to logg in, error' + res.error);
+          api.alert('Failed to login, error: ' + res.error);
         }
       }else{
         api.alert('Response Status' + response.status)
@@ -236,6 +237,13 @@ const app = new Vue({
       //alert(JSON.stringify(new_coordinates))
       return [new_coordinates]
     },
+    async previousImage(){
+      api.alert('Not implemented.')
+    },
+    async nextImage(){
+      await uploadAnnotation()
+      await assignImage()
+    },
     // should add out of range check for image list
     // fetch the first item to this.current_image_data
     // then give the image index to next
@@ -252,13 +260,14 @@ const app = new Vue({
       const image_coordinates = await this.processCoordinates(response.mask.geometry.coordinates);
       this.current_image_geojson.features[0].geometry.coordinates = image_coordinates;
       this.current_image_uri = response.image; 
+      this.current_location = "Nucleoplasm?"; //response.location;
 
       // managing loading images
       this.current_panel = 'imageviewer';
       await this.displayMap(this.current_image_uri);
       this.showAnnotation()
     },
-    async postData (url_post) {
+    async uploadAnnotation (url_post) {
       // Default options are marked with *
       const data = this.user;
       const response = await fetch(url_post, {
@@ -271,11 +280,9 @@ const app = new Vue({
           body: JSON.stringify(data)
         });
       const res= await response.json(); 
-      if(res.success){
-        alert('success');
-      }
-      else{
-      alert('failed');
+      if(!res.success){
+        alert('Failed to upload the annotaiton, error: ' + res.error);
+        throw new Error('Failed to upload the annotaiton.')
       };
     },
     anntation_mode_changed(){
@@ -363,15 +370,16 @@ const app = new Vue({
         projection: projection,
         imageExtent: extent
       })
+      const image_layer = new ImageLayer({
+        source: this.image_source,
+      })
       // clear map
       document.getElementById('map').innerHTML = ""
       this.map = new Map({
         interactions: ol.interaction.defaults({altShiftDragRotate:false, pinchRotate:false}),
         controls: defaultControls(),
         layers: [
-          new ImageLayer({
-            source: this.image_source
-          }),
+          image_layer,
           vector_layer,
         ],
         target: 'map',
@@ -408,7 +416,7 @@ const app = new Vue({
         }
         else{
             try {
-                const answer = await api.confirm({content: "Do you really want to delete all the visible annotations?", confirm_text: 'Yes, delete all.'})
+                const answer = await api.confirm({content: "Do you really want to delete the annotations?", confirm_text: 'Yes, delete it.'})
                 if (answer) {
                   const features = this.vector_source.getFeatures();
                   features.forEach((feature) => {
@@ -476,10 +484,11 @@ api.export(new ImJoyPlugin())
 </script>
 
 <window>
-  <div id="app">
-    <div class="panel" v-if="current_panel=='login'">
+  <div style="text-align: center;" id="app">
+
+    <div class="panel centered-panel" v-if="current_panel=='login'">
       <div class="panel-header">
-        <div class="panel-title">Login</div>
+        <div class="panel-title h2">Login</div>
       </div>
       <div class="panel-body">
         <div class="form-group">
@@ -495,7 +504,7 @@ api.export(new ImJoyPlugin())
         </div>
         <div class="form-group">
           <label class="form-label" for="input-example-1">Password</label>
-          <input class="form-input" type="text" name="password" v-model ="user.password" placeholder="password">
+          <input class="form-input" type="password" name="password" v-model ="user.password" placeholder="password">
         </div>
         <button class="btn" @click="login()">Login</button>
       </div>
@@ -504,15 +513,22 @@ api.export(new ImJoyPlugin())
       </div>
     </div>
 
-    <div class="panel" v-if="current_panel=='annotation choice'">
+
+    <div class="panel centered-panel" v-if="current_panel=='task_selection'">
       <div class="panel-header">
-        <div class="panel-title">Please choose a task</div>
+        <div class="panel-title h2">Please choose a task</div>
       </div>
       <div class="panel-body">
-        <button class="btn btn-primary" @click="chooseTask(tasks[1].name)">{{tasks[1].name}}</button>&nbsp;&nbsp;
-        <button class="btn btn-primary" @click="chooseTask(tasks[2].name)">{{tasks[2].name}}</button>&nbsp;&nbsp;
         <br>
         <br>
+        <div v-for="task in tasks">
+          <progress class="progress" style="width: 288px" :value="task.finished" :max="task.total"></progress>
+          <br>
+          <button class="btn" style="width: 280px" @click="chooseTask(task.name)"><i class="icon icon-edit"></i>&nbsp; {{task.name}}: {{task.finished}}/{{task.total}}</button>&nbsp;&nbsp;
+          <br>
+          <br>
+        </div>
+
         <!--<div class="progress">
           <progress class="progress-bar" arial-valuenow= 'tasks[1].finished' aria-valuemin="0" arial-valuemax='tasks[1].total' style="width:10"></progress>&nbsp;&nbsp;
           <br>
@@ -526,40 +542,27 @@ api.export(new ImJoyPlugin())
     </div>
 
     <div class="panel" v-if="current_panel=='imageviewer'">
-      <p class="navbar">
-      <section class="navbar-section">
-        <a class="navbar-brand text-bold mr-2">Image Annotation</a>
-        <!-- <a href="..." class="btn btn-link">Docs</a>
-        <a href="..." class="btn btn-link">GitHub</a> -->
+      <div class="btn-group floating-btn">
+        <button class="btn transparent-btn" @click="previousImage()"><i class="icon icon-back"></i>&nbsp;Back</button>
+        <button class="btn transparent-btn"><i class="icon icon-check"></i>&nbsp;Yes</button>
+        <button class="btn transparent-btn"><i class="icon icon-cross"></i>&nbsp;No</button>
+        <button class="btn transparent-btn" @click="nextImage()">Next&nbsp;<i class="icon icon-forward"></i></button>
+      </div>
+      <span class="h1 floating-label">{{current_location}}</span>
+      <div class="input-group floating-switch">
         <label class="form-switch">
           <input type="checkbox" v-model="anntation_mode" @change="anntation_mode_changed">
-          <i class="form-icon"></i> Adjust Segmentation
+          <i class="form-icon"></i> Adjust Mask
         </label>
-        <label class="form-switch" v-if="anntation_mode">
+        <!-- <label class="form-switch" v-if="anntation_mode">
           <input type="checkbox" v-model="freehand_mode" @change="anntation_mode_changed">
           <i class="form-icon"></i> Freehand
-        </label>
-
-        <div class="input-group input-inline">
-          <!--<button class="btn hide-on-mobile" @click="openFileDialog()">Load Local File</button>-->
-          <button class="btn" @click="assignImage()">NextImage</button>
-          <button class="btn">Yes</button>
-          <button class="btn">No</button>
-          <button class="btn">Protein Tag</button>
-          <button class="btn btn-primary">Ajust Segmentation</button>
-          <button class="btn btn-primary" @click="postData()">Done</button>
-          <button class="btn btn-primary" @click="saveAnnotation()">saveAnnotation</button>&nbsp;&nbsp;
-          <button class="btn btn-sm" title="delete" @Click="deleteAnnotation()"><i class="icon icon-delete"></i></button>&nbsp;&nbsp;
-          <button class="btn btn-primary" @click="showAnnotation()">showAnnotation</button>
-        <!-- <button class="btn input-group-btn" @click="readTestFile()">Load Example File</button> -->
-        </div>
-      </p>
-    </div>
-    <!-- <h4 >{{status}}</h4> -->
-    <!-- <canvas ref="image_canvas" style="width:35%;" width="100" height="100"></canvas> -->
-    <div v-if="loading" class="loading loading-lg floating"></div>
-    <div id='toolbar'></div>
-    <div id="map"></div>
+        </label> -->
+        <button class="btn transparent-btn" v-if="anntation_mode" @click="saveAnnotation()">Save</button>&nbsp;&nbsp;
+        <button class="btn transparent-btn" title="delete" v-if="anntation_mode" @Click="deleteAnnotation()"><i class="icon icon-delete"></i></button>&nbsp;&nbsp;
+      </div>
+      <div v-if="loading" class="loading loading-lg floating"></div>
+      <div id="map"></div>
     </div>
 
     <div class="panel" v-if="current_panel=='navigation'">
@@ -592,15 +595,55 @@ api.export(new ImJoyPlugin())
     </div>
   </div>
 
-
 </window>
 <style lang="css">
+  .centered-panel{
+    background-color: #448aff0f;
+    width: 100%;
+    height: 100%;
+    max-height: 400px;
+    max-width: 400px;
+    left: 50%;
+    top: 50%;
+    position: absolute;
+    -webkit-transform: translate3d(-50%, -50%, 0);
+    -moz-transform: translate3d(-50%, -50%, 0);
+    transform: translate3d(-50%, -50%, 0);
+  }
+  .ol-layers:first-child{
+    background-color: black;
+  }
   .navigation { 
-            background-color: FAFAFB; 
-            color: white; 
-            padding: 8px; 
-        }
-
+      background-color: FAFAFB; 
+      color: white; 
+      padding: 8px; 
+  }
+  .floating-label{
+    color:#ffefdb96;
+    position: absolute;
+    left: 50%;
+    z-index: 999;
+    top: calc(90% - 32px);
+    -webkit-transform: translate3d(-50%, -50%, 0);
+    -moz-transform: translate3d(-50%, -50%, 0);
+    transform: translate3d(-50%, -50%, 0);
+  }
+  .floating-switch{
+    position: absolute;
+    right: 10px;
+    z-index: 999;
+    top: 30px;
+  }
+  .floating-btn {
+    position: absolute;
+    left: calc(50% - 180px);
+    top: 90%;
+    z-index: 999;
+  }
+  .transparent-btn {
+    width: 90px;
+    background-color:#fff3;
+  }
   .floating {
     position: absolute;
     left: 50%;
@@ -614,14 +657,13 @@ api.export(new ImJoyPlugin())
   #toolbar > div:nth-child(1){
     fill: #448aff;
   }
+
   .ol-layer{
     top: 0px;
   }
-  #viewer > div:nth-child(2) {
-    top: 64px!important;
-  }
-  #viewer > div:first-child {
-    height: calc(100vh - 64px)!important;
+
+  #map{
+    height: 100vh;
     min-height: 100px!important;
   }
   .icon::before {
@@ -644,36 +686,5 @@ api.export(new ImJoyPlugin())
     .hide-on-mobile {
         display: none;
     }
-  }
-
-  .button_long {
-    background-color: #4CAF50; /* Green */
-    border: none;
-    color: white;
-    padding: 15px 70px;
-    text-align: center;
-    text-decoration: none;
-    display: inline-block;
-    font-size: 16px;
-  }
-  .button_long {
-    background-color: #0000FF; /* Green */
-    border: none;
-    color: white;
-    padding: 10px 70px;
-    text-align: center;
-    text-decoration: none;
-    display: inline-block;
-    font-size: 20px;
-  }
-  .progress-bar {
-    background-color: #00FF00; /* Green */
-    border: none;
-    color: white;
-    padding: 10px 100px;
-    text-align: center;
-    text-decoration: none;
-    display: inline-block;
-    font-size: 17px;
   }
 </style>
