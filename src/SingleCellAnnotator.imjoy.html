@@ -228,69 +228,58 @@ const app = new Vue({
       await this.assignImage();
     },
     async fetchCellImage(load_index){
-      const image_sample_data = Object.assign({}, imageDataTemplate);
+      //debugger
+      var image_sample_data = Object.assign({}, imageDataTemplate);
       image_sample_data.image_id = this.loaded_image_list[load_index];
       const response = await this.fetchURLData("/images/" + this.current_task_name + "/" + image_sample_data.image_id)
       image_sample_data.mask_geojson.bbox = response.bbox;
+      // response.mask.geometry.coordinates;
       const image_coordinates = await this.processCoordinates(response.mask.geometry.coordinates);
       image_sample_data.mask_geojson.features[0].geometry.coordinates = image_coordinates;
       image_sample_data.uri = response.image;
       locations = Object.keys(response.location);
       if(locations.length==1){
-        image_sample_data.label_display_mode = 'single'
+        image_sample_data.label_display_mode = 'single';
         image_sample_data.location = locations[0];
         image_sample_data.location_selected = null;
       }
       else
       { 
-        image_sample_data.label_display_mode = 'multiple'
+        image_sample_data.label_display_mode = 'multiple';
         image_sample_data.location = response.location;
       }
       return image_sample_data
     },
     // this function is to cache image data to annotate
-    async cacheImageData(){
-      //alert('let me check if I can load')
-      if (this.cached_image_data.length < this.cached_image_data_num){
-        //alert("promising, remain spaces in cached is " + this.cached_image_data_num  + " " + this.cached_image_data.length)
-        if (this.load_index < this.cell_num - 1){
-          const a = this.cell_num - this.load_index;
-          const b = this.cached_image_data_num - this.cached_image_data.length
-          const c = this.cached_image_data_num
-
-          //alert("guess which is smaller A: " + a + "or B: " + b + "or C: " + c)
-          const load_capacity = Math.min(this.cached_image_data_num - this.cached_image_data.length, this.cell_num - this.load_index);
-          //alert("I feel I can load " + load_capacity)
-          for (index = 0; index < load_capacity; index++){
-            //alert(index)
-          // load all the data to image_sample_data
-          //let image_sample_data = await this.fetchCellImage(this.load_index)
-          let temp_load_index = this.load_index;
-          this.load_index = temp_load_index + 1; 
-          //this.load_index = this.load_index + 1; // for the next image
-          //alert('Now start to cache ' + temp_load_index)
-          let image_sample_data = await this.fetchCellImage(temp_load_index)
-          //alert("After loading, the index is " + temp_load_index)
-          //alert("Hi, there are data cached, num is " + this.cached_image_data.length)
-          // get the data from server
-          // pass the data to cached_image_data
-          await this.cached_image_data.push(image_sample_data)
-          //alert("Hi, there are data cached, num is " + this.cached_image_data.length)
-          //alert('let me see how many loaded ' + this.cached_image_data.length)
-          }
-          
+    async cacheImageData(cached_image_num){
+      const cached_limit_num = cached_image_num;
+      if (this.cached_image_data.length < cached_limit_num){
+        let temp_load_index = this.load_index;
+        if (temp_load_index < this.cell_num - 1){
+          const load_capacity = Math.min(cached_limit_num - this.cached_image_data.length, this.cell_num - temp_load_index);
+          for (var index = 0; index < load_capacity; index++){
+            const loading_data = await this.fetchCellImage(temp_load_index);
+            if (this.cached_image_data.length < cached_limit_num){
+              this.cached_image_data.push(loading_data);
+              temp_load_index += 1;
+              this.load_index = temp_load_index;
+            }else{
+              return
+              // skipped the push and end the function
+            };         
+          };          
         }else{
-          await this.getImageList()
+          await this.getImageList(); // the remaining is not enought under this case
         }
-      };
+      }else{return }
     },
     // save annotated data at number of this.cached_annotated_data
     // this function is to load image list and assign image
     //loading image list
     async getImageList(){
       const response = await this.fetchURLData("/tasks/" + this.current_task_name + "?cell_num=" + this.cell_num);
-      this.load_index = 0; // index starts from 0
       this.loaded_image_list  =response.cells;
+      this.load_index = 0; // index starts from 0
     },
     async previousImage(){
       this.next_or_previous = 'previous';
@@ -304,11 +293,11 @@ const app = new Vue({
       const length = new_coordinates.length - 1;
       var minx = new_coordinates[length][0];
       var miny = new_coordinates[length][1];
-      for (index = 0; index < new_coordinates.length; index++){
+      for (var index = 0; index < new_coordinates.length; index++){
         if (minx > new_coordinates[index][0]){minx = new_coordinates[index][0]}
         if (miny > new_coordinates[index][1]){miny = new_coordinates[index][1]}
       };
-      for (index = 0; index < new_coordinates.length; index++){
+      for (var index = 0; index < new_coordinates.length; index++){
         new_coordinates[index][0] = new_coordinates[index][0] - minx;
         new_coordinates[index][1] = new_coordinates[index][1] - miny;
       };
@@ -318,30 +307,24 @@ const app = new Vue({
     async nextImage(){
       this.next_or_previous = 'next';
       // await this.uploadAnnotation();
-      await this.cached_annotated_data.push(this.current_image_data);
+      //await this.cached_annotated_data.push(this.current_image_data);
       await this.assignImage();
     },
     // should add out of range check for image list
-    // fetch the first item to this.current_image_data
-    // then give the image index to next
+
     async assignImage(){
-      const image_sample_data = Object.assign({}, imageDataTemplate);
+      //const image_sample_data = Object.assign({}, imageDataTemplate);
       if (this.next_or_previous === 'next'){
         if (this.cached_image_data.length===0){
-          alert('Directly loading')
-        // pass the data to this.current_image_data
-        this.current_image_data = await this.fetchCellImage(this.load_index);
-        //add things to change load_index
-        let temp_load_index = this.load_index + 1;
-        this.load_index = temp_load_index; 
-        //this.load_index = this.load_index + 1; // for the next image
-          // get the data from server
-        //alert('Now Go to Index ' + this.load_index)
-        }else{
-          this.current_image_data = this.cached_image_data[0];
-          alert('Now we have some data in cached_image_data, num is ' + this.cached_image_data.length)
-          this.cached_image_data.splice(0,1); //pop the image data from the list
-        }
+          //alert('Directly loading')
+          const load_one = 1
+          await this.cacheImageData(load_one)}else{
+            // run next step directly
+          };
+        this.current_image_data = this.cached_image_data[0];
+          //alert('Now we have some data in cached_image_data, num is ' + this.cached_image_data.length)
+        this.cached_image_data.splice(0,1); //pop the image data from the list
+
       }else if(this.next_or_previous === 'previous'){
         if (this.cached_annotated_data.length > 0){
           this.current_image_data = this.cached_annotated_data[0]
@@ -354,9 +337,9 @@ const app = new Vue({
       // managing loading images
       this.current_panel = 'imageviewer';
       await this.displayMap(this.current_image_data.uri);
-      this.showAnnotation();
+      await this.showAnnotation();
       //alert('I am going to load')
-      await this.cacheImageData()
+      await this.cacheImageData(this.cached_image_data_num)
     },
     async uploadAnnotation(){
       // Default options are marked with *
