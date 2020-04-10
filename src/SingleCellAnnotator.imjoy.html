@@ -250,14 +250,35 @@ const app = new Vue({
     },
     // this function is to cache image data to annotate
     async cacheImageData(){
+      //alert('let me check if I can load')
       if (this.cached_image_data.length < this.cached_image_data_num){
+        //alert("promising, remain spaces in cached is " + this.cached_image_data_num  + " " + this.cached_image_data.length)
         if (this.load_index < this.cell_num - 1){
+          const a = this.cell_num - this.load_index;
+          const b = this.cached_image_data_num - this.cached_image_data.length
+          const c = this.cached_image_data_num
+
+          //alert("guess which is smaller A: " + a + "or B: " + b + "or C: " + c)
+          const load_capacity = Math.min(this.cached_image_data_num - this.cached_image_data.length, this.cell_num - this.load_index);
+          //alert("I feel I can load " + load_capacity)
+          for (index = 0; index < load_capacity; index++){
+            //alert(index)
           // load all the data to image_sample_data
-          const image_sample_data = await this.fetchCellImage(this.load_index)
-          this.load_index = this.load_index + 1; // for the next image
+          //let image_sample_data = await this.fetchCellImage(this.load_index)
+          let temp_load_index = this.load_index;
+          this.load_index = temp_load_index + 1; 
+          //this.load_index = this.load_index + 1; // for the next image
+          //alert('Now start to cache ' + temp_load_index)
+          let image_sample_data = await this.fetchCellImage(temp_load_index)
+          //alert("After loading, the index is " + temp_load_index)
+          //alert("Hi, there are data cached, num is " + this.cached_image_data.length)
           // get the data from server
           // pass the data to cached_image_data
-          this.cached_image_data.push(image_sample_data)
+          await this.cached_image_data.push(image_sample_data)
+          //alert("Hi, there are data cached, num is " + this.cached_image_data.length)
+          //alert('let me see how many loaded ' + this.cached_image_data.length)
+          }
+          
         }else{
           await this.getImageList()
         }
@@ -307,12 +328,18 @@ const app = new Vue({
       const image_sample_data = Object.assign({}, imageDataTemplate);
       if (this.next_or_previous === 'next'){
         if (this.cached_image_data.length===0){
+          alert('Directly loading')
         // pass the data to this.current_image_data
         this.current_image_data = await this.fetchCellImage(this.load_index);
-        this.load_index = this.load_index + 1; // for the next image
+        //add things to change load_index
+        let temp_load_index = this.load_index + 1;
+        this.load_index = temp_load_index; 
+        //this.load_index = this.load_index + 1; // for the next image
           // get the data from server
+        //alert('Now Go to Index ' + this.load_index)
         }else{
           this.current_image_data = this.cached_image_data[0];
+          alert('Now we have some data in cached_image_data, num is ' + this.cached_image_data.length)
           this.cached_image_data.splice(0,1); //pop the image data from the list
         }
       }else if(this.next_or_previous === 'previous'){
@@ -328,6 +355,7 @@ const app = new Vue({
       this.current_panel = 'imageviewer';
       await this.displayMap(this.current_image_data.uri);
       this.showAnnotation();
+      //alert('I am going to load')
       await this.cacheImageData()
     },
     async uploadAnnotation(){
