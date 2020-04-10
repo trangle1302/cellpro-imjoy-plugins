@@ -389,7 +389,7 @@ const app = new Vue({
       const routeFeatures = format.writeFeaturesObject(allFeatures, {decimals: 1});
       //await writeFile(annotationPath, JSON.stringify(routeFeatures))
       //await this.saveConfig()
-      routeFeatures['bbox'] = this.current_image_data.bbox;
+      routeFeatures['bbox'] = this.current_image_data.mask_geojson.bbox;
       feature_string = JSON.stringify(routeFeatures);
       this.current_image_data.mask_geojson = routeFeatures;
     },
@@ -399,7 +399,7 @@ const app = new Vue({
 
       const format = new ol.format.GeoJSON();
       const routeFeatures = format.writeFeaturesObject(allFeatures, {decimals: 1});
-      routeFeatures['bbox'] = this.current_image_data.bbox;
+      routeFeatures['bbox'] = this.current_image_data.mask_geojson_bbox;
       const blob = new Blob([JSON.stringify(routeFeatures)], {
           type: "text/plain;charset=utf-8"
       });
