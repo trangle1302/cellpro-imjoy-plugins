@@ -91,17 +91,17 @@ const imageDataTemplate = {
   image_id: null,
   bbox: null,
   mask_geojson:{
-  'type':'FeatureCollection',
-  'features':[
-    {
-      'type':'Feature',
-      'geometry':{
-      'type':'Polygon',
-      'coordinates':null
-      },
-      'properties':null
-    }],
-  'bbox':null,
+    'type':'FeatureCollection',
+    'features':[
+      {
+        'type':'Feature',
+        'geometry':{
+        'type':'Polygon',
+        'coordinates':null
+        },
+        'properties':null
+      }],
+    'bbox':null,
   },
   label_display_mode: null,
   uri: null,
@@ -321,7 +321,7 @@ const app = new Vue({
           await this.cacheImageData(load_one)}else{
             // run next step directly
           };
-        this.current_image_data = this.cached_image_data[0];
+        this.current_image_data = await this.cached_image_data[0];
           //alert('Now we have some data in cached_image_data, num is ' + this.cached_image_data.length)
         this.cached_image_data.splice(0,1); //pop the image data from the list
 
@@ -399,7 +399,7 @@ const app = new Vue({
 
       const format = new ol.format.GeoJSON();
       const routeFeatures = format.writeFeaturesObject(allFeatures, {decimals: 1});
-      routeFeatures['bbox'] = this.current_image_data.mask_geojson_bbox;
+      routeFeatures['bbox'] = this.current_image_data.mask_geojson.bbox;
       const blob = new Blob([JSON.stringify(routeFeatures)], {
           type: "text/plain;charset=utf-8"
       });
