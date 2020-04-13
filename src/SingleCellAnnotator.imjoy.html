@@ -88,7 +88,7 @@ async function getImageMeta(url) {
   });
 };
 const imageDataTemplate = {
-  image_id: null,
+  cell_id: null,
   bbox: null,
   mask_geojson:{
   'type':'FeatureCollection',
@@ -134,35 +134,15 @@ const app = new Vue({
       password: "GPq2VZgRg2lq5lYPNh9v"
     },
   // from here this is communication to backend, to develop/activate
-    tasks: {
-      1:{
-        name: null,
-        finished: null,
-        total: null
-      },
-      2:{
-        name: null,
-        finished: null,
-        total: null
-      },
-    },
+    tasks: null,
     current_task_name: null,
-    cell_num: '20',
-    // image format
+    cell_per_batch: 10,
     loaded_image_list: null,
-    // this is to store annotated images.
-    cached_annotated_data_num: 10,
-    cached_annotated_data: [],
-    // this is a list of image data chached to annotate
-    cached_image_data_num: 10,
     cached_image_data: [],
-    // this is about current image
-    // this is the index of image in loaded_image_list to load to annotate
-    load_index: 0,
     current_location_selected: null, 
     current_image_data:null,
-    next_or_previous: null,
-    backend_url: null,
+    current_image_index: 0,
+    loading_cache: false
   },
   mounted(){
     this.selected_server_url = this.servers['production']
@@ -186,14 +166,7 @@ const app = new Vue({
             credentials: 'include'
           })
           const res2 = await response2.json()
-          data = res2.tasks
-          key_index = 1
-          for (var key in data) {
-            this.tasks[key_index].name = key
-            this.tasks[key_index].finished = data[key].finished
-            this.tasks[key_index].total = data[key].total
-            key_index = key_index + 1
-          }
+          this.tasks = res2.tasks
           this.current_panel = 'task_selection';
         }else{
           api.alert('Failed to login, error: ' + res.error);
@@ -213,72 +186,87 @@ const app = new Vue({
         if (res.success){
           return res
         }else{
-          api.alert('Internal server error: ' + res.error);
+          api.showMessage('Internal server error: ' + res.error)
+          throw 'Internal server error: ' + res.error
         }
       }else{
-        api.alert('Response Status:' + response.status)
+        api.showMessage('Response Status:' + response.status)
+        throw 'Response Status:' + response.status
       }
     },
-    // choose task type
     async chooseTask (task_name){
       this.current_task_name = task_name;
       this.initial_loading = true;
-      await this.getImageList();
-      this.next_or_previous = 'next';
-      await this.assignImage();
+      await this.getNewImageBatch(this.current_task_name, true);
     },
-    async fetchCellImage(load_index){
-      const image_sample_data = Object.assign({}, imageDataTemplate);
-      image_sample_data.image_id = this.loaded_image_list[load_index];
-      const response = await this.fetchURLData("/images/" + this.current_task_name + "/" + image_sample_data.image_id)
-      image_sample_data.mask_geojson.bbox = response.bbox;
+    async fetchCellImage(cell_id){
+      const imageData = Object.assign({}, imageDataTemplate);
+      imageData.cell_id = cell_id;
+      const response = await this.fetchURLData("/images/" + this.current_task_name + "/" + imageData.cell_id)
+      imageData.mask_geojson.bbox = response.bbox;
       const image_coordinates = await this.processCoordinates(response.mask.geometry.coordinates);
-      image_sample_data.mask_geojson.features[0].geometry.coordinates = image_coordinates;
-      image_sample_data.uri = response.image;
+      imageData.mask_geojson.features[0].geometry.coordinates = image_coordinates;
+      imageData.uri = response.image;
       locations = Object.keys(response.location);
       if(locations.length==1){
-        image_sample_data.label_display_mode = 'single'
-        image_sample_data.location = locations[0];
-        image_sample_data.location_selected = null;
+        imageData.label_display_mode = 'single'
+        imageData.location = locations[0];
+        imageData.location_selected = null;
       }
       else
       { 
-        image_sample_data.label_display_mode = 'multiple'
-        image_sample_data.location = response.location;
+        imageData.label_display_mode = 'multiple'
+        imageData.location = response.location;
       }
-      return image_sample_data
+      return imageData
     },
-    // this function is to cache image data to annotate
-    async cacheImageData(){
-      if (this.cached_image_data.length < this.cached_image_data_num){
-        if (this.load_index < this.cell_num - 1){
-          // load all the data to image_sample_data
-          const image_sample_data = await this.fetchCellImage(this.load_index)
-          this.load_index = this.load_index + 1; // for the next image
-          // get the data from server
-          // pass the data to cached_image_data
-          this.cached_image_data.push(image_sample_data)
-        }else{
-          await this.getImageList()
+    async getNewImageBatch(task_name, display_first){
+      api.showStatus('Loading a new batch...')
+      if(this.loading_cache){
+        if(task_name === this.loading_cache){
+          return
         }
-      };
-    },
-    // save annotated data at number of this.cached_annotated_data
-    // this function is to load image list and assign image
-    //loading image list
-    async getImageList(){
-      const response = await this.fetchURLData("/tasks/" + this.current_task_name + "?cell_num=" + this.cell_num);
-      this.load_index = 0; // index starts from 0
-      this.loaded_image_list  =response.cells;
-    },
-    async previousImage(){
-      this.next_or_previous = 'previous';
-      await this.assignImage();
-      //api.alert('Not implemented.')
+        else{
+          // switch tasks
+          // this.cached_image_data = []
+        }
+      }
+      try{
+        this.loading_cache = task_name;
+        const response = await this.fetchURLData("/tasks/" + task_name + "?cell_num=" + this.cell_per_batch);
+        this.loaded_image_list  =response.cells;
+        if(this.loaded_image_list.length<=0){
+          api.showMessage('No more images in this task.')
+          return
+        }
+        for(let i=0;i< this.loaded_image_list.length; i++){
+          if(task_name !== this.loading_cache){
+            console.error('Switching tasks, quit caching')
+            break
+          }
+          const cell_id = this.loaded_image_list[i];
+          api.showProgress((i+1)/this.loaded_image_list.length)
+          const imageData = await this.fetchCellImage(cell_id)
+          if(display_first && i===0){
+            this.showImage(imageData)
+            this.$forceUpdate();
+          }
+          this.cached_image_data.push(imageData)
+        }
+        // remove older images
+        if(this.cached_image_data.length>this.cell_per_batch*3){
+          this.cached_image_data = this.cached_image_data.slice(this.cell_per_batch)
+          console.log('Removing images from the cache.',  this.cached_image_data.length)
+        }
+        api.showProgress(100)
+        api.showStatus(`A new batch with ${this.loaded_image_list.length} images loaded`)
+      }
+      finally{
+        this.loading_cache = false;
+      }
     },
     async processCoordinates (coordinates){
       // in priniciple, bbox should pass the crop starting points, and do this processing
-      //alert(JSON.stringify(coordinates))
       var new_coordinates = coordinates[0]
       const length = new_coordinates.length - 1;
       var minx = new_coordinates[length][0];
@@ -291,44 +279,45 @@ const app = new Vue({
         new_coordinates[index][0] = new_coordinates[index][0] - minx;
         new_coordinates[index][1] = new_coordinates[index][1] - miny;
       };
-      //alert(JSON.stringify(new_coordinates))
       return [new_coordinates]
     },
-    async nextImage(){
-      this.next_or_previous = 'next';
-      // await this.uploadAnnotation();
-      await this.cached_annotated_data.push(this.current_image_data);
-      await this.assignImage();
-    },
-    // should add out of range check for image list
-    // fetch the first item to this.current_image_data
-    // then give the image index to next
-    async assignImage(){
-      const image_sample_data = Object.assign({}, imageDataTemplate);
-      if (this.next_or_previous === 'next'){
-        if (this.cached_image_data.length===0){
-        // pass the data to this.current_image_data
-        this.current_image_data = await this.fetchCellImage(this.load_index);
-        this.load_index = this.load_index + 1; // for the next image
-          // get the data from server
-        }else{
-          this.current_image_data = this.cached_image_data[0];
-          this.cached_image_data.splice(0,1); //pop the image data from the list
-        }
-      }else if(this.next_or_previous === 'previous'){
-        if (this.cached_annotated_data.length > 0){
-          this.current_image_data = this.cached_annotated_data[0]
-        }else{
-          api.alert('Wrong operation, there is no previous image')
-        }
-      }else{
-        api.alert('Frontend parameter choice is wrong for next_or_previous')
+    async previousImage(){
+      this.current_image_index = this.cached_image_data.indexOf(this.current_image_data)
+      if(this.current_image_index<=-1){
+        this.current_image_index = 0;
       }
-      // managing loading images
+      else{
+        this.current_image_index--;
+      }
+      await this.showImage(this.cached_image_data[this.current_image_index]);
+    },
+    async nextImage(){
+      this.current_image_index = this.cached_image_data.indexOf(this.current_image_data)
+      if(this.anntation_mode){
+        const anwser = await api.confirm("Would you like to save the mask annotation?")
+        if(anwser){
+          this.saveAnnotation()
+        }
+        this.stopAnnotation();
+      }
+      this.current_image_index++;
+      await this.showImage(this.cached_image_data[this.current_image_index]);
+      // when we reach 70% of the the cached images
+      if(this.current_image_index>this.cached_image_data.length*0.5){
+        await this.getNewImageBatch(this.current_task_name)
+      }
+    },
+    async showImage(imageData){
+      if(!imageData){
+        api.showMessage('No more image to show.')
+        console.error('no image data to show.')
+        return
+      }
+      this.current_image_data = imageData;
+      // annotation viewer
       this.current_panel = 'imageviewer';
-      await this.displayMap(this.current_image_data.uri);
-      this.showAnnotation();
-      await this.cacheImageData()
+      await this.displayMap(imageData.uri);
+      this.showMaskAnnotation(imageData.mask_geojson);
     },
     async uploadAnnotation(){
       // Default options are marked with *
@@ -366,23 +355,21 @@ const app = new Vue({
       this.vector_source.addFeatures(features)
       this.updateFeatureStyle()
     },
-    async showAnnotation (){
-      features = (new GeoJSON()).readFeatures(this.current_image_data.mask_geojson)
+    async showMaskAnnotation(mask_geojson){
+      this.vector_source.clear()
+      features = (new GeoJSON()).readFeatures(mask_geojson)
       this.vector_source.addFeatures(features)
-      //alert(await JSON.stringify(this.current_image_data.mask_geojson))
     },
     // save annotations
     async saveAnnotation(features){
       const allFeatures = features || this.vector_source.getFeatures();
       const format = new ol.format.GeoJSON();
       const routeFeatures = format.writeFeaturesObject(allFeatures, {decimals: 1});
-      //await writeFile(annotationPath, JSON.stringify(routeFeatures))
-      //await this.saveConfig()
       routeFeatures['bbox'] = this.current_image_data.bbox;
       feature_string = JSON.stringify(routeFeatures);
       this.current_image_data.mask_geojson = routeFeatures;
+      this.stopAnnotation();
     },
-    //let features = this.vector_source.getFeatures()
     async exportAnnotation() {
       const allFeatures = this.vector_source.getFeatures();
 
@@ -395,6 +382,38 @@ const app = new Vue({
       api.alert(JSON.stringify(blob))
     },
     async displayMap(image_url){
+      // assuming the current plane is z plane
+      const imgObj = await getImageMeta(image_url)
+      const extent = [0, 0, imgObj.width, imgObj.height];
+
+      const projection = new Projection({
+          code: 'image',
+          units: 'pixels',
+          extent: extent,
+      });
+
+      const image_source = new Static({
+        attributions: '©Human Protein Atlas',
+        url: image_url,
+        projection: projection,
+        imageExtent: extent
+      })
+
+      if(this.image_layer && this.map){
+        this.map.setView( new View({
+          projection: projection,
+          center: getCenter(extent),
+          zoom: 1,
+          minZoom: -10
+        }))
+        this.image_layer.setSource(image_source)
+        return
+      }
+
+      this.image_layer = new ImageLayer({
+        source: image_source,
+      })
+
       this.vector_source = new VectorSource();
       var vector_layer = new VectorLayer({
         source: this.vector_source,
@@ -417,32 +436,13 @@ const app = new Vue({
       const select = new Select({
           wrapX: false
       });
-      // assuming the current plane is z plane
-      const imgObj = await getImageMeta(image_url)
-      const extent = [0, 0, imgObj.width, imgObj.height];
-
-      const projection = new Projection({
-          code: 'image',
-          units: 'pixels',
-          extent: extent,
-      });
-
-      this.image_source = new Static({
-        attributions: '©Human Protein Atlas',
-        url: image_url,
-        projection: projection,
-        imageExtent: extent
-      })
-      const image_layer = new ImageLayer({
-        source: this.image_source,
-      })
       // clear map
       document.getElementById('map').innerHTML = ""
       this.map = new Map({
         interactions: ol.interaction.defaults({altShiftDragRotate:false, pinchRotate:false}),
         controls: defaultControls(),
         layers: [
-          image_layer,
+          this.image_layer,
           vector_layer,
         ],
         target: 'map',
@@ -466,13 +466,8 @@ const app = new Vue({
       });
       this.select = select
     },
-    async removeMaskAnnotation() {
-      if (this.vector_source) {
-          const features = this.vector_source.getFeatures();
-          features.forEach((feature) => {
-            this.vector_source.removeFeature(feature);
-          });
-      }
+    removeMaskAnnotation() {
+      this.vector_source.clear()
     },
     startAnnotation(source, freehand){
       if(!source){
@@ -497,11 +492,10 @@ const app = new Vue({
       }
       this.snapInteraction = new Snap({source: source});
       this.map.addInteraction(this.snapInteraction);
-
-      // if(this.itkInteraction)
-      // this.map.removeInteraction(this.itkInteraction);
+      this.anntation_mode = true;
     },
     stopAnnotation(){
+      this.anntation_mode = false;
       if(this.drawInteraction)
       this.map.removeInteraction(this.drawInteraction);
       if(this.snapInteraction)
@@ -523,7 +517,6 @@ const app = new Vue({
 
 class ImJoyPlugin {
   async setup() {
-
   }
 
   async run(ctx) {
@@ -572,31 +565,23 @@ api.export(new ImJoyPlugin())
       <div class="panel-body">
         <br>
         <br>
-        <div v-for="task in tasks">
+        <div v-for="(task, task_name) in tasks">
           <progress class="progress" style="width: 288px" :value="task.finished" :max="task.total"></progress>
           <br>
-          <button class="btn" style="width: 280px" @click="chooseTask(task.name)"><i class="icon icon-edit"></i>&nbsp; {{task.name}}: {{task.finished}}/{{task.total}}</button>&nbsp;&nbsp;
+          <button class="btn" style="width: 280px" @click="chooseTask(task_name)"><i class="icon icon-edit"></i>&nbsp; {{task_name}}: {{task.finished}}/{{task.total}}</button>&nbsp;&nbsp;
           <br>
           <br>
         </div>
-
-        <!--<div class="progress">
-          <progress class="progress-bar" arial-valuenow= 'tasks[1].finished' aria-valuemin="0" arial-valuemax='tasks[1].total' style="width:10"></progress>&nbsp;&nbsp;
-          <br>
-          <progress class="progress-bar" arial-valuenow= 'tasks[1].finished' aria-valuemin="0" arial-valuemax='tasks[1].total' style="width:10"></progress>&nbsp;&nbsp;
-        </div>-->
       </div>
       <div class="panel-footer">
-        <!-- buttons or inputs -->
       </div>
-
     </div>
-
+  
     <div class="panel" v-if="current_panel=='imageviewer'&&current_image_data">
       <template v-if="current_image_data.label_display_mode==='multiple'">
         <div class="floating-right-btn">
           <div class="btn-group">
-            <button class="btn transparent-btn" @click="previousImage()"><i class="icon icon-back"></i>&nbsp;Back</button>
+            <button :disabled="current_image_index===0" class="btn transparent-btn" @click="previousImage()"><i class="icon icon-back"></i>&nbsp;Back</button>
             <button class="btn transparent-btn" @click="nextImage()">Next&nbsp;<i class="icon icon-forward"></i></button>
           </div>
           <br>
@@ -607,7 +592,7 @@ api.export(new ImJoyPlugin())
       </template>
       <template v-if="current_image_data.label_display_mode==='single'">
         <div class="btn-group floating-bottom-btn">
-          <button class="btn transparent-btn" @click="previousImage()"><i class="icon icon-back"></i>&nbsp;Back</button>
+          <button :disabled="current_image_index===0" class="btn transparent-btn" @click="previousImage()"><i class="icon icon-back"></i>&nbsp;Back</button>
           <button class="btn transparent-btn" @click="current_location_selected=true" :class="{'selected-location-btn': current_location_selected===true}"><i class="icon icon-check"></i>&nbsp;Yes</button>
           <button class="btn transparent-btn" @click="current_location_selected=false" :class="{'selected-location-btn': current_location_selected===false}"><i class="icon icon-cross"></i>&nbsp;No</button>
           <button class="btn transparent-btn" @click="nextImage()">Next&nbsp;<i class="icon icon-forward"></i></button>
