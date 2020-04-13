@@ -192,7 +192,7 @@ const app = new Vue({
             this.tasks[key_index].name = key
             this.tasks[key_index].finished = data[key].finished
             this.tasks[key_index].total = data[key].total
-            key_index = key_index + 1
+            key_index += 1
           }
           this.current_panel = 'task_selection';
         }else{
@@ -253,11 +253,12 @@ const app = new Vue({
     // this function is to cache image data to annotate
     async cacheImageData(cached_image_num){
       const cached_limit_num = cached_image_num;
+      var index;
       if (this.cached_image_data.length < cached_limit_num){
         let temp_load_index = this.load_index;
         if (temp_load_index < this.cell_num - 1){
           const load_capacity = Math.min(cached_limit_num - this.cached_image_data.length, this.cell_num - temp_load_index);
-          for (var index = 0; index < load_capacity; index++){
+          for (index = 0; index < load_capacity; index++){
             const loading_data = await this.fetchCellImage(temp_load_index);
             if (this.cached_image_data.length < cached_limit_num){
               this.cached_image_data.push(loading_data);
@@ -290,10 +291,11 @@ const app = new Vue({
       // in priniciple, bbox should pass the crop starting points, and do this processing
       //alert(JSON.stringify(coordinates))
       var new_coordinates = coordinates[0]
+      var index;
       const length = new_coordinates.length - 1;
       var minx = new_coordinates[length][0];
       var miny = new_coordinates[length][1];
-      for (var index = 0; index < new_coordinates.length; index++){
+      for (index = 0; index < new_coordinates.length; index++){
         if (minx > new_coordinates[index][0]){minx = new_coordinates[index][0]}
         if (miny > new_coordinates[index][1]){miny = new_coordinates[index][1]}
       };
@@ -321,9 +323,9 @@ const app = new Vue({
           await this.cacheImageData(load_one)}else{
             // run next step directly
           };
-        this.current_image_data = await this.cached_image_data[0];
+        this.current_image_data = await this.cached_image_data.shift();
           //alert('Now we have some data in cached_image_data, num is ' + this.cached_image_data.length)
-        this.cached_image_data.splice(0,1); //pop the image data from the list
+        //this.cached_image_data.splice(0,1); //pop the image data from the list
 
       }else if(this.next_or_previous === 'previous'){
         if (this.cached_annotated_data.length > 0){
