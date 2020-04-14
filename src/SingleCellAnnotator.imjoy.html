@@ -8,7 +8,7 @@
   "type": "window",
   "tags": [],
   "ui": "",
-  "version": "0.1.9",
+  "version": "0.1.10",
   "api_version": "0.1.7",
   "description": "Annotate images for HPA single-cell image classification",
   "icon": "extension",
@@ -139,7 +139,7 @@ const app = new Vue({
     loaded_image_list: null,
     cached_image_data: [],
     current_location_selected: null, 
-    current_image_data:null,
+    current_image_data: null,
     current_image_index: 0,
     loading_cache: false
   },
@@ -196,7 +196,7 @@ const app = new Vue({
     async chooseTask (task_name){
       this.current_task_name = task_name;
       this.initial_loading = true;
-      await this.getNewImageBatch(this.current_task_name, true);
+      this.getNewImageBatch(this.current_task_name, true);
     },
     async fetchCellImage(cell_id){
       const imageData = JSON.parse(JSON.stringify(imageDataTemplate));
@@ -304,6 +304,7 @@ const app = new Vue({
         this.stopAnnotation();
       }
       this.current_image_index++;
+      if(this.cached_image_data[this.current_image_index])
       await this.showImage(this.cached_image_data[this.current_image_index]);
     },
     async showImage(imageData){
@@ -345,6 +346,15 @@ const app = new Vue({
       else{
         this.stopAnnotation()
       }
+    },
+    toggleDiscard(){
+      if(this.current_image_data.discarded){
+        this.current_image_data.discarded = false;
+      }
+      else{
+        this.current_image_data.discarded = true;
+      }
+      this.$forceUpdate()
     },
     async showMaskAnnotation(mask_geojson){
       this.vector_source.clear()
@@ -573,31 +583,32 @@ api.export(new ImJoyPlugin())
         <div class="floating-right-btn">
           <div class="btn-group">
             <button :disabled="current_image_index===0" class="btn transparent-btn" @click="previousImage()"><i class="icon icon-back"></i>&nbsp;Back</button>
-            <button class="btn transparent-btn" @click="nextImage()">Next&nbsp;<i class="icon icon-forward"></i></button>
+            <button :disabled="current_image_index>=cached_image_data.length" class="btn transparent-btn" @click="nextImage()">Next&nbsp;<i class="icon icon-forward"></i></button>
           </div>
           <br>
           <div class="columns">
-            <button v-for="(loc, k) in current_image_data.location" @click="toggleLocation(k)" class="column btn location-btn" :class="{'selected-location-btn': loc}">{{k.slice(0,12)+(k.length>12?'.': '')}}</button>
+            <button :disabled="current_image_data.discarded" v-for="(loc, k) in current_image_data.location" @click="toggleLocation(k)" class="column btn location-btn" :class="{'selected-location-btn': loc}">{{k.slice(0,12)+(k.length>12?'.': '')}}</button>
           </div>
         </div>
       </template>
       <template v-if="current_image_data.label_display_mode==='single'">
         <div class="btn-group floating-bottom-btn">
           <button :disabled="current_image_index===0" class="btn transparent-btn" @click="previousImage()"><i class="icon icon-back"></i>&nbsp;Back</button>
-          <button class="btn transparent-btn" @click="current_location_selected=true" :class="{'selected-location-btn': current_location_selected===true}"><i class="icon icon-check"></i>&nbsp;Yes</button>
-          <button class="btn transparent-btn" @click="current_location_selected=false" :class="{'selected-location-btn': current_location_selected===false}"><i class="icon icon-cross"></i>&nbsp;No</button>
-          <button class="btn transparent-btn" @click="nextImage()">Next&nbsp;<i class="icon icon-forward"></i></button>
+          <button :disabled="current_image_data.discarded" class="btn transparent-btn" @click="current_location_selected=true" :class="{'selected-location-btn': current_location_selected===true}"><i class="icon icon-check"></i>&nbsp;Yes</button>
+          <button :disabled="current_image_data.discarded" class="btn transparent-btn" @click="current_location_selected=false" :class="{'selected-location-btn': current_location_selected===false}"><i class="icon icon-cross"></i>&nbsp;No</button>
+          <button :disabled="current_image_index>=cached_image_data.length" class="btn transparent-btn" @click="nextImage()">Next&nbsp;<i class="icon icon-forward"></i></button>
         </div>
         <span class="h3 floating-label">{{current_image_data.location}}</span>
       </template>
       <div class="input-group floating-switch">
+        <button class="btn" :class="{'transparent-btn': current_image_data.discarded!==true}" @click="toggleDiscard()">Discard</button>&nbsp;&nbsp;
         <label class="form-switch">
           <input type="checkbox" v-model="anntation_mode" @change="anntation_mode_changed">
           <i class="form-icon"></i> Adjust Mask
         </label>
         <button class="btn transparent-btn" v-if="anntation_mode" @click="saveAnnotation()">Save</button>&nbsp;&nbsp;
         <button class="btn transparent-btn" title="annotation mode" v-if="anntation_mode" @click="removeMaskAnnotation()"><i class="icon icon-delete"></i></button>&nbsp;&nbsp;
-        <button class="btn transparent-btn btn-action s-circle" title="home" @click="current_panel='task_selection'"><i class="icon icon-cross"></i></button>&nbsp;&nbsp;
+        <button class="btn transparent-btn btn-action s-circle" title="home" @click="current_panel='task_selection';current_task_name=null;"><i class="icon icon-cross"></i></button>&nbsp;&nbsp;
       </div>
       <div v-if="loading" class="loading loading-lg floating"></div>
       <div id="map"></div>
@@ -607,6 +618,9 @@ api.export(new ImJoyPlugin())
 
 </window>
 <style lang="css">
+  body{
+    overflow: hidden;
+  }
   .centered-panel{
     background-color: #448aff0f;
     width: 100%;
@@ -653,6 +667,9 @@ api.export(new ImJoyPlugin())
     top: 80px;
     width: 330px;
     z-index: 999;
+  }
+  .btn{
+    width: 90px;
   }
   .location-btn {
     padding-top: 0px;
