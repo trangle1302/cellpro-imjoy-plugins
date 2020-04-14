@@ -1,4 +1,4 @@
-﻿<docs lang="markdown">
+<docs lang="markdown">
 [TODO: write documentation for this plugin.]
 </docs>
 
@@ -8,7 +8,7 @@
   "type": "window",
   "tags": [],
   "ui": "",
-  "version": "0.1.8",
+  "version": "0.1.9",
   "api_version": "0.1.7",
   "description": "Annotate images for HPA single-cell image classification",
   "icon": "extension",
@@ -199,7 +199,7 @@ const app = new Vue({
       await this.getNewImageBatch(this.current_task_name, true);
     },
     async fetchCellImage(cell_id){
-      const imageData = Object.assign({}, imageDataTemplate);
+      const imageData = JSON.parse(JSON.stringify(imageDataTemplate));
       imageData.cell_id = cell_id;
       const response = await this.fetchURLData("/images/" + this.current_task_name + "/" + imageData.cell_id)
       imageData.mask_geojson.bbox = response.bbox;
@@ -227,12 +227,12 @@ const app = new Vue({
         }
         else{
           // switch tasks
-          // this.cached_image_data = []
+          this.cached_image_data = []
         }
       }
       try{
         this.loading_cache = task_name;
-        const response = await this.fetchURLData("/tasks/" + task_name + "?cell_num=" + this.cell_per_batch);
+        const response = await this.fetchURLData("/tasks/" + task_name + "?cell_num=" + this.cell_per_batch+'&maskout=1');
         this.loaded_image_list  =response.cells;
         if(this.loaded_image_list.length<=0){
           api.showMessage('No more images in this task.')
@@ -292,6 +292,10 @@ const app = new Vue({
     },
     async nextImage(){
       this.current_image_index = this.cached_image_data.indexOf(this.current_image_data)
+      // when we reach 70% of the the cached images
+      if(this.current_image_index>this.cached_image_data.length*0.5){
+        this.getNewImageBatch(this.current_task_name)
+      }
       if(this.anntation_mode){
         const anwser = await api.confirm("Would you like to save the mask annotation?")
         if(anwser){
@@ -301,14 +305,10 @@ const app = new Vue({
       }
       this.current_image_index++;
       await this.showImage(this.cached_image_data[this.current_image_index]);
-      // when we reach 70% of the the cached images
-      if(this.current_image_index>this.cached_image_data.length*0.5){
-        await this.getNewImageBatch(this.current_task_name)
-      }
     },
     async showImage(imageData){
       if(!imageData){
-        api.showMessage('No more image to show.')
+        api.showStatus('No more image to show.')
         console.error('no image data to show.')
         return
       }
@@ -345,14 +345,6 @@ const app = new Vue({
       else{
         this.stopAnnotation()
       }
-    },
-    // this is for import and export geojson
-    async setFeatures(geojsonObject) {
-      let features = (new GeoJSON()).readFeatures(geojsonObject)
-
-      this.draw_feature_list = [...this.draw_feature_list, ...features]
-      this.vector_source.addFeatures(features)
-      this.updateFeatureStyle()
     },
     async showMaskAnnotation(mask_geojson){
       this.vector_source.clear()
@@ -596,7 +588,7 @@ api.export(new ImJoyPlugin())
           <button class="btn transparent-btn" @click="current_location_selected=false" :class="{'selected-location-btn': current_location_selected===false}"><i class="icon icon-cross"></i>&nbsp;No</button>
           <button class="btn transparent-btn" @click="nextImage()">Next&nbsp;<i class="icon icon-forward"></i></button>
         </div>
-        <span class="h1 floating-label">{{current_image_data.location}}</span>
+        <span class="h3 floating-label">{{current_image_data.location}}</span>
       </template>
       <div class="input-group floating-switch">
         <label class="form-switch">
@@ -633,11 +625,11 @@ api.export(new ImJoyPlugin())
   }
 
   .floating-label{
-    color:#ffefdb96;
+    color:#ffefdbc2;
     position: absolute;
     left: 50%;
     z-index: 999;
-    top: calc(90% - 32px);
+    top: calc(92% - 20px);
     -webkit-transform: translate3d(-50%, -50%, 0);
     -moz-transform: translate3d(-50%, -50%, 0);
     transform: translate3d(-50%, -50%, 0);
@@ -652,7 +644,7 @@ api.export(new ImJoyPlugin())
   .floating-bottom-btn {
     position: absolute;
     left: calc(50% - 180px);
-    top: 90%;
+    top: 92%;
     z-index: 999;
   }
   .floating-right-btn{
