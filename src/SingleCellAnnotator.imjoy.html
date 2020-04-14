@@ -89,7 +89,6 @@ async function getImageMeta(url) {
 };
 const imageDataTemplate = {
   cell_id: null,
-  bbox: null,
   mask_geojson:{
   'type':'FeatureCollection',
   'features':[
@@ -365,7 +364,7 @@ const app = new Vue({
       const allFeatures = features || this.vector_source.getFeatures();
       const format = new ol.format.GeoJSON();
       const routeFeatures = format.writeFeaturesObject(allFeatures, {decimals: 1});
-      routeFeatures['bbox'] = this.current_image_data.bbox;
+      routeFeatures['bbox'] = this.current_image_data.mask_geojson.bbox;
       feature_string = JSON.stringify(routeFeatures);
       this.current_image_data.mask_geojson = routeFeatures;
       this.stopAnnotation();
@@ -375,7 +374,7 @@ const app = new Vue({
 
       const format = new ol.format.GeoJSON();
       const routeFeatures = format.writeFeaturesObject(allFeatures, {decimals: 1});
-      routeFeatures['bbox'] = this.current_image_data.bbox;
+      routeFeatures['bbox'] = this.current_image_data.mask_geojson.bbox;
       const blob = new Blob([JSON.stringify(routeFeatures)], {
           type: "text/plain;charset=utf-8"
       });
