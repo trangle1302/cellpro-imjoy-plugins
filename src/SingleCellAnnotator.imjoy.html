@@ -147,7 +147,8 @@ const app = new Vue({
     current_location_selected: null, 
     current_image_data: null,
     current_image_index: 0,
-    loading_cache: false
+    loading_cache: false,
+    extend_image: false
   },
   mounted(){
     this.selected_server_url = this.servers['production']
@@ -242,7 +243,13 @@ const app = new Vue({
     async fetchCellImage(cell_id){
       const imageData = JSON.parse(JSON.stringify(imageDataTemplate));
       imageData.cell_id = cell_id;
-      const response = await this.fetchURLData("/images/" + this.current_task_name + "/" + imageData.cell_id)
+      let image_url = "/images/" + this.current_task_name + "/" + imageData.cell_id;
+      if (this.extend_image){
+        image_url += "?extend=200"
+      }else{
+        image_url += "?extend=20"
+      };
+      const response = await this.fetchURLData(image_url)
       imageData.mask_geojson.bbox = response.bbox;
       const image_coordinates = await this.processCoordinates(response.mask.geometry.coordinates);
       imageData.mask_geojson.features[0].geometry.coordinates = image_coordinates;
@@ -322,6 +329,13 @@ const app = new Vue({
       return [new_coordinates]
     },
     async previousImage(){
+      if(this.annotation_mode){
+        const anwser = await api.confirm("Would you like to save the mask annotation?")
+        if(anwser){
+          this.saveAnnotation()
+        }
+        this.stopAnnotation();
+      };
       this.current_image_index = this.cached_image_data.indexOf(this.current_image_data)
       if(this.current_image_index<=-1){
         this.current_image_index = 0;
@@ -365,6 +379,17 @@ const app = new Vue({
       await this.displayMap(imageData.uri);
       this.showMaskAnnotation(imageData.mask_geojson);
     },
+    // extend Image
+    async extendImage(){
+      this.extend_image = true;
+      this.current_image_index = this.cached_image_data.indexOf(this.current_image_data);
+      const cell_id = this.current_image_data.cell_id;
+      const imageData = await this.fetchCellImage(cell_id)
+      this.extend_image = false;
+      this.cached_image_data[this.current_image_index] = imageData;
+      await this.showImage(imageData)
+    },
+
     async uploadAnnotation(){
       // Default options are marked with *
       const sendData = JSON.parse(JSON.stringify(sendDataTemplate));
@@ -403,8 +428,9 @@ const app = new Vue({
         throw new Error('Failed to upload the annotaiton.')
       };
     },
-    annotation_mode_changed(){
+    async annotation_mode_changed(){
       if(this.annotation_mode){
+        await this.extendImage();
         this.startAnnotation(this.vector_source, this.freehand_mode)
       }
       else{
