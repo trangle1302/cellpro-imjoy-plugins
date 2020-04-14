@@ -105,7 +105,13 @@ const imageDataTemplate = {
   label_display_mode: null,
   uri: null,
   location: null,
-  location_selected: null
+  discarded: false
+};
+const sendDataTemplate = {
+  discarded: null,
+  mask: null,
+  bbox: null,
+  location:null
 };
 
 const app = new Vue({
@@ -119,7 +125,7 @@ const app = new Vue({
     drawInteraction: null,
     snapInteraction: null,
     itkInteraction: null,
-    anntation_mode: false,
+    annotation_mode: false,
     freehand_mode: true,
     vector_source: null,
     loading: false,
@@ -167,7 +173,7 @@ const app = new Vue({
           this.toggleDiscard()
         }
         else if(event.code === 'KeyM'){
-          this.anntation_mode = true
+          this.annotation_mode = true
         }
         else if(event.code === 'KeyR'){
           this.removeMaskAnnotation()
@@ -245,7 +251,6 @@ const app = new Vue({
       if(locations.length==1){
         imageData.label_display_mode = 'single'
         imageData.location = locations[0];
-        imageData.location_selected = null;
       }
       else
       { 
@@ -335,7 +340,7 @@ const app = new Vue({
     },
     async nextImage(){
       this.loadMoreIfNeeded();
-      if(this.anntation_mode){
+      if(this.annotation_mode){
         const anwser = await api.confirm("Would you like to save the mask annotation?")
         if(anwser){
           this.saveAnnotation()
@@ -362,9 +367,27 @@ const app = new Vue({
     },
     async uploadAnnotation(){
       // Default options are marked with *
+      const sendData = JSON.parse(JSON.stringify(sendDataTemplate));
+      sendData.discarded = this.current_image_data.discarded;
+      sendData.mask = this.current_image_data.mask_geojson.features;
+      sendData.bbox = this.current_image_data.mask_geojson.bbox;
+      sendData.location = {};
+      if (this.current_image_data.label_display_mode == 'single'){
+        sendData.location[this.current_image_data.location] = this.current_location_selected;
+        } else if (this.current_image_data.label_display_mode == 'multiple'){
+          sendData.location = this.current_image_data.location;
+          for (loc in sendData.location){
+            if(sendData.location[loc]==null){
+              sendData.location[loc] = false}
+          }
+          // add things here
+        } else{api.alert("label_display_mode parameter out of range");
+        return };
+      // reset current_location_selected
+      this.current_location_selected = null;
       // this is the url to send the current annotation
-      const url_post = base_url;
-      const data = this.user;
+      const sub_url = "annotations/" + this.current_task_name + "/" + this.current_image_data.cell_id;
+      const url_post = this.selected_server_url + sub_url;
       const response = await fetch(url_post, {
           method: 'POST',
           mode: 'cors',
@@ -372,7 +395,7 @@ const app = new Vue({
           headers: {
             'Content-Type': 'application/json'
           },
-          body: JSON.stringify(data)
+          body: JSON.stringify(sendData)
         });
       const res= await response.json(); 
       if(!res.success){
@@ -380,8 +403,8 @@ const app = new Vue({
         throw new Error('Failed to upload the annotaiton.')
       };
     },
-    anntation_mode_changed(){
-      if(this.anntation_mode){
+    annotation_mode_changed(){
+      if(this.annotation_mode){
         this.startAnnotation(this.vector_source, this.freehand_mode)
       }
       else{
@@ -394,7 +417,7 @@ const app = new Vue({
       }
       else{
         this.current_image_data.discarded = true;
-        this.anntation_mode = false;
+        this.annotation_mode = false;
       }
       this.$forceUpdate()
     },
@@ -496,7 +519,7 @@ const app = new Vue({
           minZoom: -10
         })
       });
-      this.anntation_mode_changed();
+      this.annotation_mode_changed();
       this.map.addControl(new MousePosition({
           coordinateFormat: createStringXY(0)
       }));
@@ -535,10 +558,10 @@ const app = new Vue({
       }
       this.snapInteraction = new Snap({source: source});
       this.map.addInteraction(this.snapInteraction);
-      this.anntation_mode = true;
+      this.annotation_mode = true;
     },
     stopAnnotation(){
-      this.anntation_mode = false;
+      this.annotation_mode = false;
       if(this.drawInteraction)
       this.map.removeInteraction(this.drawInteraction);
       if(this.snapInteraction)
@@ -649,11 +672,11 @@ api.export(new ImJoyPlugin())
       <div class="input-group floating-switch">
         <button class="btn" :class="{'transparent-btn': current_image_data.discarded!==true}" @click="toggleDiscard()">Discard</button>&nbsp;&nbsp;
         <label class="form-switch">
-          <input type="checkbox" v-model="anntation_mode" @change="anntation_mode_changed">
+          <input type="checkbox" v-model="annotation_mode" @change="annotation_mode_changed">
           <i class="form-icon"></i> Adjust Mask
         </label>
-        <button class="btn transparent-btn" v-if="anntation_mode" @click="saveAnnotation()">Save</button>&nbsp;&nbsp;
-        <button class="btn transparent-btn" title="annotation mode" v-if="anntation_mode" @click="removeMaskAnnotation()"><i class="icon icon-delete"></i></button>&nbsp;&nbsp;
+        <button class="btn transparent-btn" v-if="annotation_mode" @click="saveAnnotation()">Save</button>&nbsp;&nbsp;
+        <button class="btn transparent-btn" title="annotation mode" v-if="annotation_mode" @click="removeMaskAnnotation()"><i class="icon icon-delete"></i></button>&nbsp;&nbsp;
         <button class="btn transparent-btn btn-action s-circle" title="home" @click="home()"><i class="icon icon-cross"></i></button>&nbsp;&nbsp;
       </div>
       <div v-if="loading" class="loading loading-lg floating"></div>
