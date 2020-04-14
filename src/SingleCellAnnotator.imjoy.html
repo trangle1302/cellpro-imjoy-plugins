@@ -8,7 +8,7 @@
   "type": "window",
   "tags": [],
   "ui": "",
-  "version": "0.1.10",
+  "version": "0.1.11",
   "api_version": "0.1.7",
   "description": "Annotate images for HPA single-cell image classification",
   "icon": "extension",
@@ -145,6 +145,41 @@ const app = new Vue({
   },
   mounted(){
     this.selected_server_url = this.servers['production']
+    document.addEventListener('keydown', (event)=>{
+      if(this.current_panel==='imageviewer'){
+        if(event.code === 'KeyY'){
+          if(this.current_image_data.label_display_mode==='single'){
+            this.current_location_selected=true
+          }
+        }
+        else if(event.code === 'KeyN'){
+          if(this.current_image_data.label_display_mode==='single'){
+            this.current_location_selected=false
+          }
+        }
+        else if(event.code === 'ArrowRight'){
+          this.nextImage()
+        }
+        else if(event.code === 'ArrowLeft'){
+          this.previousImage()
+        }
+        else if(event.code === 'KeyD'){
+          this.toggleDiscard()
+        }
+        else if(event.code === 'KeyM'){
+          this.anntation_mode = true
+        }
+        else if(event.code === 'KeyR'){
+          this.removeMaskAnnotation()
+        }
+        else if(event.code === 'KeyS'){
+          this.saveAnnotation()
+        }
+        else if(event.code === 'Escape'){
+          this.home()
+        }
+      }
+    })
   },
   methods: {
     async login(){
@@ -259,6 +294,7 @@ const app = new Vue({
         }
         api.showProgress(100)
         api.showStatus(`A new batch with ${this.loaded_image_list.length} images loaded`)
+        this.loadMoreIfNeeded();
       }
       finally{
         this.loading_cache = false;
@@ -290,12 +326,15 @@ const app = new Vue({
       }
       await this.showImage(this.cached_image_data[this.current_image_index]);
     },
-    async nextImage(){
+    loadMoreIfNeeded(){
       this.current_image_index = this.cached_image_data.indexOf(this.current_image_data)
       // when we reach 70% of the the cached images
       if(this.current_image_index>this.cached_image_data.length*0.5){
         this.getNewImageBatch(this.current_task_name)
       }
+    },
+    async nextImage(){
+      this.loadMoreIfNeeded();
       if(this.anntation_mode){
         const anwser = await api.confirm("Would you like to save the mask annotation?")
         if(anwser){
@@ -313,6 +352,8 @@ const app = new Vue({
         console.error('no image data to show.')
         return
       }
+      api.showStatus(imageData.cell_id)
+      console.log('current image: ', imageData)
       this.current_image_data = imageData;
       // annotation viewer
       this.current_panel = 'imageviewer';
@@ -353,6 +394,7 @@ const app = new Vue({
       }
       else{
         this.current_image_data.discarded = true;
+        this.anntation_mode = false;
       }
       this.$forceUpdate()
     },
@@ -362,8 +404,8 @@ const app = new Vue({
       this.vector_source.addFeatures(features)
     },
     // save annotations
-    async saveAnnotation(features){
-      const allFeatures = features || this.vector_source.getFeatures();
+    async saveAnnotation(){
+      const allFeatures = this.vector_source.getFeatures();
       const format = new ol.format.GeoJSON();
       const routeFeatures = format.writeFeaturesObject(allFeatures, {decimals: 1});
       routeFeatures['bbox'] = this.current_image_data.mask_geojson.bbox;
@@ -512,6 +554,10 @@ const app = new Vue({
         this.current_image_data.location[k]=true
       }
       
+    },
+    home(){
+      this.current_panel='task_selection';
+      this.current_task_name=null;
     }
   }
 })
@@ -608,7 +654,7 @@ api.export(new ImJoyPlugin())
         </label>
         <button class="btn transparent-btn" v-if="anntation_mode" @click="saveAnnotation()">Save</button>&nbsp;&nbsp;
         <button class="btn transparent-btn" title="annotation mode" v-if="anntation_mode" @click="removeMaskAnnotation()"><i class="icon icon-delete"></i></button>&nbsp;&nbsp;
-        <button class="btn transparent-btn btn-action s-circle" title="home" @click="current_panel='task_selection';current_task_name=null;"><i class="icon icon-cross"></i></button>&nbsp;&nbsp;
+        <button class="btn transparent-btn btn-action s-circle" title="home" @click="home()"><i class="icon icon-cross"></i></button>&nbsp;&nbsp;
       </div>
       <div v-if="loading" class="loading loading-lg floating"></div>
       <div id="map"></div>
