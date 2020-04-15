@@ -479,12 +479,12 @@ const app = new Vue({
       api.alert(JSON.stringify(blob))
     },
     // go to nextImage after select yes/no.
-    async singleSelected(){
-      this.current_location_selected = true;
-      await this.nextImage()
-    },
-    async singleUnselected(){
-      this.current_location_selected = false;
+    async selectLocation(judgement){
+      if (judgement===true){
+      this.current_location_selected = true;}
+      if (judgement===false){
+      this.current_location_selected = false;}
+      api.alert(this.current_location_selected)
       await this.nextImage()
     },
     async displayMap(image_url){
@@ -703,8 +703,8 @@ api.export(new ImJoyPlugin())
       <template v-if="current_image_data.label_display_mode==='single'">
         <div class="btn-group floating-bottom-btn">
           <button :disabled="current_image_index===0" class="btn transparent-btn" @click="previousImage()"><i class="icon icon-back"></i>&nbsp;Back</button>
-          <button :disabled="current_image_data.discarded" class="btn transparent-btn" @click="singleSelected()" :class="{'selected-location-btn': current_location_selected===true}"><i class="icon icon-check"></i>&nbsp;Yes</button>
-          <button :disabled="current_image_data.discarded" class="btn transparent-btn" @click="singleUnselected()" :class="{'selected-location-btn': current_location_selected===false}"><i class="icon icon-cross"></i>&nbsp;No</button>
+          <button :disabled="current_image_data.discarded" class="btn transparent-btn" @click="selectLocation(true)" :class="{'selected-location-btn': current_location_selected===true}"><i class="icon icon-check"></i>&nbsp;Yes</button>
+          <button :disabled="current_image_data.discarded" class="btn transparent-btn" @click="selectLocation(false)" :class="{'selected-location-btn': current_location_selected===false}"><i class="icon icon-cross"></i>&nbsp;No</button>
           <button :disabled="current_image_index>=cached_image_data.length" class="btn transparent-btn" @click="nextImage()">Next&nbsp;<i class="icon icon-forward"></i></button>
         </div>
         <span class="h3 floating-label">{{current_image_data.location}}</span>
