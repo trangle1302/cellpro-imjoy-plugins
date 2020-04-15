@@ -8,7 +8,7 @@
   "type": "window",
   "tags": [],
   "ui": "",
-  "version": "0.1.17",
+  "version": "0.1.18",
   "api_version": "0.1.7",
   "description": "Annotate images for HPA single-cell image classification",
   "icon": "extension",
@@ -105,10 +105,12 @@ const imageDataTemplate = {
   label_display_mode: null,
   uri: null,
   location: null,
-  discarded: false
+  discarded: false,
+  annotation_status: null,
+  mask_adjusted: null
 };
 const sendDataTemplate = {
-  discarded: null,
+  discarded: false,
   mask: null,
   bbox: null,
   location:null
@@ -365,7 +367,7 @@ const app = new Vue({
       if(this.annotation_mode){
         const anwser = await api.confirm("Would you like to save the mask annotation?")
         if(anwser){
-          this.saveAnnotation()
+          api.alert("annotation_mode " + this.annotation_mode)
         }
         this.stopAnnotation();
       }
@@ -395,6 +397,9 @@ const app = new Vue({
       this.current_image_index = this.cached_image_data.indexOf(this.current_image_data);
       const cell_id = this.current_image_data.cell_id;
       const imageData = await this.fetchCellImage(cell_id)
+      // pass data from pre-annotation data
+      imageData.mask_adjusted = this.current_image_data.mask_adjusted;
+      imageData.location = this.current_image_data.location;
       this.extend_image = false;
       this.cached_image_data[this.current_image_index] = imageData;
       await this.showImage(imageData)
@@ -404,20 +409,31 @@ const app = new Vue({
       // Default options are marked with *
       const sendData = JSON.parse(JSON.stringify(sendDataTemplate));
       sendData.discarded = this.current_image_data.discarded;
-      sendData.mask = this.current_image_data.mask_geojson.features;
-      sendData.bbox = this.current_image_data.mask_geojson.bbox;
-      sendData.location = {};
-      if (this.current_image_data.label_display_mode == 'single'){
-        sendData.location[this.current_image_data.location] = this.current_location_selected;
-        } else if (this.current_image_data.label_display_mode == 'multiple'){
-          sendData.location = this.current_image_data.location;
-          for (loc in sendData.location){
-            if(sendData.location[loc]==null){
-              sendData.location[loc] = false}
+      if (this.current_image_data.discarded){
+        // delete sendData.mask;
+        sendData.mask = null;
+      }else{
+        sendData.bbox = this.current_image_data.mask_geojson.bbox;
+        sendData.location = {};
+        if (this.current_image_data.label_display_mode == 'single'){
+          sendData.location[this.current_image_data.location] = this.current_location_selected;
+          } else if (this.current_image_data.label_display_mode == 'multiple'){
+            sendData.location = this.current_image_data.location;
+            for (loc in sendData.location){
+              if(sendData.location[loc]==null){
+                sendData.location[loc] = false}
+            }
+            // add things here
+          } else{api.alert("label_display_mode parameter out of range");
+          return };
+        if (this.current_image_data.mask_adjusted==true){
+          sendData.mask = this.current_image_data.mask_geojson.features;
+          this.current_image_data.mask_adjusted==false;
+        }else{
+          //delete sendData.mask;
+          sendData.mask = null;
           }
-          // add things here
-        } else{api.alert("label_display_mode parameter out of range");
-        return };
+      };      
       // reset current_location_selected
       this.current_location_selected = null;
       // this is the url to send the current annotation
@@ -434,27 +450,39 @@ const app = new Vue({
           body: JSON.stringify(sendData)
         });
       const res= await response.json(); 
-      if(!res.success){
+      if(res.success){
+        this.current_image_data.annotation_status=true;
+      }
+      else{
         alert('Failed to upload the annotaiton, error: ' + res.error);
         throw new Error('Failed to upload the annotaiton.')
       };
     },
     async annotation_mode_changed(){
       if(this.annotation_mode){
+        this.current_image_data.mask_adjusted=false;
         await this.extendImage();
+        this.removeMaskAnnotation(); // remove the current mask if adjust mask
         this.startAnnotation(this.vector_source, this.freehand_mode)
       }
       else{
+        if(this.current_image_data.mask_adjusted==false){
+          api.alert("mask status: " + this.current_image_data.mask_adjusted);
+          this.annotation_mode = true;
+          api.alert("Don't forget to draw or save drawn mask!")
+          return
+        }
         this.stopAnnotation()
       }
     },
-    toggleDiscard(){
+    async toggleDiscard(){
       if(this.current_image_data.discarded){
         this.current_image_data.discarded = false;
       }
       else{
         this.current_image_data.discarded = true;
         this.annotation_mode = false;
+        await this.nextImage();
       }
       this.$forceUpdate()
     },
@@ -468,9 +496,16 @@ const app = new Vue({
       const allFeatures = this.vector_source.getFeatures();
       const format = new ol.format.GeoJSON();
       const routeFeatures = format.writeFeaturesObject(allFeatures, {decimals: 1});
+      if (!routeFeatures.features.length){
+        this.annotation_mode = true;
+        api.alert('Please draw cell mask before save!');
+        await this.annotation_mode_changed();
+        return
+      }
       routeFeatures['bbox'] = this.current_image_data.mask_geojson.bbox;
       feature_string = JSON.stringify(routeFeatures);
       this.current_image_data.mask_geojson = routeFeatures;
+      this.current_image_data.mask_adjusted = true;
       this.stopAnnotation();
     },
     async exportAnnotation() {
@@ -718,16 +753,16 @@ api.export(new ImJoyPlugin())
         </div>
         <div class="btn-group floating-bottom-btn">
           <button :disabled="current_image_index===0" class="btn transparent-btn" @click="previousImage()"><i class="icon icon-back"></i>&nbsp;Back</button>
-          <button :disabled="current_image_data.discarded" class="btn transparent-btn" @click="selectLocation(true)" :class="{'selected-location-btn': current_location_selected===true}"><i class="icon icon-check"></i>&nbsp;Yes</button>
-          <button :disabled="current_image_data.discarded" class="btn transparent-btn" @click="selectLocation(false)" :class="{'selected-location-btn': current_location_selected===false}"><i class="icon icon-cross"></i>&nbsp;No</button>
-          <button :disabled="current_image_index>=cached_image_data.length" class="btn transparent-btn" @click="nextImage()">Next&nbsp;<i class="icon icon-forward"></i></button>
+          <button :disabled="current_image_data.discarded||annotation_mode" class="btn transparent-btn" @click="selectLocation(true)" :class="{'selected-location-btn': current_location_selected===true}"><i class="icon icon-check"></i>&nbsp;Yes</button>
+          <button :disabled="current_image_data.discarded||annotation_mode" class="btn transparent-btn" @click="selectLocation(false)" :class="{'selected-location-btn': current_location_selected===false}"><i class="icon icon-cross"></i>&nbsp;No</button>
+          <button :disabled="current_image_index>=cached_image_data.length||((current_location_selected==null)&&current_image_data.annotation_status!=true)" class="btn transparent-btn" @click="nextImage()">Next&nbsp;<i class="icon icon-forward"></i></button>
         </div>
         <span class="h3 floating-label">{{current_image_data.location}}</span>
       </template>
       <div class="input-group floating-switch">
         <button class="btn" :class="{'transparent-btn': current_image_data.discarded!==true}" @click="toggleDiscard()">Discard</button>&nbsp;&nbsp;
         <label class="form-switch">
-          <input type="checkbox" v-model="annotation_mode" @change="annotation_mode_changed">
+          <input type="checkbox" v-model="annotation_mode" :disabled="current_image_data.mask_adjusted==false" @change="annotation_mode_changed">
           <i class="form-icon"></i> Adjust Mask
         </label>
         <button class="btn transparent-btn" v-if="annotation_mode" @click="saveAnnotation()">Save</button>&nbsp;&nbsp;
