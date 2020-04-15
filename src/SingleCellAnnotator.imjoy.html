@@ -417,7 +417,6 @@ const app = new Vue({
       // this is the url to send the current annotation
       const sub_url = "annotations/" + this.current_task_name + "/" + this.current_image_data.cell_id;
       const url_post = this.selected_server_url + sub_url;
-      api.alert(url_post)
       const response = await fetch(url_post, {
           method: 'POST',
           mode: 'cors',
