@@ -8,7 +8,7 @@
   "type": "window",
   "tags": [],
   "ui": "",
-  "version": "0.1.12",
+  "version": "0.1.13",
   "api_version": "0.1.7",
   "description": "Annotate images for HPA single-cell image classification",
   "icon": "extension",
@@ -34,9 +34,9 @@
 
 <script lang="javascript">
 const servers = {
-  'development': 'https://wet-grasshopper-41.telebit.io/',
-  'production': 'https://unlucky-shrimp-3.telebit.io/',
-  'localhost': 'http://127.0.0.1:5000/'
+  'development': 'https://wet-grasshopper-41.telebit.io',
+  'production': 'https://unlucky-shrimp-3.telebit.io',
+  'localhost': 'http://127.0.0.1:5000'
 }
 
 const Map = ol.Map;
@@ -136,7 +136,8 @@ const app = new Vue({
     current_panel: 'login',
     user:{
       username: "wei",
-      password: "GPq2VZgRg2lq5lYPNh9v"
+      password: "GPq2VZgRg2lq5lYPNh9v",
+      access_token: null
     },
   // from here this is communication to backend, to develop/activate
     tasks: null,
@@ -196,15 +197,19 @@ const app = new Vue({
       const response = await fetch(this.selected_server_url + "/login", {
         method: 'POST',
         mode: 'cors',
-        credentials: 'include',
         body: formData
       })
       if(response.status === 200){
         const res = await response.json()
         if(res.success){
+            if(!res.access_token){
+              api.alert('JWT access token required, please make sure you are using the latest backend.');
+              return
+            }
+            this.user.access_token = res.access_token
             const response2 = await fetch(this.selected_server_url + "/tasks", {
             method: 'GET',
-            credentials: 'include'
+            headers: {'Authorization': `Bearer ${this.user.access_token}`},
           })
           const res2 = await response2.json()
           this.tasks = res2.tasks
@@ -220,7 +225,7 @@ const app = new Vue({
     async fetchURLData (sub_url){
       const response = await fetch(this.selected_server_url + sub_url, {
         method: 'GET',
-        credentials: 'include'
+        headers: {'Authorization': `Bearer ${this.user.access_token}`},
       })
       if(response.status === 200){
         const res = await response.json()
@@ -411,14 +416,15 @@ const app = new Vue({
       // reset current_location_selected
       this.current_location_selected = null;
       // this is the url to send the current annotation
-      const sub_url = "annotations/" + this.current_task_name + "/" + this.current_image_data.cell_id;
+      const sub_url = "/annotations/" + this.current_task_name + "/" + this.current_image_data.cell_id;
       const url_post = this.selected_server_url + sub_url;
       const response = await fetch(url_post, {
           method: 'POST',
           mode: 'cors',
           cache: 'no-cache',
           headers: {
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${this.user.access_token}`,
           },
           body: JSON.stringify(sendData)
         });
