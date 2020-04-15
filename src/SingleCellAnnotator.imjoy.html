@@ -250,15 +250,16 @@ const app = new Vue({
       imageData.cell_id = cell_id;
       let image_url = "/images/" + this.current_task_name + "/" + imageData.cell_id;
       if (this.extend_image){
-        image_url += "?extend=200"
+        image_url += "?extend=200&maskout=1"
       }else{
-        image_url += "?extend=20"
+        image_url += "?extend=20&maskout=1"
       };
       const response = await this.fetchURLData(image_url)
       imageData.mask_geojson.bbox = response.bbox;
       const image_coordinates = await this.processCoordinates(response.mask.geometry.coordinates);
       imageData.mask_geojson.features[0].geometry.coordinates = image_coordinates;
-      imageData.uri = response.image;
+      //ER, Microtubule, Nuclei, Protein,
+      imageData.uri = response.images;
       locations = Object.keys(response.location);
       if(locations.length==1){
         imageData.label_display_mode = 'single'
@@ -284,7 +285,7 @@ const app = new Vue({
       }
       try{
         this.loading_cache = task_name;
-        const response = await this.fetchURLData("/tasks/" + task_name + "?cell_num=" + this.cell_per_batch+'&maskout=1');
+        const response = await this.fetchURLData("/tasks/" + task_name + "?cell_num=" + this.cell_per_batch);
         this.loaded_image_list  =response.cells;
         if(this.loaded_image_list.length<=0){
           api.showMessage('No more images in this task.')
@@ -341,6 +342,8 @@ const app = new Vue({
         }
         this.stopAnnotation();
       };
+      //await this.uploadAnnotation();
+      this.current_location_selected = null; // reset to null after uploadannotation.
       this.current_image_index = this.cached_image_data.indexOf(this.current_image_data)
       if(this.current_image_index<=-1){
         this.current_image_index = 0;
@@ -366,6 +369,8 @@ const app = new Vue({
         }
         this.stopAnnotation();
       }
+      //await this.uploadAnnotation();
+      this.current_location_selected = null; // reset to null after uploadannotation.
       this.current_image_index++;
       if(this.cached_image_data[this.current_image_index])
       await this.showImage(this.cached_image_data[this.current_image_index]);
@@ -479,9 +484,18 @@ const app = new Vue({
       });
       api.alert(JSON.stringify(blob))
     },
+    // go to nextImage after select yes/no.
+    async selectLocation(selected){
+      if (selected===true){
+      this.current_location_selected = true;}
+      if (selected===false){
+      this.current_location_selected = false;}
+      api.alert(this.current_location_selected)
+      await this.nextImage()
+    },
     async displayMap(image_url){
       // assuming the current plane is z plane
-      const imgObj = await getImageMeta(image_url)
+      const imgObj = await getImageMeta(image_url.Microtubule)
       const extent = [0, 0, imgObj.width, imgObj.height];
 
       const projection = new Projection({
@@ -492,7 +506,7 @@ const app = new Vue({
 
       const image_source = new Static({
         attributions: '©Human Protein Atlas',
-        url: image_url,
+        url: image_url.Microtubule,
         projection: projection,
         imageExtent: extent
       })
@@ -693,10 +707,20 @@ api.export(new ImJoyPlugin())
         </div>
       </template>
       <template v-if="current_image_data.label_display_mode==='single'">
+        <div class="btn-group floating-let-btn">
+          <input type="checkbox">
+            <i class="form-icon"></i> Nuclei&nbsp;&nbsp;
+          <input type="checkbox">
+            <i class="form-icon"></i> Microtubule&nbsp;&nbsp;
+          <input type="checkbox">
+            <i class="form-icon"></i> ER&nbsp;&nbsp;
+          <input type="checkbox">
+            <i class="form-icon"></i> Protein
+        </div>
         <div class="btn-group floating-bottom-btn">
           <button :disabled="current_image_index===0" class="btn transparent-btn" @click="previousImage()"><i class="icon icon-back"></i>&nbsp;Back</button>
-          <button :disabled="current_image_data.discarded" class="btn transparent-btn" @click="current_location_selected=true" :class="{'selected-location-btn': current_location_selected===true}"><i class="icon icon-check"></i>&nbsp;Yes</button>
-          <button :disabled="current_image_data.discarded" class="btn transparent-btn" @click="current_location_selected=false" :class="{'selected-location-btn': current_location_selected===false}"><i class="icon icon-cross"></i>&nbsp;No</button>
+          <button :disabled="current_image_data.discarded" class="btn transparent-btn" @click="selectLocation(true)" :class="{'selected-location-btn': current_location_selected===true}"><i class="icon icon-check"></i>&nbsp;Yes</button>
+          <button :disabled="current_image_data.discarded" class="btn transparent-btn" @click="selectLocation(false)" :class="{'selected-location-btn': current_location_selected===false}"><i class="icon icon-cross"></i>&nbsp;No</button>
           <button :disabled="current_image_index>=cached_image_data.length" class="btn transparent-btn" @click="nextImage()">Next&nbsp;<i class="icon icon-forward"></i></button>
         </div>
         <span class="h3 floating-label">{{current_image_data.location}}</span>
@@ -769,6 +793,13 @@ api.export(new ImJoyPlugin())
     width: 330px;
     z-index: 999;
   }
+  .floating-left-btn{
+    position: absolute;
+    left: 3px;
+    top: 80px;
+    width: 330px;
+    z-index: 999;
+  }
   .btn{
     width: 90px;
   }
@@ -788,11 +819,11 @@ api.export(new ImJoyPlugin())
     background-color: #3580ff7d!important;
     color: white!important;
   }
-  .transparent-btn {
+  .transparent-btn, .transparent-btn:focus {
     width: 90px;
     background-color:#fff3;
   }
-  .transparent-btn:hover, .transparent-btn:focus{
+  .transparent-btn:hover {
     background-color:rgba(255, 255, 255, 0.42);
   }
   .floating {
