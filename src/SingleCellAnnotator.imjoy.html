@@ -342,7 +342,7 @@ const app = new Vue({
         }
         this.stopAnnotation();
       };
-      //await this.uploadAnnotation();
+      await this.uploadAnnotation();
       this.current_location_selected = null; // reset to null after uploadannotation.
       this.current_image_index = this.cached_image_data.indexOf(this.current_image_data)
       if(this.current_image_index<=-1){
@@ -369,7 +369,7 @@ const app = new Vue({
         }
         this.stopAnnotation();
       }
-      //await this.uploadAnnotation();
+      await this.uploadAnnotation();
       this.current_location_selected = null; // reset to null after uploadannotation.
       this.current_image_index++;
       if(this.cached_image_data[this.current_image_index])
