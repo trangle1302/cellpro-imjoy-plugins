@@ -421,6 +421,7 @@ const app = new Vue({
       const response = await fetch(url_post, {
           method: 'POST',
           mode: 'cors',
+          credentials: 'include',
           cache: 'no-cache',
           headers: {
             'Content-Type': 'application/json'
