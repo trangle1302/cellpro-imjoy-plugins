@@ -8,7 +8,7 @@
   "type": "window",
   "tags": [],
   "ui": "",
-  "version": "0.1.14",
+  "version": "0.1.15",
   "api_version": "0.1.7",
   "description": "Annotate images for HPA single-cell image classification",
   "icon": "extension",
@@ -256,8 +256,7 @@ const app = new Vue({
       };
       const response = await this.fetchURLData(image_url)
       imageData.mask_geojson.bbox = response.bbox;
-      const image_coordinates = await this.processCoordinates(response.mask.geometry.coordinates);
-      imageData.mask_geojson.features[0].geometry.coordinates = image_coordinates;
+      imageData.mask_geojson.features[0].geometry.coordinates = response.mask.geometry.coordinates;
       //ER, Microtubule, Nuclei, Protein,
       imageData.uri = response.images;
       locations = Object.keys(response.location);
