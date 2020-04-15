@@ -486,10 +486,10 @@ const app = new Vue({
       api.alert(JSON.stringify(blob))
     },
     // go to nextImage after select yes/no.
-    async selectLocation(judgement){
-      if (judgement===true){
+    async selectLocation(selected){
+      if (selected===true){
       this.current_location_selected = true;}
-      if (judgement===false){
+      if (selected===false){
       this.current_location_selected = false;}
       api.alert(this.current_location_selected)
       await this.nextImage()
