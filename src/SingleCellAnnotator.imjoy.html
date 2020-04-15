@@ -336,6 +336,8 @@ const app = new Vue({
         }
         this.stopAnnotation();
       };
+      await this.uploadAnnotation();
+      this.current_location_selected = null; // reset to null after uploadannotation.
       this.current_image_index = this.cached_image_data.indexOf(this.current_image_data)
       if(this.current_image_index<=-1){
         this.current_image_index = 0;
@@ -361,6 +363,8 @@ const app = new Vue({
         }
         this.stopAnnotation();
       }
+      await this.uploadAnnotation();
+      this.current_location_selected = null; // reset to null after uploadannotation.
       this.current_image_index++;
       if(this.cached_image_data[this.current_image_index])
       await this.showImage(this.cached_image_data[this.current_image_index]);
@@ -413,6 +417,7 @@ const app = new Vue({
       // this is the url to send the current annotation
       const sub_url = "annotations/" + this.current_task_name + "/" + this.current_image_data.cell_id;
       const url_post = this.selected_server_url + sub_url;
+      api.alert(url_post)
       const response = await fetch(url_post, {
           method: 'POST',
           mode: 'cors',
@@ -472,6 +477,15 @@ const app = new Vue({
           type: "text/plain;charset=utf-8"
       });
       api.alert(JSON.stringify(blob))
+    },
+    // go to nextImage after select yes/no.
+    async singleSelected(){
+      this.current_location_selected = true;
+      await this.nextImage()
+    },
+    async singleUnselected(){
+      this.current_location_selected = false;
+      await this.nextImage()
     },
     async displayMap(image_url){
       // assuming the current plane is z plane
@@ -689,8 +703,8 @@ api.export(new ImJoyPlugin())
       <template v-if="current_image_data.label_display_mode==='single'">
         <div class="btn-group floating-bottom-btn">
           <button :disabled="current_image_index===0" class="btn transparent-btn" @click="previousImage()"><i class="icon icon-back"></i>&nbsp;Back</button>
-          <button :disabled="current_image_data.discarded" class="btn transparent-btn" @click="current_location_selected=true" :class="{'selected-location-btn': current_location_selected===true}"><i class="icon icon-check"></i>&nbsp;Yes</button>
-          <button :disabled="current_image_data.discarded" class="btn transparent-btn" @click="current_location_selected=false" :class="{'selected-location-btn': current_location_selected===false}"><i class="icon icon-cross"></i>&nbsp;No</button>
+          <button :disabled="current_image_data.discarded" class="btn transparent-btn" @click="singleSelected()" :class="{'selected-location-btn': current_location_selected===true}"><i class="icon icon-check"></i>&nbsp;Yes</button>
+          <button :disabled="current_image_data.discarded" class="btn transparent-btn" @click="singleUnselected()" :class="{'selected-location-btn': current_location_selected===false}"><i class="icon icon-cross"></i>&nbsp;No</button>
           <button :disabled="current_image_index>=cached_image_data.length" class="btn transparent-btn" @click="nextImage()">Next&nbsp;<i class="icon icon-forward"></i></button>
         </div>
         <span class="h3 floating-label">{{current_image_data.location}}</span>
