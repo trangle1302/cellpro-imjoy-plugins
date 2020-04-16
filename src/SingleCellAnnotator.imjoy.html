@@ -653,6 +653,10 @@ const app = new Vue({
       for(let k of Object.keys(channels)){
         if(!channel_settings[k]){
           channel_settings[k] = {name: k, show: true}
+          // don't show ER by default
+          if(k==='ER'){
+            channel_settings[k].show = false;
+          }
         }
       }
       const image = await composeChannels(channels, channel_settings, 0.5)
@@ -788,7 +792,18 @@ const app = new Vue({
       this.current_panel='task_selection';
       this.current_task_name=null;
     },
-    channelSettingsUpdated(){
+    channelSettingsUpdated(event){
+      // make sure ER and Microtubule are not turned on at the same time
+      if(event.target.name === 'ER' && event.target.value === 'on'){
+        if(this.channel_settings['Microtubule']){
+          this.channel_settings['Microtubule'].show = false
+        }
+      }
+      else if(event.target.name === 'Microtubule' && event.target.value === 'on'){
+        if(this.channel_settings['ER']){
+          this.channel_settings['ER'].show = false
+        }
+      }
       this.displayMap(this.current_image_data.channels, this.channel_settings);
     }
   }
@@ -857,6 +872,12 @@ api.export(new ImJoyPlugin())
     </div>
   
     <div class="panel" v-if="current_panel=='imageviewer'&&current_image_data">
+      <div class="form-group floating-channel-btn">
+        <label v-for="ch in channel_settings" class="form-checkbox">
+          <input v-model="ch.show" :name="ch.name" @change="channelSettingsUpdated" type="checkbox">
+          <i class="form-icon"></i> {{ch.name}}
+        </label>
+      </div>
       <template v-if="current_image_data.label_display_mode==='multiple'">
         <div class="floating-right-btn">
           <div class="btn-group">
@@ -870,12 +891,6 @@ api.export(new ImJoyPlugin())
         </div>
       </template>
       <template v-if="current_image_data.label_display_mode==='single'">
-        <div class="form-group floating-channel-btn">
-          <label v-for="ch in channel_settings" class="form-checkbox">
-            <input v-model="ch.show" @change="channelSettingsUpdated" type="checkbox">
-            <i class="form-icon"></i> {{ch.name}}
-          </label>
-        </div>
         <div class="btn-group floating-bottom-btn">
           <button :disabled="current_image_index===0||annotation_mode" class="btn transparent-btn" @click="previousImage()"><i class="icon icon-back"></i>&nbsp;Back</button>
           <button :disabled="current_image_data.discarded||annotation_mode" class="btn transparent-btn" @click="selectLocation(true)" :class="{'selected-location-btn': current_location_selected===true}"><i class="icon icon-check"></i>&nbsp;Yes</button>
@@ -943,7 +958,7 @@ api.export(new ImJoyPlugin())
     text-align: left;
     position: absolute;
     left: 50px;
-    top: 30px;
+    top: 10px;
     z-index: 999;
   }
 
