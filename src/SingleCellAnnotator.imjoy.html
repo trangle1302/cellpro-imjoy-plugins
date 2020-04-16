@@ -359,9 +359,9 @@ const app = new Vue({
         if (this.current_image_data.mask_adjusted&&this.current_image_data.annotation_status===null){
           // stay at the current image  
         };
-        if (this.current_image_data.label_display_mode=='multiple'&&this.current_image_data.annotation_status===null){
+        if (this.current_image_data.label_display_mode==='multiple'&&this.current_image_data.annotation_status===null){
           // stay at the current image
-        } else if (this.current_image_data.label_display_mode=='single'&&this.current_image_data.mask_adjusted){
+        } else if (this.current_image_data.label_display_mode==='single'&&this.current_image_data.mask_adjusted){
           // stay at the current image
         }else{
           this.current_image_index--;
@@ -386,7 +386,7 @@ const app = new Vue({
         this.stopAnnotation();
       }
       await this.uploadAnnotation();
-      if (this.current_image_data.label_display_mode=='multiple'&&this.current_image_data.annotation_status===null){
+      if (this.current_image_data.label_display_mode==='multiple'&&this.current_image_data.annotation_status===null){
         return
       }else{this.current_image_index++;}
       this.current_location_selected = null; // reset to null after uploadannotation.
