@@ -661,7 +661,7 @@ const app = new Vue({
       const format = new ol.format.GeoJSON();
       const routeFeatures = format.writeFeaturesObject(allFeatures, {decimals: 1});
       if (!routeFeatures.features.length){
-        api.alert('Please draw cell mask before save!');
+        api.alert('Please draw a cell mask before saving!');
         return
       }
       if(routeFeatures.features.length>1){
@@ -688,10 +688,11 @@ const app = new Vue({
     // go to nextImage after select yes/no.
     async selectLocation(selected){
       if (selected){
-      this.current_location_selected = true;
-      }else if (selected===false){
-      this.current_location_selected = false;
-      }else{"Not Implemented Error"; return}
+        this.current_location_selected = true;
+      }
+      else{
+        this.current_location_selected = false;
+      }
       this.current_image_data.location_adjusted = true;
       await this.nextImage()
     },
@@ -990,7 +991,7 @@ api.export(new ImJoyPlugin())
     position: absolute;
     left: 50%;
     z-index: 999;
-    bottom: 70px;
+    bottom: 40px;
     -webkit-transform: translate3d(-50%, -50%, 0);
     -moz-transform: translate3d(-50%, -50%, 0);
     transform: translate3d(-50%, -50%, 0);
@@ -1013,7 +1014,7 @@ api.export(new ImJoyPlugin())
   .floating-bottom-btn {
     position: absolute;
     left: calc(50% - 180px);
-    bottom: 50px;
+    bottom: 20px;
     z-index: 999;
   }
   .floating-right-btn{
