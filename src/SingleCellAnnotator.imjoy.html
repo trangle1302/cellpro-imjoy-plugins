@@ -8,7 +8,7 @@
   "type": "window",
   "tags": [],
   "ui": "",
-  "version": "0.1.18",
+  "version": "0.1.20",
   "api_version": "0.1.7",
   "description": "Annotate images for HPA single-cell image classification",
   "icon": "extension",
@@ -139,6 +139,7 @@ async function composeChannels(channels, channel_settings){
 }
 
 const imageDataTemplate = {
+  extend: null,
   cell_id: null,
   mask_geojson:{
   'type':'FeatureCollection',
@@ -158,13 +159,15 @@ const imageDataTemplate = {
   location: null,
   discarded: false,
   annotation_status: null,
-  mask_adjusted: null
+  mask_adjusted: null,
+  location_adjusted: null,
 };
 const sendDataTemplate = {
   discarded: false,
   mask: null,
   bbox: null,
-  location:null
+  location:null,
+  extend: null
 };
 
 const app = new Vue({
@@ -304,9 +307,11 @@ const app = new Vue({
       imageData.cell_id = cell_id;
       let image_url = "/images/" + this.current_task_name + "/" + imageData.cell_id;
       if (this.extend_image){
-        image_url += "?extend=200&maskout=1"
+        image_url += "?extend=200&maskout=1";
+        imageData.extend = 200;
       }else{
         image_url += "?extend=20&maskout=1"
+        imageData.extend = 20;
       };
       const response = await this.fetchURLData(image_url)
       imageData.mask_geojson.bbox = response.bbox;
@@ -403,7 +408,16 @@ const app = new Vue({
         this.current_image_index = 0;
       }
       else{
-        this.current_image_index--;
+        if (this.current_image_data.mask_adjusted&&this.current_image_data.annotation_status===null){
+          // stay at the current image  
+        };
+        if (this.current_image_data.label_display_mode==='multiple'&&this.current_image_data.annotation_status===null){
+          // stay at the current image
+        } else if (this.current_image_data.label_display_mode==='single'&&this.current_image_data.mask_adjusted){
+          // stay at the current image
+        }else{
+          this.current_image_index--;
+        }
       }
       await this.showImage(this.cached_image_data[this.current_image_index]);
     },
@@ -419,13 +433,15 @@ const app = new Vue({
       if(this.annotation_mode){
         const anwser = await api.confirm("Would you like to save the mask annotation?")
         if(anwser){
-          api.alert("annotation_mode " + this.annotation_mode)
+          this.saveAnnotation()
         }
         this.stopAnnotation();
       }
       await this.uploadAnnotation();
+      if (this.current_image_data.label_display_mode==='multiple'&&this.current_image_data.annotation_status===null){
+        return
+      }else{this.current_image_index++;}
       this.current_location_selected = null; // reset to null after uploadannotation.
-      this.current_image_index++;
       if(this.cached_image_data[this.current_image_index])
       await this.showImage(this.cached_image_data[this.current_image_index]);
     },
@@ -460,56 +476,91 @@ const app = new Vue({
     },
 
     async uploadAnnotation(){
-      // Default options are marked with *
-      const sendData = JSON.parse(JSON.stringify(sendDataTemplate));
-      sendData.discarded = this.current_image_data.discarded;
-      if (this.current_image_data.discarded){
-        // delete sendData.mask;
-        sendData.mask = null;
+      // skip upload annotation if image is annotated and no new change
+      if (this.current_image_data.annotation_status&&(this.current_image_data.mask_adjusted===null)&&(this.current_image_data.location_adjusted===null)){
+        // skip uploadannotation
+        return
       }else{
-        sendData.bbox = this.current_image_data.mask_geojson.bbox;
-        sendData.location = {};
-        if (this.current_image_data.label_display_mode == 'single'){
-          sendData.location[this.current_image_data.location] = this.current_location_selected;
+        // Default options are marked with *
+        const sendData = JSON.parse(JSON.stringify(sendDataTemplate));
+        sendData.discarded = this.current_image_data.discarded;
+        sendData.extend = this.current_image_data.extend;
+        if (this.current_image_data.discarded){
+          //delete sendData.mask;
+          sendData.mask = null;
+        }else{
+          sendData.bbox = this.current_image_data.mask_geojson.bbox;
+          sendData.location = {};
+          if (this.current_image_data.label_display_mode == 'single'){
+            // do not upload annotion if no location selected
+            if (this.current_location_selected===null){
+              if (this.current_image_data.mask_adjusted===null){
+                return
+              }else{
+              const anwser = await api.confirm("Please selecte Yes/No to annotate?")
+              this.current_image_data.annotation_status = null;
+              return
+              };
+            }else{
+              // upload the re-selection
+              this.current_image_data.annotation_status = false;
+            }
+            sendData.location[this.current_image_data.location] = this.current_location_selected;
           } else if (this.current_image_data.label_display_mode == 'multiple'){
             sendData.location = this.current_image_data.location;
             for (loc in sendData.location){
-              if(sendData.location[loc]==null){
-                sendData.location[loc] = false}
-            }
+              if(!sendData.location[loc]){
+                sendData.location[loc] = false
+              }else{
+                this.current_image_data.annotation_status = false}}
+            if (this.current_image_data.annotation_status===null){
+              const anwser = await api.confirm("No protein selected, is that correct?")
+              if (anwser){
+                this.current_image_data.annotation_status = false;
+              }else{
+                this.current_image_data.annotation_status = null;
+                sendData.location={};
+                return}};
             // add things here
-          } else{api.alert("label_display_mode parameter out of range");
+          }else{api.alert("label_display_mode parameter out of range");
           return };
-        if (this.current_image_data.mask_adjusted==true){
-          sendData.mask = this.current_image_data.mask_geojson.features;
-          this.current_image_data.mask_adjusted==false;
-        }else{
-          //delete sendData.mask;
-          sendData.mask = null;
-          }
-      };      
-      // reset current_location_selected
-      this.current_location_selected = null;
-      // this is the url to send the current annotation
-      const sub_url = "/annotations/" + this.current_task_name + "/" + this.current_image_data.cell_id;
-      const url_post = this.selected_server_url + sub_url;
-      const response = await fetch(url_post, {
-          method: 'POST',
-          mode: 'cors',
-          cache: 'no-cache',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${this.user.access_token}`,
-          },
-          body: JSON.stringify(sendData)
-        });
-      const res= await response.json(); 
-      if(res.success){
+          if (this.current_image_data.mask_adjusted){
+            sendData.mask = this.current_image_data.mask_geojson.features;
+            this.current_image_data.mask_adjusted=false;
+          }else{
+            //delete sendData.mask;
+            sendData.mask = null;
+          };
+        };      
+        // reset current_location_selected
+        this.current_location_selected = null;
+        // this is the url to send the current annotation
+        const sub_url = "/annotations/" + this.current_task_name + "/" + this.current_image_data.cell_id;
+        const url_post = this.selected_server_url + sub_url;
+        // only for test use
         this.current_image_data.annotation_status=true;
-      }
-      else{
-        alert('Failed to upload the annotaiton, error: ' + res.error);
-        throw new Error('Failed to upload the annotaiton.')
+
+        // this should be set after uploadannotation
+        this.current_image_data.mask_adjusted=null;
+        this.current_image_data.location_adjusted = null;
+        const response = await fetch(url_post, {
+            method: 'POST',
+            mode: 'cors',
+            cache: 'no-cache',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${this.user.access_token}`,
+            },
+            body: JSON.stringify(sendData)
+          });
+        const res= await response.json();
+        if(res.success){
+          this.current_image_data.annotation_status=true;
+        }
+        else{
+          alert('Failed to upload the annotaiton, error: ' + res.error);
+          throw new Error('Failed to upload the annotaiton.')
+        };
       };
     },
     async annotation_mode_changed(){
@@ -520,8 +571,7 @@ const app = new Vue({
         this.startAnnotation(this.vector_source, this.freehand_mode)
       }
       else{
-        if(this.current_image_data.mask_adjusted==false){
-          api.alert("mask status: " + this.current_image_data.mask_adjusted);
+        if(this.current_image_data.mask_adjusted===false){
           this.annotation_mode = true;
           api.alert("Don't forget to draw or save drawn mask!")
           return
@@ -575,10 +625,12 @@ const app = new Vue({
     },
     // go to nextImage after select yes/no.
     async selectLocation(selected){
-      if (selected===true){
-      this.current_location_selected = true;}
-      if (selected===false){
-      this.current_location_selected = false;}
+      if (selected){
+      this.current_location_selected = true;
+      }else if (selected===false){
+      this.current_location_selected = false;
+      }else{"Not Implemented Error"; return}
+      this.current_image_data.location_adjusted = true;
       await this.nextImage()
     },
     async displayMap(channels){
@@ -714,7 +766,7 @@ const app = new Vue({
       else{
         this.current_image_data.location[k]=true
       }
-      
+      this.current_image_data.location_adjusted = true;
     },
     home(){
       this.current_panel='task_selection';
@@ -789,8 +841,8 @@ api.export(new ImJoyPlugin())
       <template v-if="current_image_data.label_display_mode==='multiple'">
         <div class="floating-right-btn">
           <div class="btn-group">
-            <button :disabled="current_image_index===0" class="btn transparent-btn" @click="previousImage()"><i class="icon icon-back"></i>&nbsp;Back</button>
-            <button :disabled="current_image_index>=cached_image_data.length" class="btn transparent-btn" @click="nextImage()">Next&nbsp;<i class="icon icon-forward"></i></button>
+            <button :disabled="current_image_index===0||annotation_mode" class="btn transparent-btn" @click="previousImage()"><i class="icon icon-back"></i>&nbsp;Back</button>
+            <button :disabled="current_image_index>=cached_image_data.length||annotation_mode" class="btn transparent-btn" @click="nextImage()">Next&nbsp;<i class="icon icon-forward"></i></button>
           </div>
           <br>
           <div class="columns">
@@ -806,17 +858,17 @@ api.export(new ImJoyPlugin())
           </label>
         </div>
         <div class="btn-group floating-bottom-btn">
-          <button :disabled="current_image_index===0" class="btn transparent-btn" @click="previousImage()"><i class="icon icon-back"></i>&nbsp;Back</button>
+          <button :disabled="current_image_index===0||annotation_mode" class="btn transparent-btn" @click="previousImage()"><i class="icon icon-back"></i>&nbsp;Back</button>
           <button :disabled="current_image_data.discarded||annotation_mode" class="btn transparent-btn" @click="selectLocation(true)" :class="{'selected-location-btn': current_location_selected===true}"><i class="icon icon-check"></i>&nbsp;Yes</button>
           <button :disabled="current_image_data.discarded||annotation_mode" class="btn transparent-btn" @click="selectLocation(false)" :class="{'selected-location-btn': current_location_selected===false}"><i class="icon icon-cross"></i>&nbsp;No</button>
-          <button :disabled="current_image_index>=cached_image_data.length||((current_location_selected==null)&&current_image_data.annotation_status!=true)" class="btn transparent-btn" @click="nextImage()">Next&nbsp;<i class="icon icon-forward"></i></button>
+          <button :disabled="current_image_index>=cached_image_data.length||((current_location_selected===null)&&(!current_image_data.annotation_status))" class="btn transparent-btn" @click="nextImage()">Next&nbsp;<i class="icon icon-forward"></i></button>
         </div>
         <span class="h3 floating-label">{{current_image_data.location}}</span>
       </template>
       <div class="input-group floating-switch">
         <button class="btn" :class="{'transparent-btn': current_image_data.discarded!==true}" @click="toggleDiscard()">Discard</button>&nbsp;&nbsp;
         <label class="form-switch">
-          <input type="checkbox" v-model="annotation_mode" :disabled="current_image_data.mask_adjusted==false" @change="annotation_mode_changed">
+          <input type="checkbox" v-model="annotation_mode" :disabled="current_image_data.mask_adjusted===false" @change="annotation_mode_changed">
           <i class="form-icon"></i> Adjust Mask
         </label>
         <button class="btn transparent-btn" v-if="annotation_mode" @click="saveAnnotation()">Save</button>&nbsp;&nbsp;
