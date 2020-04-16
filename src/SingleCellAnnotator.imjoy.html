@@ -212,6 +212,7 @@ const app = new Vue({
       access_token: null
     },
     channel_settings: {},
+    alpha: 0.5,
   // from here this is communication to backend, to develop/activate
     tasks: null,
     current_task_name: null,
@@ -228,7 +229,25 @@ const app = new Vue({
     this.selected_server_url = this.servers['production']
     document.addEventListener('keydown', (event)=>{
       if(this.current_panel==='imageviewer'){
-        if(event.code === 'KeyY'){
+        if(event.shiftKey && event.code ==='Equal' || ['+', 'Plus', 'NumpadAdd'].includes(event.code)){
+          if(this.alpha<1){
+            this.alpha = this.alpha+0.1;
+          }
+          else{
+            this.alpha = 1;
+          }
+          this.displayMap(this.current_image_data.channels, this.channel_settings);
+        }
+        else if(['-', 'Minus', 'NumpadSubtract'].includes(event.code)){
+          if(this.alpha>0){
+            this.alpha = this.alpha-0.1;
+          }
+          else{
+            this.alpha = 0;
+          }
+          this.displayMap(this.current_image_data.channels, this.channel_settings);
+        }
+        else if(event.code === 'KeyY'){
           if(this.current_image_data.label_display_mode==='single'){
             this.selectLocation(true)
           }
@@ -706,7 +725,7 @@ const app = new Vue({
           }
         }
       }
-      const image = await composeChannels(channels, channel_settings, 0.5)
+      const image = await composeChannels(channels, channel_settings, this.alpha)
       const extent = [0, 0, image.width, image.height];
 
       const projection = new Projection({
@@ -852,6 +871,7 @@ const app = new Vue({
           this.channel_settings['ER'].show = false
         }
       }
+      this.$forceUpdate()
       this.displayMap(this.current_image_data.channels, this.channel_settings);
     }
   }
