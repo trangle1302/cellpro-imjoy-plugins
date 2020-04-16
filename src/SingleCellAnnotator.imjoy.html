@@ -8,7 +8,7 @@
   "type": "window",
   "tags": [],
   "ui": "",
-  "version": "0.1.20",
+  "version": "0.1.21",
   "api_version": "0.1.7",
   "description": "Annotate images for HPA single-cell image classification",
   "icon": "extension",
@@ -432,8 +432,7 @@ const app = new Vue({
         sendData.discarded = this.current_image_data.discarded;
         sendData.extend = this.current_image_data.extend;
         if (this.current_image_data.discarded){
-          //delete sendData.mask;
-          sendData.mask = null;
+          delete sendData.mask;
         }else{
           sendData.bbox = this.current_image_data.mask_geojson.bbox;
           sendData.location = {};
@@ -474,8 +473,7 @@ const app = new Vue({
             sendData.mask = this.current_image_data.mask_geojson.features;
             this.current_image_data.mask_adjusted=false;
           }else{
-            //delete sendData.mask;
-            sendData.mask = null;
+            delete sendData.mask;
           };
         };      
         // reset current_location_selected
