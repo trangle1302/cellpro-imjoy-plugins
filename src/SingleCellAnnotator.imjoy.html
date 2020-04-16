@@ -430,6 +430,7 @@ const app = new Vue({
         // Default options are marked with *
         const sendData = JSON.parse(JSON.stringify(sendDataTemplate));
         sendData.discarded = this.current_image_data.discarded;
+        sendData.extend = this.current_image_data.extend;
         if (this.current_image_data.discarded){
           //delete sendData.mask;
           sendData.mask = null;
@@ -488,6 +489,7 @@ const app = new Vue({
         // this should be set after uploadannotation
         this.current_image_data.mask_adjusted=null;
         this.current_image_data.location_adjusted = null;
+        api.alert(JSON.stringify(sendData))
         const response = await fetch(url_post, {
             method: 'POST',
             mode: 'cors',
