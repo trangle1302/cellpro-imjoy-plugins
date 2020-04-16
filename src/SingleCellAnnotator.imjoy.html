@@ -484,8 +484,7 @@ const app = new Vue({
         // this should be set after uploadannotation
         this.current_image_data.mask_adjusted=null;
         this.current_image_data.location_adjusted = null;
-        api.alert(JSON.stringify(sendData))
-        /*const response = await fetch(url_post, {
+        const response = await fetch(url_post, {
             method: 'POST',
             mode: 'cors',
             cache: 'no-cache',
@@ -502,7 +501,7 @@ const app = new Vue({
         else{
           alert('Failed to upload the annotaiton, error: ' + res.error);
           throw new Error('Failed to upload the annotaiton.')
-        };*/
+        };
       };
     },
     async annotation_mode_changed(){
