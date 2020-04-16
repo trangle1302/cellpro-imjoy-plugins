@@ -806,7 +806,7 @@ api.export(new ImJoyPlugin())
           <button :disabled="current_image_index===0" class="btn transparent-btn" @click="previousImage()"><i class="icon icon-back"></i>&nbsp;Back</button>
           <button :disabled="current_image_data.discarded||annotation_mode" class="btn transparent-btn" @click="selectLocation(true)" :class="{'selected-location-btn': current_location_selected===true}"><i class="icon icon-check"></i>&nbsp;Yes</button>
           <button :disabled="current_image_data.discarded||annotation_mode" class="btn transparent-btn" @click="selectLocation(false)" :class="{'selected-location-btn': current_location_selected===false}"><i class="icon icon-cross"></i>&nbsp;No</button>
-          <button :disabled="current_image_index>=cached_image_data.length||((current_location_selected===null)&&(current_image_data.annotation_status!==true))" class="btn transparent-btn" @click="nextImage()">Next&nbsp;<i class="icon icon-forward"></i></button>
+          <button :disabled="current_image_index>=cached_image_data.length||((current_location_selected===null)&&(!current_image_data.annotation_status))" class="btn transparent-btn" @click="nextImage()">Next&nbsp;<i class="icon icon-forward"></i></button>
         </div>
         <span class="h3 floating-label">{{current_image_data.location}}</span>
       </template>
