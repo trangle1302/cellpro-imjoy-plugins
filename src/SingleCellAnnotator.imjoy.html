@@ -454,7 +454,7 @@ const app = new Vue({
           } else if (this.current_image_data.label_display_mode == 'multiple'){
             sendData.location = this.current_image_data.location;
             for (loc in sendData.location){
-              if((sendData.location[loc]===null)||(sendData.location[loc]===false)){
+              if(!sendData.location[loc]){
                 sendData.location[loc] = false
               }else{
                 this.current_image_data.annotation_status = false}}
