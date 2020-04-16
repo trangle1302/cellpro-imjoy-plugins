@@ -320,18 +320,13 @@ const app = new Vue({
       if(response.status === 200){
         const res = await response.json()
         if(res.success){
-            if(!res.access_token){
-              api.alert('JWT access token required, please make sure you are using the latest backend.');
-              return
-            }
-            this.user.access_token = res.access_token
-            const response2 = await fetch(this.selected_server_url + "/tasks", {
-            method: 'GET',
-            headers: {'Authorization': `Bearer ${this.user.access_token}`},
-          })
-          const res2 = await response2.json()
-          this.tasks = res2.tasks
+          if(!res.access_token){
+            api.alert('JWT access token required, please make sure you are using the latest backend.');
+            return
+          }
+          this.user.access_token = res.access_token
           this.current_panel = 'task_selection';
+          await this.getTaskList()
         }else{
           api.alert('Failed to login, error: ' + res.error);
         }
@@ -339,7 +334,14 @@ const app = new Vue({
         api.alert('Response Status' + response.status)
       }
     },
-
+    async getTaskList(){
+      const response2 = await fetch(this.selected_server_url + "/tasks", {
+        method: 'GET',
+        headers: {'Authorization': `Bearer ${this.user.access_token}`},
+      })
+      const res2 = await response2.json()
+      this.tasks = res2.tasks
+    },
     async fetchURLData (sub_url){
       const response = await fetch(this.selected_server_url + sub_url, {
         method: 'GET',
@@ -808,6 +810,7 @@ const app = new Vue({
     home(){
       this.current_panel='task_selection';
       this.current_task_name=null;
+      this.getTaskList();
     },
     channelSettingsUpdated(event){
       // make sure ER and Microtubule are not turned on at the same time
