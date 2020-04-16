@@ -336,8 +336,8 @@ const app = new Vue({
         if (miny > new_coordinates[index][1]){miny = new_coordinates[index][1]}
       };
       for (index = 0; index < new_coordinates.length; index++){
-        new_coordinates[index][0] = new_coordinates[index][0] - minx;
-        new_coordinates[index][1] = new_coordinates[index][1] - miny;
+        new_coordinates[index][0] = Math.round(new_coordinates[index][0] - minx);
+        new_coordinates[index][1] = Math.round(new_coordinates[index][1] - miny);
       };
       return [new_coordinates]
     },
