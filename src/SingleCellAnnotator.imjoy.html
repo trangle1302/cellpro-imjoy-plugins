@@ -103,7 +103,6 @@ const colormap = {'Microtubule': 0, 'Protein': 1, 'ER': 0, 'Nuclei': 2, 'Mask': 
 async function composeChannels(channels, channel_settings, alpha){
   const rgb_channels = []
   const canvas = document.createElement('canvas') 
-
   for(let k in channel_settings){
     if(channels[k] && colormap.hasOwnProperty(k)){
       if(channel_settings[k].show){
@@ -117,13 +116,12 @@ async function composeChannels(channels, channel_settings, alpha){
       console.warn('No color map defined for ' + k)
     }
   }
-  
   const ctx = canvas.getContext('2d');
   const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height)
   const channel_offset = canvas.width * canvas.height * 4
   let i, j;
-
   const data = imgData.data
+  // set color channels
   for(j=0;j<3;j++){
     if(rgb_channels[j]){
       const src = rgb_channels[j].data;
@@ -133,6 +131,7 @@ async function composeChannels(channels, channel_settings, alpha){
      
     }
   }
+  // set alpha channel
   if(rgb_channels[3]){
     const src = rgb_channels[3].data;
     for(i=0;i<channel_offset;i++){
@@ -144,7 +143,6 @@ async function composeChannels(channels, channel_settings, alpha){
       data[i*4+3] = 255; 
     }
   }
-
   ctx.putImageData(imgData, 0, 0);
   return {url: canvas.toDataURL(), width: canvas.width, height: canvas.height}
 }
@@ -468,8 +466,8 @@ const app = new Vue({
       // annotation viewer
       this.current_panel = 'imageviewer';
       this.$nextTick(async ()=>{
-        await this.displayMap(imageData.channels);
-        this.showMaskAnnotation(imageData.mask_geojson);
+        await this.displayMap(this.current_image_data.channels, this.channel_settings);
+        this.showMaskAnnotation(this.current_image_data.mask_geojson);
       })
     },
     // extend Image
@@ -644,13 +642,13 @@ const app = new Vue({
       this.current_image_data.location_adjusted = true;
       await this.nextImage()
     },
-    async displayMap(channels){
+    async displayMap(channels, channel_settings){
       for(let k of Object.keys(channels)){
-        if(!this.channel_settings[k]){
-          this.channel_settings[k] = {name: k, show: true}
+        if(!channel_settings[k]){
+          channel_settings[k] = {name: k, show: true}
         }
       }
-      const image = await composeChannels(channels, this.channel_settings, 0.5)
+      const image = await composeChannels(channels, channel_settings, 0.5)
       const extent = [0, 0, image.width, image.height];
 
       const projection = new Projection({
@@ -782,6 +780,9 @@ const app = new Vue({
     home(){
       this.current_panel='task_selection';
       this.current_task_name=null;
+    },
+    channelSettingsUpdated(){
+      this.displayMap(this.current_image_data.channels, this.channel_settings);
     }
   }
 })
@@ -864,7 +865,7 @@ api.export(new ImJoyPlugin())
       <template v-if="current_image_data.label_display_mode==='single'">
         <div class="form-group floating-channel-btn">
           <label v-for="ch in channel_settings" class="form-checkbox">
-            <input v-model="ch.show" type="checkbox">
+            <input v-model="ch.show" @change="channelSettingsUpdated" type="checkbox">
             <i class="form-icon"></i> {{ch.name}}
           </label>
         </div>
