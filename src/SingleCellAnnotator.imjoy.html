@@ -230,12 +230,12 @@ const app = new Vue({
       if(this.current_panel==='imageviewer'){
         if(event.code === 'KeyY'){
           if(this.current_image_data.label_display_mode==='single'){
-            this.current_location_selected=true
+            this.selectLocation(true)
           }
         }
         else if(event.code === 'KeyN'){
           if(this.current_image_data.label_display_mode==='single'){
-            this.current_location_selected=false
+            this.selectLocation(false)
           }
         }
         else if(event.code === 'ArrowRight'){
@@ -259,6 +259,42 @@ const app = new Vue({
         else if(event.code === 'Escape'){
           this.home()
         }
+        // alpha channel mask
+        else if(event.code === 'KeyA'){
+          if(this.channel_settings['Mask'].show)
+            this.channel_settings['Mask'].show = false;
+          else
+            this.channel_settings['Mask'].show = true;
+        }
+        // ER
+        else if(event.code === 'KeyE'){
+          if(this.channel_settings['ER'].show)
+            this.channel_settings['ER'].show = false;
+          else
+            this.channel_settings['ER'].show = true;
+        }
+        // Microtubule
+        else if(event.code === 'KeyT'){
+          if(this.channel_settings['Microtubule'].show)
+            this.channel_settings['Microtubule'].show = false;
+          else
+            this.channel_settings['Microtubule'].show = true;
+        }
+        // Nuclei
+        else if(event.code === 'KeyI'){
+          if(this.channel_settings['Nuclei'].show)
+            this.channel_settings['Nuclei'].show = false;
+          else
+            this.channel_settings['Nuclei'].show = true;
+        }
+        // Protein
+        else if(event.code === 'KeyP'){
+          if(this.channel_settings['Protein'].show)
+            this.channel_settings['Protein'].show = false;
+          else
+            this.channel_settings['Protein'].show = true;
+        }
+        this.$forceUpdate()
       }
     })
   },
