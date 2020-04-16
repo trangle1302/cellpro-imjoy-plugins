@@ -351,7 +351,7 @@ const app = new Vue({
     },
     async chooseTask (task_name){
       this.current_task_name = task_name;
-      this.initial_loading = true;
+      this.loading = true;
       this.getNewImageBatch(this.current_task_name, true);
     },
     async fetchCellImage(cell_id){
@@ -503,14 +503,21 @@ const app = new Vue({
         console.error('no image data to show.')
         return
       }
+
       api.showStatus(imageData.cell_id)
       console.log('current image: ', imageData)
       this.current_image_data = imageData;
       // annotation viewer
       this.current_panel = 'imageviewer';
       this.$nextTick(async ()=>{
-        await this.displayMap(this.current_image_data.channels, this.channel_settings);
-        this.showMaskAnnotation(this.current_image_data.mask_geojson);
+        this.loading = true;
+        try{
+            await this.displayMap(this.current_image_data.channels, this.channel_settings);
+            this.showMaskAnnotation(this.current_image_data.mask_geojson);
+          }
+        finally{
+          this.loading = false;
+        }
       })
     },
     // extend Image
@@ -525,6 +532,7 @@ const app = new Vue({
       this.extend_image = false;
       this.cached_image_data[this.current_image_index] = imageData;
       await this.showImage(imageData)
+      await this.showMaskAnnotation(imageData.mask_geojson);
     },
 
     async uploadAnnotation(){
@@ -617,17 +625,17 @@ const app = new Vue({
     },
     async annotation_mode_changed(){
       if(this.annotation_mode){
-        this.current_image_data.mask_adjusted=false;
-        await this.extendImage();
-        this.removeMaskAnnotation(); // remove the current mask if adjust mask
-        this.startAnnotation(this.vector_source, this.freehand_mode)
+        this.loading = true;
+        try{
+          this.current_image_data.mask_adjusted=false;
+          this.startAnnotation(this.vector_source, this.freehand_mode)
+          await this.extendImage();
+        }
+        finally{
+          this.loading = false;
+        }
       }
       else{
-        if(this.current_image_data.mask_adjusted===false){
-          this.annotation_mode = true;
-          api.alert("Don't forget to draw or save drawn mask!")
-          return
-        }
         this.stopAnnotation()
       }
     },
@@ -653,9 +661,11 @@ const app = new Vue({
       const format = new ol.format.GeoJSON();
       const routeFeatures = format.writeFeaturesObject(allFeatures, {decimals: 1});
       if (!routeFeatures.features.length){
-        this.annotation_mode = true;
         api.alert('Please draw cell mask before save!');
-        await this.annotation_mode_changed();
+        return
+      }
+      if(routeFeatures.features.length>1){
+        api.alert('Only one cell mask is allowed!');
         return
       }
       routeFeatures['bbox'] = this.current_image_data.mask_geojson.bbox;
@@ -752,7 +762,7 @@ const app = new Vue({
       document.getElementById('map').innerHTML = ""
       this.map = new Map({
         interactions: ol.interaction.defaults({altShiftDragRotate:false, pinchRotate:false}),
-        controls: defaultControls(),
+        controls: [],
         layers: [
           this.image_layer,
           vector_layer,
@@ -779,6 +789,7 @@ const app = new Vue({
       this.select = select
     },
     removeMaskAnnotation() {
+      this.current_image_data.mask_adjusted = true;
       this.vector_source.clear()
     },
     startAnnotation(source, freehand){
@@ -908,6 +919,16 @@ api.export(new ImJoyPlugin())
     </div>
   
     <div class="panel" v-if="current_panel=='imageviewer'&&current_image_data">
+      <div class="input-group floating-switch">
+        <button v-show="!annotation_mode" class="btn" :class="{'transparent-btn': current_image_data.discarded!==true}" @click="toggleDiscard()">Discard</button>&nbsp;&nbsp;
+        <label class="form-switch">
+          <input type="checkbox" v-model="annotation_mode" @change="annotation_mode_changed">
+          <i class="form-icon"></i> <span class="hide-on-mobile">Adjust Mask</span>
+        </label>
+        <button v-show="current_image_data.mask_adjusted" class="btn transparent-btn" v-if="annotation_mode" @click="saveAnnotation()">Save</button>&nbsp;&nbsp;
+        <button class="btn transparent-btn" title="annotation mode" v-if="annotation_mode" @click="removeMaskAnnotation()"><i class="icon icon-delete"></i></button>&nbsp;&nbsp;
+        <button class="btn transparent-btn btn-action s-circle" title="home" @click="home()"><i class="icon icon-cross"></i></button>&nbsp;&nbsp;
+      </div>
       <div class="form-group floating-channel-btn">
         <label v-for="ch in channel_settings" class="form-checkbox">
           <input v-model="ch.show" :name="ch.name" @change="channelSettingsUpdated" type="checkbox">
@@ -935,16 +956,7 @@ api.export(new ImJoyPlugin())
         </div>
         <span class="h3 floating-label">{{current_image_data.location}}</span>
       </template>
-      <div class="input-group floating-switch">
-        <button class="btn" :class="{'transparent-btn': current_image_data.discarded!==true}" @click="toggleDiscard()">Discard</button>&nbsp;&nbsp;
-        <label class="form-switch">
-          <input type="checkbox" v-model="annotation_mode" :disabled="current_image_data.mask_adjusted===false" @change="annotation_mode_changed">
-          <i class="form-icon"></i> Adjust Mask
-        </label>
-        <button class="btn transparent-btn" v-if="annotation_mode" @click="saveAnnotation()">Save</button>&nbsp;&nbsp;
-        <button class="btn transparent-btn" title="annotation mode" v-if="annotation_mode" @click="removeMaskAnnotation()"><i class="icon icon-delete"></i></button>&nbsp;&nbsp;
-        <button class="btn transparent-btn btn-action s-circle" title="home" @click="home()"><i class="icon icon-cross"></i></button>&nbsp;&nbsp;
-      </div>
+      
       <div v-if="loading" class="loading loading-lg floating"></div>
       <div id="map"></div>
     </div>
@@ -978,7 +990,7 @@ api.export(new ImJoyPlugin())
     position: absolute;
     left: 50%;
     z-index: 999;
-    top: calc(92% - 20px);
+    bottom: 70px;
     -webkit-transform: translate3d(-50%, -50%, 0);
     -moz-transform: translate3d(-50%, -50%, 0);
     transform: translate3d(-50%, -50%, 0);
@@ -993,15 +1005,15 @@ api.export(new ImJoyPlugin())
   .floating-channel-btn{
     text-align: left;
     position: absolute;
-    left: 50px;
+    left: 5px;
     top: 10px;
-    z-index: 999;
+    z-index: 666;
   }
 
   .floating-bottom-btn {
     position: absolute;
     left: calc(50% - 180px);
-    top: 92%;
+    bottom: 50px;
     z-index: 999;
   }
   .floating-right-btn{
@@ -1063,6 +1075,7 @@ api.export(new ImJoyPlugin())
   }
 
   #map{
+    max-height: 100%;
     height: 100vh;
     min-height: 100px!important;
   }
