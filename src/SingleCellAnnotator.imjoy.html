@@ -8,7 +8,7 @@
   "type": "window",
   "tags": [],
   "ui": "",
-  "version": "0.1.19",
+  "version": "0.1.20",
   "api_version": "0.1.7",
   "description": "Annotate images for HPA single-cell image classification",
   "icon": "extension",
@@ -88,6 +88,7 @@ async function getImageMeta(url) {
   });
 };
 const imageDataTemplate = {
+  extend: null,
   cell_id: null,
   mask_geojson:{
   'type':'FeatureCollection',
@@ -114,7 +115,8 @@ const sendDataTemplate = {
   discarded: false,
   mask: null,
   bbox: null,
-  location:null
+  location:null,
+  extend: null
 };
 
 const app = new Vue({
@@ -253,9 +255,11 @@ const app = new Vue({
       imageData.cell_id = cell_id;
       let image_url = "/images/" + this.current_task_name + "/" + imageData.cell_id;
       if (this.extend_image){
-        image_url += "?extend=200&maskout=1"
+        image_url += "?extend=200&maskout=1";
+        imageData.extend = 200;
       }else{
         image_url += "?extend=20&maskout=1"
+        imageData.extend = 20;
       };
       const response = await this.fetchURLData(image_url)
       imageData.mask_geojson.bbox = response.bbox;
