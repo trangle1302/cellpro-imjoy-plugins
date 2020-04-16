@@ -138,8 +138,8 @@ const app = new Vue({
     select: null,
     current_panel: 'login',
     user:{
-      username: "wei",
-      password: "GPq2VZgRg2lq5lYPNh9v",
+      username: "hao",
+      password: "Ue9zloXN7fCyiYmtTq2s",
       access_token: null
     },
   // from here this is communication to backend, to develop/activate
@@ -377,7 +377,7 @@ const app = new Vue({
       if(this.annotation_mode){
         const anwser = await api.confirm("Would you like to save the mask annotation?")
         if(anwser){
-          api.alert("annotation_mode " + this.annotation_mode)
+          this.saveAnnotation()
         }
         this.stopAnnotation();
       }
