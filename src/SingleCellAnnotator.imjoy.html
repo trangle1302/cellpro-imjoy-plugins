@@ -101,6 +101,8 @@ async function getImageData(url) {
 const colormap = {'Microtubule': 0, 'Protein': 1, 'ER': 0, 'Nuclei': 2, 'Mask': 3}
 
 async function composeChannels(channels, channel_settings, alpha){
+  if(alpha<0) alpha = 0;
+  if(alpha>1) alpha = 1;
   const rgb_channels = []
   const canvas = document.createElement('canvas') 
   for(let k in channel_settings){
@@ -135,7 +137,12 @@ async function composeChannels(channels, channel_settings, alpha){
   if(rgb_channels[3]){
     const src = rgb_channels[3].data;
     for(i=0;i<channel_offset;i++){
-      data[i*4+3] = parseInt((255-src[i])*alpha); 
+      if(src[i] === 0){
+        data[i*4+3] = parseInt(alpha*255);
+      }
+      else{
+        data[i*4+3] = 255;
+      }
     }
   }
   else{
