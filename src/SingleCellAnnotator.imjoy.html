@@ -8,7 +8,7 @@
   "type": "window",
   "tags": [],
   "ui": "",
-  "version": "0.1.21",
+  "version": "0.1.22",
   "api_version": "0.1.7",
   "description": "Annotate images for HPA single-cell image classification",
   "icon": "extension",
@@ -336,8 +336,8 @@ const app = new Vue({
         if (miny > new_coordinates[index][1]){miny = new_coordinates[index][1]}
       };
       for (index = 0; index < new_coordinates.length; index++){
-        new_coordinates[index][0] = Math.round(new_coordinates[index][0] - minx);
-        new_coordinates[index][1] = Math.round(new_coordinates[index][1] - miny);
+        new_coordinates[index][0] = new_coordinates[index][0] - minx;
+        new_coordinates[index][1] = new_coordinates[index][1] - miny;
       };
       return [new_coordinates]
     },
@@ -435,6 +435,8 @@ const app = new Vue({
           delete sendData.mask;
         }else{
           sendData.bbox = this.current_image_data.mask_geojson.bbox;
+          for (item in sendData.bbox){
+            sendData.bbox[item] = Number(sendData.bbox[item].toFixed(1))};
           sendData.location = {};
           if (this.current_image_data.label_display_mode == 'single'){
             // do not upload annotion if no location selected
@@ -471,6 +473,12 @@ const app = new Vue({
           return };
           if (this.current_image_data.mask_adjusted){
             sendData.mask = this.current_image_data.mask_geojson.features;
+            // now adjust the digit to 1 decimal for cooridinates
+            let coordinates = this.current_image_data.mask_geojson.features[0].geometry.coordinates[0]
+            for (let index = 0; index < coordinates.length; index++){
+              coordinates[index][0] = Number(coordinates[index][0].toFixed(1));
+              coordinates[index][1] = Number(coordinates[index][1].toFixed(1));
+            };
             this.current_image_data.mask_adjusted=false;
           }else{
             delete sendData.mask;
@@ -483,7 +491,6 @@ const app = new Vue({
         const url_post = this.selected_server_url + sub_url;
         // only for test use
         this.current_image_data.annotation_status=true;
-
         // this should be set after uploadannotation
         this.current_image_data.mask_adjusted=null;
         this.current_image_data.location_adjusted = null;
