@@ -100,7 +100,7 @@ async function getImageData(url) {
 
 const colormap = {'Microtubule': 0, 'Protein': 1, 'ER': 0, 'Nuclei': 2, 'Mask': 3}
 
-async function composeChannels(channels, channel_settings){
+async function composeChannels(channels, channel_settings, alpha){
   const rgb_channels = []
   const canvas = document.createElement('canvas') 
 
@@ -122,20 +122,31 @@ async function composeChannels(channels, channel_settings){
   const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height)
   const channel_offset = canvas.width * canvas.height * 4
   let i, j;
-  debugger
+
   const data = imgData.data
-  for(i=0;i<channel_offset;i++){
-    for(j=0;j<3;j++){
-      if(rgb_channels[j]){
-        data[i*4+j]  = rgb_channels[j].data[i]
+  for(j=0;j<3;j++){
+    if(rgb_channels[j]){
+      const src = rgb_channels[j].data;
+      for(i=0;i<channel_offset;i++){
+          data[i*4+j]  = src[i]
       }
+     
     }
-    // alpha
-    data[i*4+3] = 255;
   }
-  debugger
+  if(rgb_channels[3]){
+    const src = rgb_channels[3].data;
+    for(i=0;i<channel_offset;i++){
+      data[i*4+3] = parseInt((255-src[i])*alpha); 
+    }
+  }
+  else{
+    for(i=0;i<channel_offset;i++){
+      data[i*4+3] = 255; 
+    }
+  }
+
   ctx.putImageData(imgData, 0, 0);
-  return canvas.toDataURL()
+  return {url: canvas.toDataURL(), width: canvas.width, height: canvas.height}
 }
 
 const imageDataTemplate = {
@@ -424,7 +435,7 @@ const app = new Vue({
     loadMoreIfNeeded(){
       this.current_image_index = this.cached_image_data.indexOf(this.current_image_data)
       // when we reach 70% of the the cached images
-      if(this.current_image_index>this.cached_image_data.length*0.5){
+      if(this.current_image_index>this.cached_image_data.length*0.7){
         this.getNewImageBatch(this.current_task_name)
       }
     },
@@ -639,7 +650,7 @@ const app = new Vue({
           this.channel_settings[k] = {name: k, show: true}
         }
       }
-      const image = composeChannels(channels, this.channel_settings)
+      const image = await composeChannels(channels, this.channel_settings, 0.5)
       const extent = [0, 0, image.width, image.height];
 
       const projection = new Projection({
