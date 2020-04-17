@@ -530,6 +530,7 @@ const app = new Vue({
         }
         else{
           this.stopMaskAnnotation()
+          this.current_image_data.mask_adjusted = false;
         }
       };
       if(this.current_image_data.location_changed){
@@ -562,6 +563,7 @@ const app = new Vue({
         }
         else{
           this.stopMaskAnnotation()
+          this.current_image_data.mask_adjusted = false;
         }
       }
       if(this.current_image_data.location_changed){
@@ -683,7 +685,7 @@ const app = new Vue({
         throw new Error('Failed to upload the annotaiton.')
       };
     },
-    async draw_mask_mode_changed(){
+    async drawMaskModeChanged(){
       if(this.draw_mask_mode){
         this.loading = true;
         try{
@@ -695,6 +697,15 @@ const app = new Vue({
         }
       }
       else{
+        if(this.current_image_data.mask_adjusted){
+          const anwser = await api.confirm("Would you like to save the mask annotation?")
+          if(anwser){
+            this.saveMaskAnnotation()
+          }
+          else{
+            this.current_image_data.mask_adjusted = false;
+          }
+        };
         this.stopMaskAnnotation()
       }
     },
@@ -830,7 +841,7 @@ const app = new Vue({
           minZoom: -10
         })
       });
-      this.draw_mask_mode_changed();
+      this.drawMaskModeChanged();
       this.map.addControl(new MousePosition({
           coordinateFormat: createStringXY(0)
       }));
@@ -986,7 +997,7 @@ api.export(new ImJoyPlugin())
     <div class="panel" v-if="current_panel=='imageviewer'&&current_image_data">
       <div v-show="!hide_controls" class="input-group floating-switch">
         <label class="form-switch">
-          <input type="checkbox" v-model="draw_mask_mode" @change="draw_mask_mode_changed">
+          <input type="checkbox" v-model="draw_mask_mode" @change="drawMaskModeChanged">
           <i class="form-icon"></i> <span class="hide-on-mobile">Redraw Mask</span>
         </label>
         <button v-show="current_image_data.mask_adjusted" class="btn transparent-btn" v-if="draw_mask_mode" @click="saveMaskAnnotation()">Save</button>&nbsp;&nbsp;
