@@ -212,6 +212,7 @@ const app = new Vue({
     },
     channel_settings: {},
     alpha: 0.5,
+    hide_controls: false,
   // from here this is communication to backend, to develop/activate
     tasks: null,
     current_task_name: null,
@@ -221,10 +222,13 @@ const app = new Vue({
     current_image_data: null,
     current_image_index: 0,
     loading_cache: false,
+    innerHeight: '100vh'
   },
   mounted(){
-    window.onresize = function() {
+    window.onresize = ()=>{
       document.body.height = window.innerHeight;
+      this.innerHTML = window.innerHeight + 'px';
+      this.$forceUpdate()
     }
     window.onresize();
     this.selected_server_url = this.servers['production']
@@ -315,6 +319,14 @@ const app = new Vue({
             this.channel_settings['Protein'].show = false;
           else
             this.channel_settings['Protein'].show = true;
+        }
+        else if(event.code === 'KeyH'){
+          if(this.hide_controls){
+            this.hide_controls = false
+          } 
+          else{
+            this.hide_controls = true
+          }
         }
         this.$forceUpdate()
       }
@@ -438,7 +450,7 @@ const app = new Vue({
           const cell_id = this.loaded_image_list[i];
           api.showProgress((i+1)/this.loaded_image_list.length)
           const imageData = await this.fetchCellImage(cell_id)
-          if(display_first && i===0){
+          if(display_first && !this.current_image_data && this.current_task_name){
             this.showImage(imageData)
             this.$forceUpdate();
           }
@@ -530,6 +542,7 @@ const app = new Vue({
       this.current_panel = 'imageviewer';
       this.$nextTick(async ()=>{
         this.loading = true;
+        window.onresize();
         try{
             await this.displayMap(this.current_image_data.channels, this.channel_settings);
             this.showMaskAnnotation(this.current_image_data.mask_geojson);
@@ -830,7 +843,9 @@ const app = new Vue({
       this.current_panel='task_selection';
       this.current_task_name = null;
       this.cached_image_data = [];
+      this.current_image_data = null
       this.getTaskList();
+      this.$forceUpdate();
     },
     channelSettingsUpdated(event){
       // make sure ER and Microtubule are not turned on at the same time
@@ -913,7 +928,7 @@ api.export(new ImJoyPlugin())
     </div>
   
     <div class="panel" v-if="current_panel=='imageviewer'&&current_image_data">
-      <div class="input-group floating-switch">
+      <div v-show="!hide_controls" class="input-group floating-switch">
         <button v-show="!annotation_mode" class="btn" :class="{'transparent-btn': current_image_data.discarded!==true}" @click="toggleDiscard()">Discard</button>&nbsp;&nbsp;
         <label class="form-switch">
           <input type="checkbox" v-model="annotation_mode" @change="annotation_mode_changed">
@@ -923,14 +938,14 @@ api.export(new ImJoyPlugin())
         <button class="btn transparent-btn" title="annotation mode" v-if="annotation_mode" @click="removeMaskAnnotation()"><i class="icon icon-delete"></i></button>&nbsp;&nbsp;
         <button class="btn transparent-btn btn-action s-circle" title="home" @click="home()"><i class="icon icon-cross"></i></button>&nbsp;&nbsp;
       </div>
-      <div class="form-group floating-channel-btn">
+      <div v-show="!hide_controls" class="form-group floating-channel-btn">
         <label v-for="ch in channel_settings" class="form-checkbox">
           <input v-model="ch.show" :name="ch.name" @change="channelSettingsUpdated" type="checkbox">
           <i class="form-icon"></i> {{ch.name}}
         </label>
       </div>
       <template v-if="current_image_data.label_display_mode==='multiple'">
-        <div class="floating-right-btn">
+        <div v-show="!hide_controls" class="floating-right-btn">
           <div class="btn-group">
             <button :disabled="current_image_index===0||annotation_mode" class="btn transparent-btn" @click="previousImage()"><i class="icon icon-back"></i>&nbsp;Back</button>
             <button :disabled="current_image_index>=cached_image_data.length||annotation_mode" class="btn transparent-btn" @click="nextImage()">Next&nbsp;<i class="icon icon-forward"></i></button>
@@ -942,17 +957,17 @@ api.export(new ImJoyPlugin())
         </div>
       </template>
       <template v-if="current_image_data.label_display_mode==='single'">
-        <div class="btn-group floating-bottom-btn">
+        <div v-show="!hide_controls" class="btn-group floating-bottom-btn">
           <button :disabled="current_image_index===0||annotation_mode" class="btn transparent-btn" @click="previousImage()"><i class="icon icon-back"></i>&nbsp;Back</button>
           <button :disabled="current_image_data.discarded||annotation_mode" class="btn transparent-btn" @click="selectLocation(true)" :class="{'selected-location-btn': current_image_data.location[current_image_data.single_location]===true}"><i class="icon icon-check"></i>&nbsp;Yes</button>
           <button :disabled="current_image_data.discarded||annotation_mode" class="btn transparent-btn" @click="selectLocation(false)" :class="{'selected-location-btn': current_image_data.location[current_image_data.single_location]===false}"><i class="icon icon-cross"></i>&nbsp;No</button>
           <button :disabled="current_image_index>=cached_image_data.length||annotation_mode" class="btn transparent-btn" @click="nextImage()">Next&nbsp;<i class="icon icon-forward"></i></button>
         </div>
-        <span class="h3 floating-label">{{current_image_data.single_location}}</span>
+        <span v-show="!hide_controls" class="h3 floating-label">{{current_image_data.single_location}}</span>
       </template>
       
       <div v-if="loading" class="loading loading-lg floating"></div>
-      <div id="map"></div>
+      <div id="map" v-show="current_panel=='imageviewer'" :style="{height: innerHeight}"></div>
     </div>
     </div>
   </div>
@@ -1070,8 +1085,7 @@ api.export(new ImJoyPlugin())
 
   #map{
     max-height: 100%;
-    height: 100vh;
-    min-height: 100px!important;
+    min-height: 50vh!important;
   }
   .icon::before {
     position: relative;
