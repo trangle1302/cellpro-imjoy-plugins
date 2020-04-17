@@ -498,9 +498,6 @@ const app = new Vue({
       };
       if(this.current_image_data.location_changed){
         await this.uploadAnnotation();
-      };
-      if(this.current_image_data.discarded){
-        await this.uploadAnnotation();
       }
       this.current_image_index = this.cached_image_data.indexOf(this.current_image_data)
       if(this.current_image_index<=-1){
@@ -527,9 +524,6 @@ const app = new Vue({
         }
       }
       if(this.current_image_data.location_changed){
-        await this.uploadAnnotation();
-      };
-      if(this.current_image_data.discarded){
         await this.uploadAnnotation();
       }
       this.current_image_index++;
@@ -578,7 +572,7 @@ const app = new Vue({
     },
     async uploadAnnotation(){
       // skip upload annotation if image is annotated and no new change
-      if ((!this.current_image_data.mask_adjusted)&&(!this.current_image_data.location_changed)&&(!this.current_image_data.discarded)){
+      if ((!this.current_image_data.mask_adjusted)&&(!this.current_image_data.location_changed)){
         return
       }
       // Default options are marked with *
@@ -661,6 +655,7 @@ const app = new Vue({
       }
     },
     async toggleDiscard(){
+      this.current_task_name.location_changed = true;
       if(this.current_image_data.discarded){
         this.current_image_data.discarded = false;
       }
@@ -1020,122 +1015,122 @@ api.export(new ImJoyPlugin())
     top: 40px;
     -webkit-transform: translate3d(-50%, -50%, 0);
     -moz-transform: translate3d(-50%, -50%, 0);
-    transform: translate3d(-50%, -50%, 0);
-  }
-
-  @media screen and (max-width: 800px) {
-    .floating-label{
-      top: 90px!important;
+      transform: translate3d(-50%, -50%, 0);
     }
-  }
   
-  .floating-switch{
-    position: absolute;
-    right: 10px;
-    z-index: 999;
-    top: 20px;
-  }
-
-  .ol-mouse-position{
-    top:unset;
-    bottom: 3px;
-  }
-  .floating-channel-btn{
-    text-align: left;
-    position: absolute;
-    left: 5px;
-    top: 10px;
-    z-index: 666;
-  }
-
-  .floating-bottom-btn {
-    position: absolute;
-    left: calc(50% - 180px);
-    bottom: 5px;
-    z-index: 999;
-  }
-  .floating-right-btn{
-    position: absolute;
-    right: 3px;
-    top: 80px;
-    width: 330px;
-    z-index: 999;
-  }
-  .floating-left-btn{
-    position: absolute;
-    left: 3px;
-    top: 80px;
-    width: 330px;
-    z-index: 999;
-  }
-  .btn{
-    width: 90px;
-  }
-  .location-btn {
-    padding-top: 0px;
-    font-size: small;
-    margin-left: 0px;
-    height: 26px;
-    flex: none;
-    width: 110px;
-    background-color:#fff3;
-  }
-  .location-btn:hover, .location-btn:focus{
-    background-color:rgba(255, 255, 255, 0.42);
-  }
-  .selected-location-btn{
-    background-color: #3580ff7d!important;
-    color: white!important;
-  }
-  .transparent-btn, .transparent-btn:focus {
-    width: 90px;
-    background-color:#fff3;
-  }
-  .transparent-btn:hover {
-    background-color:rgba(255, 255, 255, 0.42);
-  }
-  .floating {
-    position: absolute;
-    left: 50%;
-    top: 30%;
-  }
-  #toolbar {
-    position: absolute;
-    top: 112px;
-    left: 10px;
-  }
-  #toolbar > div:nth-child(1){
-    fill: #448aff;
-  }
-
-  .ol-layer{
-    top: 0px;
-  }
-
-  #map{
-    max-height: 100%;
-    min-height: 50vh!important;
-  }
-  .icon::before {
-    position: relative;
-  }
-  .navbar {
-    padding-left: 10px;
-  }
-  .navbar .navbar-brand {
-    font-size: 1.5rem;
-    text-decoration: none;
-  }
-  
-  .mouse-position{
-    padding-left: 124px;
-    padding-top: 10px;
-  }
-  
-  @media all and (max-width: 512px) { /* Change Width Here */
-    .hide-on-mobile {
-        display: none;
+    @media screen and (max-width: 800px) {
+      .floating-label{
+        top: 90px!important;
+      }
     }
-  }
-</style>
+    
+    .floating-switch{
+      position: absolute;
+      right: 10px;
+      z-index: 999;
+      top: 20px;
+    }
   
+    .ol-mouse-position{
+      top:unset;
+      bottom: 3px;
+    }
+    .floating-channel-btn{
+      text-align: left;
+      position: absolute;
+      left: 5px;
+      top: 10px;
+      z-index: 666;
+    }
+  
+    .floating-bottom-btn {
+      position: absolute;
+      left: calc(50% - 180px);
+      bottom: 5px;
+      z-index: 999;
+    }
+    .floating-right-btn{
+      position: absolute;
+      right: 3px;
+      top: 80px;
+      width: 330px;
+      z-index: 999;
+    }
+    .floating-left-btn{
+      position: absolute;
+      left: 3px;
+      top: 80px;
+      width: 330px;
+      z-index: 999;
+    }
+    .btn{
+      width: 90px;
+    }
+    .location-btn {
+      padding-top: 0px;
+      font-size: small;
+      margin-left: 0px;
+      height: 26px;
+      flex: none;
+      width: 110px;
+      background-color:#fff3;
+    }
+    .location-btn:hover, .location-btn:focus{
+      background-color:rgba(255, 255, 255, 0.42);
+    }
+    .selected-location-btn{
+      background-color: #3580ff7d!important;
+      color: white!important;
+    }
+    .transparent-btn, .transparent-btn:focus {
+      width: 90px;
+      background-color:#fff3;
+    }
+    .transparent-btn:hover {
+      background-color:rgba(255, 255, 255, 0.42);
+    }
+    .floating {
+      position: absolute;
+      left: 50%;
+      top: 30%;
+    }
+    #toolbar {
+      position: absolute;
+      top: 112px;
+      left: 10px;
+    }
+    #toolbar > div:nth-child(1){
+      fill: #448aff;
+    }
+  
+    .ol-layer{
+      top: 0px;
+    }
+  
+    #map{
+      max-height: 100%;
+      min-height: 50vh!important;
+    }
+    .icon::before {
+      position: relative;
+    }
+    .navbar {
+      padding-left: 10px;
+    }
+    .navbar .navbar-brand {
+      font-size: 1.5rem;
+      text-decoration: none;
+    }
+    
+    .mouse-position{
+      padding-left: 124px;
+      padding-top: 10px;
+    }
+    
+    @media all and (max-width: 512px) { /* Change Width Here */
+      .hide-on-mobile {
+          display: none;
+      }
+    }
+  </style>
+    
