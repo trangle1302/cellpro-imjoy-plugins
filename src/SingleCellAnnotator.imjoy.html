@@ -419,6 +419,10 @@ const app = new Vue({
             console.error('Switching tasks, quit caching')
             break
           }
+          if(!this.current_task_name){
+            api.showProgress(0)
+            return
+          }
           const cell_id = this.loaded_image_list[i];
           api.showProgress((i+1)/this.loaded_image_list.length)
           const imageData = await this.fetchCellImage(cell_id)
@@ -809,7 +813,8 @@ const app = new Vue({
     },
     home(){
       this.current_panel='task_selection';
-      this.current_task_name=null;
+      this.current_task_name = null;
+      this.cached_image_data = [];
       this.getTaskList();
     },
     channelSettingsUpdated(event){
