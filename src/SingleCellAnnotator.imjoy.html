@@ -223,6 +223,10 @@ const app = new Vue({
     loading_cache: false,
   },
   mounted(){
+    window.onresize = function() {
+      document.body.height = window.innerHeight;
+    }
+    window.onresize();
     this.selected_server_url = this.servers['production']
     document.addEventListener('keydown', (event)=>{
       if(this.current_panel==='imageviewer'){
