@@ -986,151 +986,151 @@ api.export(new ImJoyPlugin())
 
 </window>
 <style lang="css">
-  body{
-    color: #448aff!important;
-    overflow: hidden;
-  }
-  .centered-panel{
-    background-color: #448aff0f;
-    width: 100%;
-    height: 100%;
-    max-height: 400px;
-    max-width: 400px;
-    left: 50%;
-    top: 50%;
-    position: absolute;
-    -webkit-transform: translate3d(-50%, -50%, 0);
-    -moz-transform: translate3d(-50%, -50%, 0);
+body{
+  color: #448aff!important;
+  overflow: hidden;
+}
+.centered-panel{
+  background-color: #448aff0f;
+  width: 100%;
+  height: 100%;
+  max-height: 400px;
+  max-width: 400px;
+  left: 50%;
+  top: 50%;
+  position: absolute;
+  -webkit-transform: translate3d(-50%, -50%, 0);
+  -moz-transform: translate3d(-50%, -50%, 0);
+  transform: translate3d(-50%, -50%, 0);
+}
+.ol-layers:first-child{
+  background-color: black;
+}
+
+.floating-label{
+  color:#ffefdbc2;
+  position: absolute;
+  left: 50%;
+  z-index: 999;
+  top: 40px;
+  -webkit-transform: translate3d(-50%, -50%, 0);
+  -moz-transform: translate3d(-50%, -50%, 0);
     transform: translate3d(-50%, -50%, 0);
   }
-  .ol-layers:first-child{
-    background-color: black;
+
+  @media screen and (max-width: 800px) {
+    .floating-label{
+      top: 90px!important;
+    }
+  }
+  
+  .floating-switch{
+    position: absolute;
+    right: 10px;
+    z-index: 999;
+    top: 20px;
   }
 
-  .floating-label{
-    color:#ffefdbc2;
+  .ol-mouse-position{
+    top:unset;
+    bottom: 3px;
+  }
+  .floating-channel-btn{
+    text-align: left;
+    position: absolute;
+    left: 5px;
+    top: 10px;
+    z-index: 666;
+  }
+
+  .floating-bottom-btn {
+    position: absolute;
+    left: calc(50% - 180px);
+    bottom: 5px;
+    z-index: 999;
+  }
+  .floating-right-btn{
+    position: absolute;
+    right: 3px;
+    top: 80px;
+    width: 330px;
+    z-index: 999;
+  }
+  .floating-left-btn{
+    position: absolute;
+    left: 3px;
+    top: 80px;
+    width: 330px;
+    z-index: 999;
+  }
+  .btn{
+    width: 90px;
+  }
+  .location-btn {
+    padding-top: 0px;
+    font-size: small;
+    margin-left: 0px;
+    height: 26px;
+    flex: none;
+    width: 110px;
+    background-color:#fff3;
+  }
+  .location-btn:hover, .location-btn:focus{
+    background-color:rgba(255, 255, 255, 0.42);
+  }
+  .selected-location-btn{
+    background-color: #3580ff7d!important;
+    color: white!important;
+  }
+  .transparent-btn, .transparent-btn:focus {
+    width: 90px;
+    background-color:#fff3;
+  }
+  .transparent-btn:hover {
+    background-color:rgba(255, 255, 255, 0.42);
+  }
+  .floating {
     position: absolute;
     left: 50%;
-    z-index: 999;
-    top: 40px;
-    -webkit-transform: translate3d(-50%, -50%, 0);
-    -moz-transform: translate3d(-50%, -50%, 0);
-      transform: translate3d(-50%, -50%, 0);
-    }
+    top: 30%;
+  }
+  #toolbar {
+    position: absolute;
+    top: 112px;
+    left: 10px;
+  }
+  #toolbar > div:nth-child(1){
+    fill: #448aff;
+  }
+
+  .ol-layer{
+    top: 0px;
+  }
+
+  #map{
+    max-height: 100%;
+    min-height: 50vh!important;
+  }
+  .icon::before {
+    position: relative;
+  }
+  .navbar {
+    padding-left: 10px;
+  }
+  .navbar .navbar-brand {
+    font-size: 1.5rem;
+    text-decoration: none;
+  }
   
-    @media screen and (max-width: 800px) {
-      .floating-label{
-        top: 90px!important;
-      }
-    }
-    
-    .floating-switch{
-      position: absolute;
-      right: 10px;
-      z-index: 999;
-      top: 20px;
-    }
+  .mouse-position{
+    padding-left: 124px;
+    padding-top: 10px;
+  }
   
-    .ol-mouse-position{
-      top:unset;
-      bottom: 3px;
+  @media all and (max-width: 512px) { /* Change Width Here */
+    .hide-on-mobile {
+        display: none;
     }
-    .floating-channel-btn{
-      text-align: left;
-      position: absolute;
-      left: 5px;
-      top: 10px;
-      z-index: 666;
-    }
+  }
+</style>
   
-    .floating-bottom-btn {
-      position: absolute;
-      left: calc(50% - 180px);
-      bottom: 5px;
-      z-index: 999;
-    }
-    .floating-right-btn{
-      position: absolute;
-      right: 3px;
-      top: 80px;
-      width: 330px;
-      z-index: 999;
-    }
-    .floating-left-btn{
-      position: absolute;
-      left: 3px;
-      top: 80px;
-      width: 330px;
-      z-index: 999;
-    }
-    .btn{
-      width: 90px;
-    }
-    .location-btn {
-      padding-top: 0px;
-      font-size: small;
-      margin-left: 0px;
-      height: 26px;
-      flex: none;
-      width: 110px;
-      background-color:#fff3;
-    }
-    .location-btn:hover, .location-btn:focus{
-      background-color:rgba(255, 255, 255, 0.42);
-    }
-    .selected-location-btn{
-      background-color: #3580ff7d!important;
-      color: white!important;
-    }
-    .transparent-btn, .transparent-btn:focus {
-      width: 90px;
-      background-color:#fff3;
-    }
-    .transparent-btn:hover {
-      background-color:rgba(255, 255, 255, 0.42);
-    }
-    .floating {
-      position: absolute;
-      left: 50%;
-      top: 30%;
-    }
-    #toolbar {
-      position: absolute;
-      top: 112px;
-      left: 10px;
-    }
-    #toolbar > div:nth-child(1){
-      fill: #448aff;
-    }
-  
-    .ol-layer{
-      top: 0px;
-    }
-  
-    #map{
-      max-height: 100%;
-      min-height: 50vh!important;
-    }
-    .icon::before {
-      position: relative;
-    }
-    .navbar {
-      padding-left: 10px;
-    }
-    .navbar .navbar-brand {
-      font-size: 1.5rem;
-      text-decoration: none;
-    }
-    
-    .mouse-position{
-      padding-left: 124px;
-      padding-top: 10px;
-    }
-    
-    @media all and (max-width: 512px) { /* Change Width Here */
-      .hide-on-mobile {
-          display: none;
-      }
-    }
-  </style>
-    
