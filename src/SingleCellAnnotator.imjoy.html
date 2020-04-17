@@ -715,9 +715,9 @@ const app = new Vue({
         this.current_image_data.discarded = false;
       }
       else{
-        this.current_image_data.discarded = true;        
+        this.current_image_data.discarded = true;
+        await this.nextImage();    
       }
-      await this.nextImage();
       this.$forceUpdate()
     },
     async showMaskAnnotation(mask_geojson){
@@ -885,6 +885,7 @@ const app = new Vue({
       this.draw_mask_mode = true;
     },
     stopMaskAnnotation(){
+      if(!this.map) return;
       if(this.drawInteraction)
       this.map.removeInteraction(this.drawInteraction);
       if(this.snapInteraction)
