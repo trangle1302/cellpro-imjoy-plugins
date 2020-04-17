@@ -763,7 +763,7 @@ const app = new Vue({
           wrapX: false
       });
       // clear map
-      document.getElementById('map').innerHTML = ""
+      this.$refs.map.innerHTML = ""
       this.map = new Map({
         interactions: ol.interaction.defaults({altShiftDragRotate:false, pinchRotate:false}),
         controls: [],
@@ -846,6 +846,9 @@ const app = new Vue({
       this.cached_image_data = [];
       this.current_image_data = null
       this.getTaskList();
+      // destroy the map
+      this.$refs.map.innerHTML = "";
+      this.map = null;
       this.$forceUpdate();
     },
     channelSettingsUpdated(event){
@@ -968,7 +971,7 @@ api.export(new ImJoyPlugin())
       </template>
       
       <div v-if="loading" class="loading loading-lg floating"></div>
-      <div id="map" v-show="current_panel=='imageviewer'" :style="{height: innerHeight}"></div>
+      <div id="map" ref="map" v-show="current_panel=='imageviewer'" :style="{height: innerHeight}"></div>
     </div>
     </div>
   </div>
