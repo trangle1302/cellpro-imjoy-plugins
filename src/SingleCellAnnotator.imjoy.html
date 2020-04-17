@@ -493,7 +493,9 @@ const app = new Vue({
       if(this.current_image_data.mask_adjusted){
         const anwser = await api.confirm("Would you like to save the mask annotation?")
         if(anwser){
-          this.saveMaskAnnotation()
+          if(!await this.saveMaskAnnotation()){
+            return
+          }
         }
         else{
           this.stopMaskAnnotation()
@@ -523,7 +525,9 @@ const app = new Vue({
       if(this.current_image_data.mask_adjusted){
         const anwser = await api.confirm("Would you like to save the mask annotation?")
         if(anwser){
-          this.saveMaskAnnotation()
+          if(!await this.saveMaskAnnotation()){
+            return
+          }
         }
         else{
           this.stopMaskAnnotation()
@@ -685,18 +689,18 @@ const app = new Vue({
       const routeFeatures = format.writeFeaturesObject(allFeatures, {decimals: 1});
       if (!routeFeatures.features.length){
         api.alert('Please draw a cell mask before saving!');
-        return
+        return false
       }
       if(routeFeatures.features.length>1){
         api.alert('Only one cell mask is allowed!');
-        return
+        return false
       }
-      
       routeFeatures['bbox'] = this.current_image_data.mask_geojson.bbox;
       this.current_image_data.mask_geojson = routeFeatures;
       this.current_image_data.mask_adjusted = true;
       await this.uploadAnnotation()
       this.stopMaskAnnotation()
+      return true
     },
     async exportAnnotation() {
       const allFeatures = this.vector_source.getFeatures();
