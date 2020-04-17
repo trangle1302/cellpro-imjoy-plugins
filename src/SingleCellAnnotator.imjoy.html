@@ -498,6 +498,9 @@ const app = new Vue({
       };
       if(this.current_image_data.location_changed){
         await this.uploadAnnotation();
+      };
+      if(this.current_image_data.discarded){
+        await this.uploadAnnotation();
       }
       this.current_image_index = this.cached_image_data.indexOf(this.current_image_data)
       if(this.current_image_index<=-1){
@@ -524,6 +527,9 @@ const app = new Vue({
         }
       }
       if(this.current_image_data.location_changed){
+        await this.uploadAnnotation();
+      };
+      if(this.current_image_data.discarded){
         await this.uploadAnnotation();
       }
       this.current_image_index++;
@@ -572,7 +578,7 @@ const app = new Vue({
     },
     async uploadAnnotation(){
       // skip upload annotation if image is annotated and no new change
-      if ((!this.current_image_data.mask_adjusted)&&(!this.current_image_data.location_changed)){
+      if ((!this.current_image_data.mask_adjusted)&&(!this.current_image_data.location_changed)&&(!this.current_image_data.discarded)){
         return
       }
       // Default options are marked with *
