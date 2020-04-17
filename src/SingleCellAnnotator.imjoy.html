@@ -589,7 +589,10 @@ const app = new Vue({
         this.stopMaskAnnotation()
       }
       if(this.draw_mask_mode && !imageData.extended){
-        this.extendImage()
+        const location = this.current_image_data.location;
+        await this.extendImage();
+        this.current_image_data.location = location;
+        this.current_image_data.redraw_mask_occurred = true;
       }
       else{
         this.$nextTick(async ()=>{
