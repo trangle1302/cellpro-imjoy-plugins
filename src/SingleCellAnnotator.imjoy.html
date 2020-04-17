@@ -931,7 +931,8 @@ api.export(new ImJoyPlugin())
 
     <div class="panel centered-panel" v-if="current_panel=='login'">
       <div class="panel-header">
-        <div class="panel-title h2">HPA Image Annotator (v{{version}})</div>
+        <div class="panel-title h2">HPA Image Annotator</div>
+        <span>(v{{version}})</span>
       </div>
       <div class="panel-body">
         <div class="form-group">
@@ -959,11 +960,11 @@ api.export(new ImJoyPlugin())
 
     <div class="panel centered-panel" v-if="current_panel=='task_selection'">
       <div class="panel-header">
-        <div class="panel-title h2">HPA Image Annotator (v{{version}})</div>
+        <div class="panel-title h2">HPA Image Annotator </div> <span>(v{{version}})</span>
+        <br>
         <p>Please choose a task:</p>
       </div>
       <div class="panel-body">
-        <br>
         <br>
         <div v-for="(task, task_name) in tasks">
           <progress class="progress" style="width: 288px" :value="task.finished" :max="task.total"></progress>
