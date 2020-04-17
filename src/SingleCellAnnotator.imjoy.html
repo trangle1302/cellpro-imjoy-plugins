@@ -613,6 +613,9 @@ const app = new Vue({
       this.current_image_data.mask_geojson = imageData.mask_geojson;
       this.current_image_data.channels = imageData.channels;
       this.current_image_data.extended = imageData.extended;
+      this.current_image_data.extend = imageData.extend;
+      this.current_image_data.mask_adjusted = imageData.mask_adjusted;
+
       await this.showImage(this.current_image_data)
       await this.showMaskAnnotation(this.current_image_data.mask_geojson);
       this.loading = false;
