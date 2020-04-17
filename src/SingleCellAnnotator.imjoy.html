@@ -223,9 +223,13 @@ const app = new Vue({
     current_image_index: 0,
     loading_cache: false,
     innerHeight: '100vh',
-    isMobile: false
+    isMobile: false,
+    version: null
   },
   mounted(){
+    this.$nextTick(async()=>{
+      this.version = await api.getConfig('_version');
+    })
     this.isMobile = mobileAndTabletcheck()
     window.onresize = ()=>{
       document.body.height = window.innerHeight;
@@ -335,6 +339,28 @@ const app = new Vue({
     })
   },
   methods: {
+    info(){
+      api.alert(`====== Hot keys ======
+
+      ➕: Increase brightness
+      ➖: Decrease brightness
+      ➡️: Next image
+      ⬅️: Back
+      Y: Yes
+      N: No
+      D: Discard (toggle)
+      M: Redraw mask (toggle)
+      R: Remove mask
+      S: Save mask
+      A: Alpha mask channel (toggle)
+      E: ER channel (toggle)
+      T: Microtubule channel (toggle)
+      I: Nuclei channel (toggle)
+      P: Protein channel (toggle)
+      H: Hide all controls (toggle)
+      Esc: Quit annotation
+      `)
+    },
     async login(){
       const formData = new FormData();
       formData.append('username', this.user.username);
@@ -887,6 +913,7 @@ api.export(new ImJoyPlugin())
     <div class="panel centered-panel" v-if="current_panel=='login'">
       <div class="panel-header">
         <div class="panel-title h2">Login</div>
+        <span>v{{version}}</span>
       </div>
       <div class="panel-body">
         <div class="form-group">
@@ -915,6 +942,7 @@ api.export(new ImJoyPlugin())
     <div class="panel centered-panel" v-if="current_panel=='task_selection'">
       <div class="panel-header">
         <div class="panel-title h2">Please choose a task</div>
+        <span>v{{version}}</span>
       </div>
       <div class="panel-body">
         <br>
@@ -947,6 +975,7 @@ api.export(new ImJoyPlugin())
           <input v-model="ch.show" :name="ch.name" @change="channelSettingsUpdated" type="checkbox">
           <i class="form-icon"></i> {{ch.name}}
         </label>
+        <button class="btn btn-sm s-circle" style="background-color: transparent;" title="info" @click="info()"><i class="icon icon-message"></i></button>
       </div>
       <template v-if="current_image_data.label_display_mode==='multiple'">
         <div v-show="!hide_controls" class="floating-right-btn">
@@ -983,10 +1012,10 @@ api.export(new ImJoyPlugin())
   }
   .centered-panel{
     background-color: #448aff0f;
-    width: 100%;
-    height: 100%;
-    max-height: 400px;
-    max-width: 400px;
+    width: 400px;
+    height: 450px;
+    max-height: 100%;
+    max-width: 100%;
     left: 50%;
     top: 50%;
     position: absolute;
@@ -1042,9 +1071,6 @@ api.export(new ImJoyPlugin())
     top: 80px;
     width: 330px;
     z-index: 999;
-  }
-  .btn{
-    width: 90px;
   }
   .location-btn {
     padding-top: 0px;
