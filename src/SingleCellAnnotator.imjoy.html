@@ -161,6 +161,7 @@ async function composeChannels(channels, channel_settings, alpha, brightness){
 }
 
 const imageDataTemplate = {
+  redraw_mask_occurred: false,
   extend: null,
   cell_id: null,
   mask_geojson:{
@@ -690,7 +691,12 @@ const app = new Vue({
         this.loading = true;
         try{
           this.current_image_data.mask_adjusted=false;
-          await this.extendImage();
+          if(!this.current_image_data.redraw_mask_occurred){
+            const location = this.current_image_data.location;
+            await this.extendImage();
+            this.current_image_data.location = location;
+            this.current_image_data.redraw_mask_occurred = true;
+          }
         }
         finally{
           this.loading = false;
