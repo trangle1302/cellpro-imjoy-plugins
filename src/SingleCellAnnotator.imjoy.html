@@ -222,9 +222,11 @@ const app = new Vue({
     current_image_data: null,
     current_image_index: 0,
     loading_cache: false,
-    innerHeight: '100vh'
+    innerHeight: '100vh',
+    isMobile: false
   },
   mounted(){
+    this.isMobile = mobileAndTabletcheck()
     window.onresize = ()=>{
       document.body.height = window.innerHeight;
       this.innerHTML = window.innerHeight + 'px';
@@ -420,7 +422,7 @@ const app = new Vue({
       return imageData
     },
     async getNewImageBatch(task_name, display_first){
-      api.showStatus('Loading a new batch...')
+      if(!this.isMobile) api.showStatus('Loading a new batch...')
       if(this.loading_cache){
         if(task_name === this.loading_cache){
           return
@@ -462,7 +464,7 @@ const app = new Vue({
           console.log('Removing images from the cache.',  this.cached_image_data.length)
         }
         api.showProgress(100)
-        api.showStatus(`A new batch with ${this.loaded_image_list.length} images loaded`)
+        if(!this.isMobile) api.showStatus(`A new batch with ${this.loaded_image_list.length} images loaded`)
         this.loadMoreIfNeeded();
       }
       finally{
@@ -534,8 +536,7 @@ const app = new Vue({
         console.error('no image data to show.')
         return
       }
-
-      api.showStatus(imageData.cell_id)
+      if(!this.isMobile) api.showStatus(imageData.cell_id)
       console.log('current image: ', imageData)
       this.current_image_data = imageData;
       // annotation viewer
