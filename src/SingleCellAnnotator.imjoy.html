@@ -390,7 +390,7 @@ const app = new Vue({
     async chooseTask (task_name){
       this.current_task_name = task_name;
       this.loading = true;
-      this.getNewImageBatch(this.current_task_name, true);
+      this.getNewImageBatch(this.current_task_name);
     },
     async fetchCellImage(cell_id, extend_image){
       const imageData = JSON.parse(JSON.stringify(imageDataTemplate));
@@ -421,7 +421,7 @@ const app = new Vue({
       }
       return imageData
     },
-    async getNewImageBatch(task_name, display_first){
+    async getNewImageBatch(task_name){
       if(!this.isMobile) api.showStatus('Loading a new batch...')
       if(this.loading_cache){
         if(task_name === this.loading_cache){
@@ -451,8 +451,8 @@ const app = new Vue({
           }
           const cell_id = this.loaded_image_list[i];
           api.showProgress((i+1)/this.loaded_image_list.length)
-          const imageData = await this.fetchCellImage(cell_id)
-          if(display_first && !this.current_image_data && this.current_task_name){
+          const imageData = await this.fetchCellImage(cell_id, this.draw_mask_mode)
+          if(!this.current_image_data && this.current_task_name){
             this.showImage(imageData)
             this.$forceUpdate();
           }
