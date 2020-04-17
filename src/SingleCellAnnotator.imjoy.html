@@ -464,9 +464,11 @@ const app = new Vue({
       if(this.draw_mask_mode){
         const anwser = await api.confirm("Would you like to save the mask annotation?")
         if(anwser){
-          this.saveMaskAnnotation()
-        }
+          const redraw = await this.saveMaskAnnotation()
+          if(redraw){return};
+        }else{this.current_image_data.mask_adjusted = false}
         this.stopMaskAnnotation();
+        this.draw_mask_mode = false;
       };
       if(this.current_image_data.location_changed){
         await this.uploadAnnotation();
@@ -492,9 +494,11 @@ const app = new Vue({
       if(this.draw_mask_mode){
         const anwser = await api.confirm("Would you like to save the mask annotation?")
         if(anwser){
-          this.saveMaskAnnotation()
-        }
+          const redraw = await this.saveMaskAnnotation();
+          if(redraw){return};
+        }else{this.current_image_data.mask_adjusted = false}
         this.stopMaskAnnotation();
+        this.draw_mask_mode = false;
       }
       if(this.current_image_data.location_changed){
         await this.uploadAnnotation();
@@ -584,6 +588,8 @@ const app = new Vue({
       }
       // this is the url to send the current annotation
       api.alert(JSON.stringify(sendData))
+      this.current_image_data.mask_adjusted = false;
+      this.current_image_data.location_changed = false;
       /*
       const sub_url = "/annotations/" + this.current_task_name + "/" + this.current_image_data.cell_id;
       const url_post = this.selected_server_url + sub_url;
@@ -646,11 +652,12 @@ const app = new Vue({
       const routeFeatures = format.writeFeaturesObject(allFeatures, {decimals: 1});
       if (!routeFeatures.features.length){
         api.alert('Please draw a cell mask before saving!');
-        return
+
+        return true
       }
       if(routeFeatures.features.length>1){
         api.alert('Only one cell mask is allowed!');
-        return
+        return true
       }
       
       routeFeatures['bbox'] = this.current_image_data.mask_geojson.bbox;
@@ -658,7 +665,9 @@ const app = new Vue({
       this.current_image_data.mask_adjusted = true;
       await this.uploadAnnotation()
       this.draw_mask_mode = false;
+      this.current_image_data.mask_adjusted = false;
       this.stopMaskAnnotation();
+      return false
     },
     async exportAnnotation() {
       const allFeatures = this.vector_source.getFeatures();
@@ -909,7 +918,7 @@ api.export(new ImJoyPlugin())
       <div class="input-group floating-switch">
         <button class="btn" :class="{'transparent-btn': current_image_data.discarded!==true}" @click="toggleDiscard()">Discard</button>&nbsp;&nbsp;
         <button v-show="current_image_data.mask_adjusted" class="btn transparent-btn" v-if="draw_mask_mode" @click="saveMaskAnnotation()">Save</button>&nbsp;&nbsp;
-        <button class="btn transparent-btn" title="annotation mode" @click="removeMaskAnnotation()"><i class="{'transparent-btn': draw_mask_mode!==true}" @change="draw_mask_mode_changed"><span>Adjust Mask</span></i></button>&nbsp;&nbsp;
+        <button class="btn transparent-btn" title="annotation mode" @click="removeMaskAnnotation()"><i class="{'transparent-btn': draw_mask_mode!==true}" @change="draw_mask_mode_changed"><span>Draw</span></i></button>&nbsp;&nbsp;
         <button class="btn transparent-btn btn-action s-circle" title="home" @click="home()"><i class="icon icon-cross"></i></button>&nbsp;&nbsp;
       </div>
       <div class="form-group floating-channel-btn">
