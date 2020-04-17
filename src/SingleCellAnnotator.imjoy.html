@@ -398,10 +398,12 @@ const app = new Vue({
       let image_url = "/images/" + this.current_task_name + "/" + imageData.cell_id;
       if (extend_image){
         image_url += "?extend=200&maskout=1";
+        imageData.extended = true;
         imageData.extend = 200;
       }else{
         image_url += "?extend=20&maskout=1"
         imageData.extend = 20;
+        imageData.extended = false;
       }
       const response = await this.fetchURLData(image_url)
       imageData.mask_geojson.bbox = response.bbox;
@@ -539,20 +541,26 @@ const app = new Vue({
       this.current_image_data = imageData;
       // annotation viewer
       this.current_panel = 'imageviewer';
-      this.$nextTick(async ()=>{
-        this.loading = true;
-        window.onresize();
-        try{
-            await this.displayMap(this.current_image_data.channels, this.channel_settings);
-            this.showMaskAnnotation(this.current_image_data.mask_geojson);
+      if(this.draw_mask_mode && !imageData.extended){
+        this.extendImage()
+      }
+      else{
+        this.$nextTick(async ()=>{
+          this.loading = true;
+          window.onresize();
+          try{
+              await this.displayMap(this.current_image_data.channels, this.channel_settings);
+              this.showMaskAnnotation(this.current_image_data.mask_geojson);
+            }
+          finally{
+            this.loading = false;
           }
-        finally{
-          this.loading = false;
-        }
-      })
+        })
+      }
     },
     // extend Image
     async extendImage(){
+      this.loading = true;
       this.current_image_index = this.cached_image_data.indexOf(this.current_image_data);
       const cell_id = this.current_image_data.cell_id;
       const imageData = await this.fetchCellImage(cell_id, true)
@@ -560,6 +568,7 @@ const app = new Vue({
       this.current_image_data = imageData
       await this.showImage(imageData)
       await this.showMaskAnnotation(imageData.mask_geojson);
+      this.loading = false;
     },
     async uploadAnnotation(){
       // skip upload annotation if image is annotated and no new change
