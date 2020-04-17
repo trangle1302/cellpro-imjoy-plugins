@@ -8,7 +8,7 @@
   "type": "window",
   "tags": [],
   "ui": "",
-  "version": "0.1.27",
+  "version": "0.1.28",
   "api_version": "0.1.7",
   "description": "Annotate images for HPA single-cell image classification",
   "icon": "extension",
@@ -196,7 +196,7 @@ const app = new Vue({
     drawInteraction: null,
     snapInteraction: null,
     itkInteraction: null,
-    annotation_mode: false,
+    draw_mask_mode: false,
     freehand_mode: true,
     vector_source: null,
     loading: false,
@@ -206,8 +206,8 @@ const app = new Vue({
     select: null,
     current_panel: 'login',
     user:{
-      username: "wei",
-      password: "GPq2VZgRg2lq5lYPNh9v",
+      username: null,
+      password: null,
       access_token: null
     },
     channel_settings: {},
@@ -276,7 +276,7 @@ const app = new Vue({
           this.toggleDiscard()
         }
         else if(event.code === 'KeyM'){
-          this.annotation_mode = true
+          this.draw_mask_mode = true
         }
         else if(event.code === 'KeyR'){
           this.removeMaskAnnotation()
@@ -397,11 +397,11 @@ const app = new Vue({
       imageData.cell_id = cell_id;
       let image_url = "/images/" + this.current_task_name + "/" + imageData.cell_id;
       if (extend_image){
-        image_url += "?extend=200&maskout=1";
-        imageData.extend = 200;
+        image_url += "?extend=500&maskout=1";
+        imageData.extend = 500;
       }else{
-        image_url += "?extend=20&maskout=1"
-        imageData.extend = 20;
+        image_url += "?extend=200&maskout=1"
+        imageData.extend = 200;
       }
       const response = await this.fetchURLData(image_url)
       imageData.mask_geojson.bbox = response.bbox;
@@ -488,12 +488,14 @@ const app = new Vue({
       return [new_coordinates]
     },
     async previousImage(){
-      if(this.annotation_mode){
+      if(this.draw_mask_mode){
         const anwser = await api.confirm("Would you like to save the mask annotation?")
         if(anwser){
-          this.saveMaskAnnotation()
-        }
+          const redraw = await this.saveMaskAnnotation()
+          if(redraw){return};
+        }else{this.current_image_data.mask_adjusted = false}
         this.stopMaskAnnotation();
+        this.draw_mask_mode = false;
       };
       if(this.current_image_data.location_changed){
         await this.uploadAnnotation();
@@ -516,12 +518,14 @@ const app = new Vue({
     },
     async nextImage(){
       this.loadMoreIfNeeded();
-      if(this.annotation_mode){
+      if(this.draw_mask_mode){
         const anwser = await api.confirm("Would you like to save the mask annotation?")
         if(anwser){
-          this.saveMaskAnnotation()
-        }
+          const redraw = await this.saveMaskAnnotation();
+          if(redraw){return};
+        }else{this.current_image_data.mask_adjusted = false}
         this.stopMaskAnnotation();
+        this.draw_mask_mode = false;
       }
       if(this.current_image_data.location_changed){
         await this.uploadAnnotation();
@@ -632,12 +636,14 @@ const app = new Vue({
         throw new Error('Failed to upload the annotaiton.')
       };
     },
-    async annotation_mode_changed(){
-      if(this.annotation_mode){
+    async draw_mask_mode_changed(){
+      if(this.draw_mask_mode){
+        api.alert('triggered')
         this.loading = true;
         try{
           this.current_image_data.mask_adjusted=false;
-          await this.extendImage();
+          // already use extendImage from origin
+          //await this.extendImage();
         }
         finally{
           this.loading = false;
@@ -653,7 +659,7 @@ const app = new Vue({
       }
       else{
         this.current_image_data.discarded = true;
-        this.annotation_mode = false;
+        this.draw_mask_mode = false;
         await this.nextImage();
       }
       this.$forceUpdate()
@@ -669,18 +675,22 @@ const app = new Vue({
       const routeFeatures = format.writeFeaturesObject(allFeatures, {decimals: 1});
       if (!routeFeatures.features.length){
         api.alert('Please draw a cell mask before saving!');
-        return
+
+        return true
       }
       if(routeFeatures.features.length>1){
         api.alert('Only one cell mask is allowed!');
-        return
+        return true
       }
       
       routeFeatures['bbox'] = this.current_image_data.mask_geojson.bbox;
       this.current_image_data.mask_geojson = routeFeatures;
       this.current_image_data.mask_adjusted = true;
       await this.uploadAnnotation()
+      this.draw_mask_mode = false;
+      this.current_image_data.mask_adjusted = false;
       this.stopMaskAnnotation();
+      return false
     },
     async exportAnnotation() {
       const allFeatures = this.vector_source.getFeatures();
@@ -779,7 +789,7 @@ const app = new Vue({
           minZoom: -10
         })
       });
-      this.annotation_mode_changed();
+      this.draw_mask_mode_changed();
       this.map.addControl(new MousePosition({
           coordinateFormat: createStringXY(0)
       }));
@@ -794,7 +804,8 @@ const app = new Vue({
     },
     removeMaskAnnotation() {
       this.current_image_data.mask_adjusted = true;
-      this.vector_source.clear()
+      this.vector_source.clear();
+      this.draw_mask_mode = true;
       this.startMaskAnnotation(this.vector_source, this.freehand_mode)
     },
     startMaskAnnotation(source, freehand){
@@ -820,10 +831,10 @@ const app = new Vue({
       }
       this.snapInteraction = new Snap({source: source});
       this.map.addInteraction(this.snapInteraction);
-      this.annotation_mode = true;
+      this.draw_mask_mode = true;
     },
     stopMaskAnnotation(){
-      this.annotation_mode = false;
+      //this.draw_mask_mode = false; // mute this
       if(this.drawInteraction)
       this.map.removeInteraction(this.drawInteraction);
       if(this.snapInteraction)
@@ -933,13 +944,9 @@ api.export(new ImJoyPlugin())
   
     <div class="panel" v-if="current_panel=='imageviewer'&&current_image_data">
       <div v-show="!hide_controls" class="input-group floating-switch">
-        <button v-show="!annotation_mode" class="btn" :class="{'transparent-btn': current_image_data.discarded!==true}" @click="toggleDiscard()">Discard</button>&nbsp;&nbsp;
-        <label class="form-switch">
-          <input type="checkbox" v-model="annotation_mode" @change="annotation_mode_changed">
-          <i class="form-icon"></i> <span class="hide-on-mobile">Adjust Mask</span>
-        </label>
-        <button v-show="current_image_data.mask_adjusted" class="btn transparent-btn" v-if="annotation_mode" @click="saveMaskAnnotation()">Save</button>&nbsp;&nbsp;
-        <button class="btn transparent-btn" title="annotation mode" v-if="annotation_mode" @click="removeMaskAnnotation()"><i class="icon icon-delete"></i></button>&nbsp;&nbsp;
+        <button class="btn" :class="{'transparent-btn': current_image_data.discarded!==true}" @click="toggleDiscard()">Discard</button>&nbsp;&nbsp;
+        <button v-show="current_image_data.mask_adjusted" class="btn transparent-btn" v-if="draw_mask_mode" @click="saveMaskAnnotation()">Save</button>&nbsp;&nbsp;
+        <button class="btn transparent-btn" title="annotation mode" @click="removeMaskAnnotation()"><i class="{'transparent-btn': draw_mask_mode!==true}" @change="draw_mask_mode_changed"><span>Draw</span></i></button>&nbsp;&nbsp;
         <button class="btn transparent-btn btn-action s-circle" title="home" @click="home()"><i class="icon icon-cross"></i></button>&nbsp;&nbsp;
       </div>
       <div v-show="!hide_controls" class="form-group floating-channel-btn">
@@ -951,8 +958,8 @@ api.export(new ImJoyPlugin())
       <template v-if="current_image_data.label_display_mode==='multiple'">
         <div v-show="!hide_controls" class="floating-right-btn">
           <div class="btn-group">
-            <button :disabled="current_image_index===0||annotation_mode" class="btn transparent-btn" @click="previousImage()"><i class="icon icon-back"></i>&nbsp;Back</button>
-            <button :disabled="current_image_index>=cached_image_data.length||annotation_mode" class="btn transparent-btn" @click="nextImage()">Next&nbsp;<i class="icon icon-forward"></i></button>
+            <button :disabled="current_image_index===0" class="btn transparent-btn" @click="previousImage()"><i class="icon icon-back"></i>&nbsp;Back</button>
+            <button :disabled="current_image_index>=cached_image_data.length" class="btn transparent-btn" @click="nextImage()">Next&nbsp;<i class="icon icon-forward"></i></button>
           </div>
           <br>
           <div class="columns">
@@ -962,10 +969,10 @@ api.export(new ImJoyPlugin())
       </template>
       <template v-if="current_image_data.label_display_mode==='single'">
         <div v-show="!hide_controls" class="btn-group floating-bottom-btn">
-          <button :disabled="current_image_index===0||annotation_mode" class="btn transparent-btn" @click="previousImage()"><i class="icon icon-back"></i>&nbsp;Back</button>
-          <button :disabled="current_image_data.discarded||annotation_mode" class="btn transparent-btn" @click="selectLocation(true)" :class="{'selected-location-btn': current_image_data.location[current_image_data.single_location]===true}"><i class="icon icon-check"></i>&nbsp;Yes</button>
-          <button :disabled="current_image_data.discarded||annotation_mode" class="btn transparent-btn" @click="selectLocation(false)" :class="{'selected-location-btn': current_image_data.location[current_image_data.single_location]===false}"><i class="icon icon-cross"></i>&nbsp;No</button>
-          <button :disabled="current_image_index>=cached_image_data.length||annotation_mode" class="btn transparent-btn" @click="nextImage()">Next&nbsp;<i class="icon icon-forward"></i></button>
+          <button :disabled="current_image_index===0" class="btn transparent-btn" @click="previousImage()"><i class="icon icon-back"></i>&nbsp;Back</button>
+          <button :disabled="current_image_data.discarded" class="btn transparent-btn" @click="selectLocation(true)" :class="{'selected-location-btn': current_image_data.location[current_image_data.single_location]===true}"><i class="icon icon-check"></i>&nbsp;Yes</button>
+          <button :disabled="current_image_data.discarded" class="btn transparent-btn" @click="selectLocation(false)" :class="{'selected-location-btn': current_image_data.location[current_image_data.single_location]===false}"><i class="icon icon-cross"></i>&nbsp;No</button>
+          <button :disabled="current_image_index>=cached_image_data.length" class="btn transparent-btn" @click="nextImage()">Next&nbsp;<i class="icon icon-forward"></i></button>
         </div>
         <span v-show="!hide_controls" class="h3 floating-label">{{current_image_data.single_location}}</span>
       </template>
