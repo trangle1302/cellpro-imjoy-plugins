@@ -8,7 +8,7 @@
   "type": "window",
   "tags": [],
   "ui": "",
-  "version": "0.1.24",
+  "version": "0.1.25",
   "api_version": "0.1.7",
   "description": "Annotate images for HPA single-cell image classification",
   "icon": "extension",
@@ -468,6 +468,9 @@ const app = new Vue({
         }
         this.stopMaskAnnotation();
       };
+      if(this.current_image_data.location_changed){
+        await this.uploadAnnotation();
+      }
       this.current_image_index = this.cached_image_data.indexOf(this.current_image_data)
       if(this.current_image_index<=-1){
         this.current_image_index = 0;
