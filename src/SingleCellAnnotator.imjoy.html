@@ -725,7 +725,6 @@ const app = new Vue({
       this.$forceUpdate()
     },
     async showMaskAnnotation(mask_geojson){
-      debugger
       this.vector_source.clear()
       features = (new GeoJSON()).readFeatures(mask_geojson)
       this.vector_source.addFeatures(features)
