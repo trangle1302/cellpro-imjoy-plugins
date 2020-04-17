@@ -8,7 +8,7 @@
   "type": "window",
   "tags": [],
   "ui": "",
-  "version": "0.1.27",
+  "version": "0.1.28",
   "api_version": "0.1.7",
   "description": "Annotate images for HPA single-cell image classification",
   "icon": "extension",
@@ -196,7 +196,7 @@ const app = new Vue({
     drawInteraction: null,
     snapInteraction: null,
     itkInteraction: null,
-    annotation_mode: false,
+    draw_mask_mode: false,
     freehand_mode: true,
     vector_source: null,
     loading: false,
@@ -206,8 +206,8 @@ const app = new Vue({
     select: null,
     current_panel: 'login',
     user:{
-      username: "wei",
-      password: "GPq2VZgRg2lq5lYPNh9v",
+      username: "",
+      password: "",
       access_token: null
     },
     channel_settings: {},
@@ -280,7 +280,7 @@ const app = new Vue({
           this.toggleDiscard()
         }
         else if(event.code === 'KeyM'){
-          this.annotation_mode = true
+          this.draw_mask_mode = true
         }
         else if(event.code === 'KeyR'){
           this.removeMaskAnnotation()
@@ -297,6 +297,7 @@ const app = new Vue({
             this.channel_settings['Mask'].show = false;
           else
             this.channel_settings['Mask'].show = true;
+          this.displayMap(this.current_image_data.channels, this.channel_settings);
         }
         // ER
         else if(event.code === 'KeyE'){
@@ -304,6 +305,7 @@ const app = new Vue({
             this.channel_settings['ER'].show = false;
           else
             this.channel_settings['ER'].show = true;
+          this.displayMap(this.current_image_data.channels, this.channel_settings);
         }
         // Microtubule
         else if(event.code === 'KeyT'){
@@ -311,6 +313,7 @@ const app = new Vue({
             this.channel_settings['Microtubule'].show = false;
           else
             this.channel_settings['Microtubule'].show = true;
+          this.displayMap(this.current_image_data.channels, this.channel_settings);
         }
         // Nuclei
         else if(event.code === 'KeyI'){
@@ -318,6 +321,7 @@ const app = new Vue({
             this.channel_settings['Nuclei'].show = false;
           else
             this.channel_settings['Nuclei'].show = true;
+          this.displayMap(this.current_image_data.channels, this.channel_settings);
         }
         // Protein
         else if(event.code === 'KeyP'){
@@ -325,6 +329,7 @@ const app = new Vue({
             this.channel_settings['Protein'].show = false;
           else
             this.channel_settings['Protein'].show = true;
+          this.displayMap(this.current_image_data.channels, this.channel_settings);
         }
         else if(event.code === 'KeyH'){
           if(this.hide_controls){
@@ -416,7 +421,7 @@ const app = new Vue({
     async chooseTask (task_name){
       this.current_task_name = task_name;
       this.loading = true;
-      this.getNewImageBatch(this.current_task_name, true);
+      this.getNewImageBatch(this.current_task_name);
     },
     async fetchCellImage(cell_id, extend_image){
       const imageData = JSON.parse(JSON.stringify(imageDataTemplate));
@@ -424,10 +429,12 @@ const app = new Vue({
       let image_url = "/images/" + this.current_task_name + "/" + imageData.cell_id;
       if (extend_image){
         image_url += "?extend=200&maskout=1";
+        imageData.extended = true;
         imageData.extend = 200;
       }else{
         image_url += "?extend=20&maskout=1"
         imageData.extend = 20;
+        imageData.extended = false;
       }
       const response = await this.fetchURLData(image_url)
       imageData.mask_geojson.bbox = response.bbox;
@@ -447,7 +454,7 @@ const app = new Vue({
       }
       return imageData
     },
-    async getNewImageBatch(task_name, display_first){
+    async getNewImageBatch(task_name){
       if(!this.isMobile) api.showStatus('Loading a new batch...')
       if(this.loading_cache){
         if(task_name === this.loading_cache){
@@ -477,8 +484,8 @@ const app = new Vue({
           }
           const cell_id = this.loaded_image_list[i];
           api.showProgress((i+1)/this.loaded_image_list.length)
-          const imageData = await this.fetchCellImage(cell_id)
-          if(display_first && !this.current_image_data && this.current_task_name){
+          const imageData = await this.fetchCellImage(cell_id, this.draw_mask_mode)
+          if(!this.current_image_data && this.current_task_name){
             this.showImage(imageData)
             this.$forceUpdate();
           }
@@ -514,12 +521,17 @@ const app = new Vue({
       return [new_coordinates]
     },
     async previousImage(){
-      if(this.annotation_mode){
+      if(this.current_image_data.mask_adjusted){
         const anwser = await api.confirm("Would you like to save the mask annotation?")
         if(anwser){
-          this.saveMaskAnnotation()
+          if(!await this.saveMaskAnnotation()){
+            return
+          }
         }
-        this.stopMaskAnnotation();
+        else{
+          this.stopMaskAnnotation()
+          this.current_image_data.mask_adjusted = false;
+        }
       };
       if(this.current_image_data.location_changed){
         await this.uploadAnnotation();
@@ -542,12 +554,17 @@ const app = new Vue({
     },
     async nextImage(){
       this.loadMoreIfNeeded();
-      if(this.annotation_mode){
+      if(this.current_image_data.mask_adjusted){
         const anwser = await api.confirm("Would you like to save the mask annotation?")
         if(anwser){
-          this.saveMaskAnnotation()
+          if(!await this.saveMaskAnnotation()){
+            return
+          }
         }
-        this.stopMaskAnnotation();
+        else{
+          this.stopMaskAnnotation()
+          this.current_image_data.mask_adjusted = false;
+        }
       }
       if(this.current_image_data.location_changed){
         await this.uploadAnnotation();
@@ -567,20 +584,29 @@ const app = new Vue({
       this.current_image_data = imageData;
       // annotation viewer
       this.current_panel = 'imageviewer';
-      this.$nextTick(async ()=>{
-        this.loading = true;
-        window.onresize();
-        try{
-            await this.displayMap(this.current_image_data.channels, this.channel_settings);
-            this.showMaskAnnotation(this.current_image_data.mask_geojson);
+      if(!this.draw_mask_mode){
+        this.stopMaskAnnotation()
+      }
+      if(this.draw_mask_mode && !imageData.extended){
+        this.extendImage()
+      }
+      else{
+        this.$nextTick(async ()=>{
+          this.loading = true;
+          window.onresize();
+          try{
+              await this.displayMap(this.current_image_data.channels, this.channel_settings);
+              this.showMaskAnnotation(this.current_image_data.mask_geojson);
+            }
+          finally{
+            this.loading = false;
           }
-        finally{
-          this.loading = false;
-        }
-      })
+        })
+      }
     },
     // extend Image
     async extendImage(){
+      this.loading = true;
       this.current_image_index = this.cached_image_data.indexOf(this.current_image_data);
       const cell_id = this.current_image_data.cell_id;
       const imageData = await this.fetchCellImage(cell_id, true)
@@ -588,6 +614,7 @@ const app = new Vue({
       this.current_image_data = imageData
       await this.showImage(imageData)
       await this.showMaskAnnotation(imageData.mask_geojson);
+      this.loading = false;
     },
     async uploadAnnotation(){
       // skip upload annotation if image is annotated and no new change
@@ -617,7 +644,7 @@ const app = new Vue({
             }
           };
         }
-       
+        
   
         if (this.current_image_data.mask_adjusted){
           sendData.extend = this.current_image_data.extend;
@@ -658,8 +685,8 @@ const app = new Vue({
         throw new Error('Failed to upload the annotaiton.')
       };
     },
-    async annotation_mode_changed(){
-      if(this.annotation_mode){
+    async drawMaskModeChanged(){
+      if(this.draw_mask_mode){
         this.loading = true;
         try{
           this.current_image_data.mask_adjusted=false;
@@ -670,18 +697,27 @@ const app = new Vue({
         }
       }
       else{
+        if(this.current_image_data.mask_adjusted){
+          const anwser = await api.confirm("Would you like to save the mask annotation?")
+          if(anwser){
+            this.saveMaskAnnotation()
+          }
+          else{
+            this.current_image_data.mask_adjusted = false;
+          }
+        };
         this.stopMaskAnnotation()
       }
     },
     async toggleDiscard(){
+      this.current_image_data.location_changed = true;
       if(this.current_image_data.discarded){
         this.current_image_data.discarded = false;
       }
       else{
-        this.current_image_data.discarded = true;
-        this.annotation_mode = false;
-        await this.nextImage();
+        this.current_image_data.discarded = true;        
       }
+      await this.nextImage();
       this.$forceUpdate()
     },
     async showMaskAnnotation(mask_geojson){
@@ -695,18 +731,18 @@ const app = new Vue({
       const routeFeatures = format.writeFeaturesObject(allFeatures, {decimals: 1});
       if (!routeFeatures.features.length){
         api.alert('Please draw a cell mask before saving!');
-        return
+        return false
       }
       if(routeFeatures.features.length>1){
         api.alert('Only one cell mask is allowed!');
-        return
+        return false
       }
-      
       routeFeatures['bbox'] = this.current_image_data.mask_geojson.bbox;
       this.current_image_data.mask_geojson = routeFeatures;
       this.current_image_data.mask_adjusted = true;
       await this.uploadAnnotation()
-      this.stopMaskAnnotation();
+      this.stopMaskAnnotation()
+      return true
     },
     async exportAnnotation() {
       const allFeatures = this.vector_source.getFeatures();
@@ -805,7 +841,7 @@ const app = new Vue({
           minZoom: -10
         })
       });
-      this.annotation_mode_changed();
+      this.drawMaskModeChanged();
       this.map.addControl(new MousePosition({
           coordinateFormat: createStringXY(0)
       }));
@@ -846,10 +882,9 @@ const app = new Vue({
       }
       this.snapInteraction = new Snap({source: source});
       this.map.addInteraction(this.snapInteraction);
-      this.annotation_mode = true;
+      this.draw_mask_mode = true;
     },
     stopMaskAnnotation(){
-      this.annotation_mode = false;
       if(this.drawInteraction)
       this.map.removeInteraction(this.drawInteraction);
       if(this.snapInteraction)
@@ -912,8 +947,8 @@ api.export(new ImJoyPlugin())
 
     <div class="panel centered-panel" v-if="current_panel=='login'">
       <div class="panel-header">
-        <div class="panel-title h2">Login</div>
-        <span>v{{version}}</span>
+        <div class="panel-title h2">HPA Image Annotator</div>
+        <span>(v{{version}})</span>
       </div>
       <div class="panel-body">
         <div class="form-group">
@@ -941,11 +976,11 @@ api.export(new ImJoyPlugin())
 
     <div class="panel centered-panel" v-if="current_panel=='task_selection'">
       <div class="panel-header">
-        <div class="panel-title h2">Please choose a task</div>
-        <span>v{{version}}</span>
+        <div class="panel-title h2">HPA Image Annotator </div> <span>(v{{version}})</span>
+        <br>
+        <p>Please choose a task:</p>
       </div>
       <div class="panel-body">
-        <br>
         <br>
         <div v-for="(task, task_name) in tasks">
           <progress class="progress" style="width: 288px" :value="task.finished" :max="task.total"></progress>
@@ -961,13 +996,13 @@ api.export(new ImJoyPlugin())
   
     <div class="panel" v-if="current_panel=='imageviewer'&&current_image_data">
       <div v-show="!hide_controls" class="input-group floating-switch">
-        <button v-show="!annotation_mode" class="btn" :class="{'transparent-btn': current_image_data.discarded!==true}" @click="toggleDiscard()">Discard</button>&nbsp;&nbsp;
         <label class="form-switch">
-          <input type="checkbox" v-model="annotation_mode" @change="annotation_mode_changed">
-          <i class="form-icon"></i> <span class="hide-on-mobile">Adjust Mask</span>
+          <input type="checkbox" v-model="draw_mask_mode" @change="drawMaskModeChanged">
+          <i class="form-icon"></i> <span class="hide-on-mobile">Redraw Mask</span>
         </label>
-        <button v-show="current_image_data.mask_adjusted" class="btn transparent-btn" v-if="annotation_mode" @click="saveMaskAnnotation()">Save</button>&nbsp;&nbsp;
-        <button class="btn transparent-btn" title="annotation mode" v-if="annotation_mode" @click="removeMaskAnnotation()"><i class="icon icon-delete"></i></button>&nbsp;&nbsp;
+        <button v-show="current_image_data.mask_adjusted" class="btn transparent-btn" v-if="draw_mask_mode" @click="saveMaskAnnotation()">Save</button>&nbsp;&nbsp;
+        <button class="btn transparent-btn" title="annotation mode" v-if="draw_mask_mode" @click="removeMaskAnnotation()"><i class="icon icon-delete"></i></button>&nbsp;&nbsp;
+        <button v-show="!draw_mask_mode" class="btn" :class="{'transparent-btn': current_image_data.discarded!==true}" @click="toggleDiscard()">Discard</button>&nbsp;&nbsp;
         <button class="btn transparent-btn btn-action s-circle" title="home" @click="home()"><i class="icon icon-cross"></i></button>&nbsp;&nbsp;
       </div>
       <div v-show="!hide_controls" class="form-group floating-channel-btn">
@@ -980,21 +1015,21 @@ api.export(new ImJoyPlugin())
       <template v-if="current_image_data.label_display_mode==='multiple'">
         <div v-show="!hide_controls" class="floating-right-btn">
           <div class="btn-group">
-            <button :disabled="current_image_index===0||annotation_mode" class="btn transparent-btn" @click="previousImage()"><i class="icon icon-back"></i>&nbsp;Back</button>
-            <button :disabled="current_image_index>=cached_image_data.length||annotation_mode" class="btn transparent-btn" @click="nextImage()">Next&nbsp;<i class="icon icon-forward"></i></button>
+            <button :disabled="current_image_index===0" class="btn transparent-btn" @click="previousImage()"><i class="icon icon-back"></i>&nbsp;Back</button>
+            <button :disabled="current_image_index>=cached_image_data.length" class="btn transparent-btn" @click="nextImage()">Next&nbsp;<i class="icon icon-forward"></i></button>
           </div>
           <br>
           <div class="columns">
-            <button :disabled="current_image_data.discarded" v-for="(loc, k) in current_image_data.location" @click="toggleLocation(k)" class="column btn location-btn" :class="{'selected-location-btn': loc}">{{k.slice(0,12)+(k.length>12?'.': '')}}</button>
+            <button :disabled="current_image_data.discarded||draw_mask_mode" v-for="(loc, k) in current_image_data.location" @click="toggleLocation(k)" class="column btn location-btn" :class="{'selected-location-btn': loc}">{{k.slice(0,12)+(k.length>12?'.': '')}}</button>
           </div>
         </div>
       </template>
       <template v-if="current_image_data.label_display_mode==='single'">
         <div v-show="!hide_controls" class="btn-group floating-bottom-btn">
-          <button :disabled="current_image_index===0||annotation_mode" class="btn transparent-btn" @click="previousImage()"><i class="icon icon-back"></i>&nbsp;Back</button>
-          <button :disabled="current_image_data.discarded||annotation_mode" class="btn transparent-btn" @click="selectLocation(true)" :class="{'selected-location-btn': current_image_data.location[current_image_data.single_location]===true}"><i class="icon icon-check"></i>&nbsp;Yes</button>
-          <button :disabled="current_image_data.discarded||annotation_mode" class="btn transparent-btn" @click="selectLocation(false)" :class="{'selected-location-btn': current_image_data.location[current_image_data.single_location]===false}"><i class="icon icon-cross"></i>&nbsp;No</button>
-          <button :disabled="current_image_index>=cached_image_data.length||annotation_mode" class="btn transparent-btn" @click="nextImage()">Next&nbsp;<i class="icon icon-forward"></i></button>
+          <button :disabled="current_image_index===0" class="btn transparent-btn" @click="previousImage()"><i class="icon icon-back"></i>&nbsp;Back</button>
+          <button :disabled="current_image_data.discarded||draw_mask_mode" class="btn transparent-btn" @click="selectLocation(true)" :class="{'selected-location-btn': current_image_data.location[current_image_data.single_location]===true}"><i class="icon icon-check"></i>&nbsp;Yes</button>
+          <button :disabled="current_image_data.discarded||draw_mask_mode" class="btn transparent-btn" @click="selectLocation(false)" :class="{'selected-location-btn': current_image_data.location[current_image_data.single_location]===false}"><i class="icon icon-cross"></i>&nbsp;No</button>
+          <button :disabled="current_image_index>=cached_image_data.length" class="btn transparent-btn" @click="nextImage()">Next&nbsp;<i class="icon icon-forward"></i></button>
         </div>
         <span v-show="!hide_controls" class="h3 floating-label">{{current_image_data.single_location}}</span>
       </template>
@@ -1008,6 +1043,7 @@ api.export(new ImJoyPlugin())
 </window>
 <style lang="css">
   body{
+    color: #448aff!important;
     overflow: hidden;
   }
   .centered-panel{
@@ -1032,18 +1068,29 @@ api.export(new ImJoyPlugin())
     position: absolute;
     left: 50%;
     z-index: 999;
-    bottom: 40px;
+    top: 40px;
     -webkit-transform: translate3d(-50%, -50%, 0);
     -moz-transform: translate3d(-50%, -50%, 0);
-    transform: translate3d(-50%, -50%, 0);
+      transform: translate3d(-50%, -50%, 0);
   }
+
+  @media screen and (max-width: 800px) {
+    .floating-label{
+      top: 90px!important;
+    }
+  }
+  
   .floating-switch{
     position: absolute;
     right: 10px;
     z-index: 999;
-    top: 30px;
+    top: 20px;
   }
 
+  .ol-mouse-position{
+    top:unset;
+    bottom: 3px;
+  }
   .floating-channel-btn{
     text-align: left;
     position: absolute;
@@ -1055,7 +1102,7 @@ api.export(new ImJoyPlugin())
   .floating-bottom-btn {
     position: absolute;
     left: calc(50% - 180px);
-    bottom: 20px;
+    bottom: 5px;
     z-index: 999;
   }
   .floating-right-btn{
@@ -1139,3 +1186,4 @@ api.export(new ImJoyPlugin())
     }
   }
 </style>
+    
