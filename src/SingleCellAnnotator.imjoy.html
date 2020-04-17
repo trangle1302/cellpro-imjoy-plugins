@@ -199,8 +199,8 @@ const app = new Vue({
     select: null,
     current_panel: 'login',
     user:{
-      username: "wei",
-      password: "GPq2VZgRg2lq5lYPNh9v",
+      username: null,
+      password: null,
       access_token: null
     },
     channel_settings: {},
@@ -587,10 +587,6 @@ const app = new Vue({
     
       }
       // this is the url to send the current annotation
-      api.alert(JSON.stringify(sendData))
-      this.current_image_data.mask_adjusted = false;
-      this.current_image_data.location_changed = false;
-      /*
       const sub_url = "/annotations/" + this.current_task_name + "/" + this.current_image_data.cell_id;
       const url_post = this.selected_server_url + sub_url;
       const response = await fetch(url_post, {
@@ -611,7 +607,7 @@ const app = new Vue({
       else{
         alert('Failed to upload the annotaiton, error: ' + res.error);
         throw new Error('Failed to upload the annotaiton.')
-      };*/
+      };
     },
     async draw_mask_mode_changed(){
       if(this.draw_mask_mode){
