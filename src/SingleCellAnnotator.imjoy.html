@@ -490,7 +490,7 @@ const app = new Vue({
       return [new_coordinates]
     },
     async previousImage(){
-      if(this.mask_adjusted){
+      if(this.current_image_data.mask_adjusted){
         const anwser = await api.confirm("Would you like to save the mask annotation?")
         if(anwser){
           this.saveMaskAnnotation()
@@ -517,7 +517,7 @@ const app = new Vue({
     },
     async nextImage(){
       this.loadMoreIfNeeded();
-      if(this.mask_adjusted){
+      if(this.current_image_data.mask_adjusted){
         const anwser = await api.confirm("Would you like to save the mask annotation?")
         if(anwser){
           this.saveMaskAnnotation()
