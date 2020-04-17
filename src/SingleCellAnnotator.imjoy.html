@@ -972,7 +972,7 @@ api.export(new ImJoyPlugin())
           </div>
           <br>
           <div class="columns">
-            <button :disabled="current_image_data.discarded" v-for="(loc, k) in current_image_data.location" @click="toggleLocation(k)" class="column btn location-btn" :class="{'selected-location-btn': loc}">{{k.slice(0,12)+(k.length>12?'.': '')}}</button>
+            <button :disabled="current_image_data.discarded||draw_mask_mode" v-for="(loc, k) in current_image_data.location" @click="toggleLocation(k)" class="column btn location-btn" :class="{'selected-location-btn': loc}">{{k.slice(0,12)+(k.length>12?'.': '')}}</button>
           </div>
         </div>
       </template>
