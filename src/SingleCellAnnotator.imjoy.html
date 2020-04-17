@@ -8,7 +8,7 @@
   "type": "window",
   "tags": [],
   "ui": "",
-  "version": "0.1.25",
+  "version": "0.1.26",
   "api_version": "0.1.7",
   "description": "Annotate images for HPA single-cell image classification",
   "icon": "extension",
@@ -100,9 +100,10 @@ async function getImageData(url) {
 
 const colormap = {'Microtubule': 0, 'Protein': 1, 'ER': 0, 'Nuclei': 2, 'Mask': 3}
 
-async function composeChannels(channels, channel_settings, alpha){
+async function composeChannels(channels, channel_settings, alpha, brightness){
   if(alpha<0) alpha = 0;
   if(alpha>1) alpha = 1;
+  brightness = brightness || 1.0;
   const rgb_channels = []
   const canvas = document.createElement('canvas') 
   for(let k in channel_settings){
@@ -121,16 +122,21 @@ async function composeChannels(channels, channel_settings, alpha){
   const ctx = canvas.getContext('2d');
   const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height)
   const channel_offset = canvas.width * canvas.height * 4
-  let i, j;
+  let i, j, v;
   const data = imgData.data
   // set color channels
   for(j=0;j<3;j++){
     if(rgb_channels[j]){
       const src = rgb_channels[j].data;
       for(i=0;i<channel_offset;i++){
-          data[i*4+j]  = src[i]
+        if(brightness===1){
+          data[i*4+j] = src[i]
+        }
+        else{
+          v = src[i]*brightness;
+          data[i*4+j] = v>255?255:parseInt(v);
+        }
       }
-     
     }
   }
   // set alpha channel
@@ -176,6 +182,7 @@ const imageDataTemplate = {
   discarded: false,
   mask_adjusted: false,
   location_changed: false,
+  brightness: 1.0,
 };
 
 const app = new Vue({
@@ -216,6 +223,10 @@ const app = new Vue({
     loading_cache: false,
   },
   mounted(){
+    window.onresize = function() {
+      document.body.height = window.innerHeight;
+    }
+    window.onresize();
     this.selected_server_url = this.servers['production']
     document.addEventListener('keydown', (event)=>{
       if(this.current_panel==='imageviewer'){
@@ -226,7 +237,8 @@ const app = new Vue({
           else{
             this.alpha = 1;
           }
-          this.displayMap(this.current_image_data.channels, this.channel_settings);
+          this.current_image_data.brightness = this.current_image_data.brightness + 0.3
+          this.displayMap(this.current_image_data.channels, this.channel_settings, this.current_image_data.brightness);
         }
         else if(['-', 'Minus', 'NumpadSubtract'].includes(event.code)){
           if(this.alpha>0){
@@ -235,7 +247,8 @@ const app = new Vue({
           else{
             this.alpha = 0;
           }
-          this.displayMap(this.current_image_data.channels, this.channel_settings);
+          this.current_image_data.brightness = this.current_image_data.brightness - 0.3
+          this.displayMap(this.current_image_data.channels, this.channel_settings, this.current_image_data.brightness);
         }
         else if(event.code === 'KeyY'){
           if(this.current_image_data.label_display_mode==='single'){
@@ -672,7 +685,7 @@ const app = new Vue({
       this.current_image_data.location_changed = true;
       await this.nextImage()
     },
-    async displayMap(channels, channel_settings){
+    async displayMap(channels, channel_settings, brightness){
       for(let k of Object.keys(channels)){
         if(!channel_settings[k]){
           channel_settings[k] = {name: k, show: true}
@@ -682,7 +695,7 @@ const app = new Vue({
           }
         }
       }
-      const image = await composeChannels(channels, channel_settings, this.alpha)
+      const image = await composeChannels(channels, channel_settings, this.alpha, brightness)
       const extent = [0, 0, image.width, image.height];
 
       const projection = new Projection({
