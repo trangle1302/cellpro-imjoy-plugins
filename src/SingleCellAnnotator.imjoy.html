@@ -100,9 +100,10 @@ async function getImageData(url) {
 
 const colormap = {'Microtubule': 0, 'Protein': 1, 'ER': 0, 'Nuclei': 2, 'Mask': 3}
 
-async function composeChannels(channels, channel_settings, alpha){
+async function composeChannels(channels, channel_settings, alpha, brightness){
   if(alpha<0) alpha = 0;
   if(alpha>1) alpha = 1;
+  brightness = brightness || 1.0;
   const rgb_channels = []
   const canvas = document.createElement('canvas') 
   for(let k in channel_settings){
@@ -121,16 +122,21 @@ async function composeChannels(channels, channel_settings, alpha){
   const ctx = canvas.getContext('2d');
   const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height)
   const channel_offset = canvas.width * canvas.height * 4
-  let i, j;
+  let i, j, v;
   const data = imgData.data
   // set color channels
   for(j=0;j<3;j++){
     if(rgb_channels[j]){
       const src = rgb_channels[j].data;
       for(i=0;i<channel_offset;i++){
-          data[i*4+j]  = src[i]
+        if(brightness===1){
+          data[i*4+j] = src[i]
+        }
+        else{
+          v = src[i]*brightness;
+          data[i*4+j] = v>255?255:parseInt(v);
+        }
       }
-     
     }
   }
   // set alpha channel
@@ -176,6 +182,7 @@ const imageDataTemplate = {
   discarded: false,
   mask_adjusted: false,
   location_changed: false,
+  brightness: 1.0,
 };
 
 const app = new Vue({
@@ -205,6 +212,7 @@ const app = new Vue({
     },
     channel_settings: {},
     alpha: 0.5,
+    hide_controls: false,
   // from here this is communication to backend, to develop/activate
     tasks: null,
     current_task_name: null,
@@ -214,8 +222,17 @@ const app = new Vue({
     current_image_data: null,
     current_image_index: 0,
     loading_cache: false,
+    innerHeight: '100vh',
+    isMobile: false
   },
   mounted(){
+    this.isMobile = mobileAndTabletcheck()
+    window.onresize = ()=>{
+      document.body.height = window.innerHeight;
+      this.innerHTML = window.innerHeight + 'px';
+      this.$forceUpdate()
+    }
+    window.onresize();
     this.selected_server_url = this.servers['production']
     document.addEventListener('keydown', (event)=>{
       if(this.current_panel==='imageviewer'){
@@ -226,7 +243,8 @@ const app = new Vue({
           else{
             this.alpha = 1;
           }
-          this.displayMap(this.current_image_data.channels, this.channel_settings);
+          this.current_image_data.brightness = this.current_image_data.brightness + 0.3
+          this.displayMap(this.current_image_data.channels, this.channel_settings, this.current_image_data.brightness);
         }
         else if(['-', 'Minus', 'NumpadSubtract'].includes(event.code)){
           if(this.alpha>0){
@@ -235,7 +253,8 @@ const app = new Vue({
           else{
             this.alpha = 0;
           }
-          this.displayMap(this.current_image_data.channels, this.channel_settings);
+          this.current_image_data.brightness = this.current_image_data.brightness - 0.3
+          this.displayMap(this.current_image_data.channels, this.channel_settings, this.current_image_data.brightness);
         }
         else if(event.code === 'KeyY'){
           if(this.current_image_data.label_display_mode==='single'){
@@ -302,6 +321,14 @@ const app = new Vue({
             this.channel_settings['Protein'].show = false;
           else
             this.channel_settings['Protein'].show = true;
+        }
+        else if(event.code === 'KeyH'){
+          if(this.hide_controls){
+            this.hide_controls = false
+          } 
+          else{
+            this.hide_controls = true
+          }
         }
         this.$forceUpdate()
       }
@@ -395,7 +422,7 @@ const app = new Vue({
       return imageData
     },
     async getNewImageBatch(task_name, display_first){
-      api.showStatus('Loading a new batch...')
+      if(!this.isMobile) api.showStatus('Loading a new batch...')
       if(this.loading_cache){
         if(task_name === this.loading_cache){
           return
@@ -425,7 +452,7 @@ const app = new Vue({
           const cell_id = this.loaded_image_list[i];
           api.showProgress((i+1)/this.loaded_image_list.length)
           const imageData = await this.fetchCellImage(cell_id)
-          if(display_first && i===0){
+          if(display_first && !this.current_image_data && this.current_task_name){
             this.showImage(imageData)
             this.$forceUpdate();
           }
@@ -437,7 +464,7 @@ const app = new Vue({
           console.log('Removing images from the cache.',  this.cached_image_data.length)
         }
         api.showProgress(100)
-        api.showStatus(`A new batch with ${this.loaded_image_list.length} images loaded`)
+        if(!this.isMobile) api.showStatus(`A new batch with ${this.loaded_image_list.length} images loaded`)
         this.loadMoreIfNeeded();
       }
       finally{
@@ -513,14 +540,14 @@ const app = new Vue({
         console.error('no image data to show.')
         return
       }
-
-      api.showStatus(imageData.cell_id)
+      if(!this.isMobile) api.showStatus(imageData.cell_id)
       console.log('current image: ', imageData)
       this.current_image_data = imageData;
       // annotation viewer
       this.current_panel = 'imageviewer';
       this.$nextTick(async ()=>{
         this.loading = true;
+        window.onresize();
         try{
             await this.displayMap(this.current_image_data.channels, this.channel_settings);
             this.showMaskAnnotation(this.current_image_data.mask_geojson);
@@ -682,7 +709,7 @@ const app = new Vue({
       this.current_image_data.location_changed = true;
       await this.nextImage()
     },
-    async displayMap(channels, channel_settings){
+    async displayMap(channels, channel_settings, brightness){
       for(let k of Object.keys(channels)){
         if(!channel_settings[k]){
           channel_settings[k] = {name: k, show: true}
@@ -692,7 +719,7 @@ const app = new Vue({
           }
         }
       }
-      const image = await composeChannels(channels, channel_settings, this.alpha)
+      const image = await composeChannels(channels, channel_settings, this.alpha, brightness)
       const extent = [0, 0, image.width, image.height];
 
       const projection = new Projection({
@@ -746,7 +773,7 @@ const app = new Vue({
           wrapX: false
       });
       // clear map
-      document.getElementById('map').innerHTML = ""
+      this.$refs.map.innerHTML = ""
       this.map = new Map({
         interactions: ol.interaction.defaults({altShiftDragRotate:false, pinchRotate:false}),
         controls: [],
@@ -828,7 +855,12 @@ const app = new Vue({
       this.current_panel='task_selection';
       this.current_task_name = null;
       this.cached_image_data = [];
+      this.current_image_data = null
       this.getTaskList();
+      // destroy the map
+      this.$refs.map.innerHTML = "";
+      this.map = null;
+      this.$forceUpdate();
     },
     channelSettingsUpdated(event){
       // make sure ER and Microtubule are not turned on at the same time
@@ -911,20 +943,20 @@ api.export(new ImJoyPlugin())
     </div>
   
     <div class="panel" v-if="current_panel=='imageviewer'&&current_image_data">
-      <div class="input-group floating-switch">
+      <div v-show="!hide_controls" class="input-group floating-switch">
         <button class="btn" :class="{'transparent-btn': current_image_data.discarded!==true}" @click="toggleDiscard()">Discard</button>&nbsp;&nbsp;
         <button v-show="current_image_data.mask_adjusted" class="btn transparent-btn" v-if="draw_mask_mode" @click="saveMaskAnnotation()">Save</button>&nbsp;&nbsp;
         <button class="btn transparent-btn" title="annotation mode" @click="removeMaskAnnotation()"><i class="{'transparent-btn': draw_mask_mode!==true}" @change="draw_mask_mode_changed"><span>Draw</span></i></button>&nbsp;&nbsp;
         <button class="btn transparent-btn btn-action s-circle" title="home" @click="home()"><i class="icon icon-cross"></i></button>&nbsp;&nbsp;
       </div>
-      <div class="form-group floating-channel-btn">
+      <div v-show="!hide_controls" class="form-group floating-channel-btn">
         <label v-for="ch in channel_settings" class="form-checkbox">
           <input v-model="ch.show" :name="ch.name" @change="channelSettingsUpdated" type="checkbox">
           <i class="form-icon"></i> {{ch.name}}
         </label>
       </div>
       <template v-if="current_image_data.label_display_mode==='multiple'">
-        <div class="floating-right-btn">
+        <div v-show="!hide_controls" class="floating-right-btn">
           <div class="btn-group">
             <button :disabled="current_image_index===0" class="btn transparent-btn" @click="previousImage()"><i class="icon icon-back"></i>&nbsp;Back</button>
             <button :disabled="current_image_index>=cached_image_data.length" class="btn transparent-btn" @click="nextImage()">Next&nbsp;<i class="icon icon-forward"></i></button>
@@ -936,17 +968,17 @@ api.export(new ImJoyPlugin())
         </div>
       </template>
       <template v-if="current_image_data.label_display_mode==='single'">
-        <div class="btn-group floating-bottom-btn">
+        <div v-show="!hide_controls" class="btn-group floating-bottom-btn">
           <button :disabled="current_image_index===0" class="btn transparent-btn" @click="previousImage()"><i class="icon icon-back"></i>&nbsp;Back</button>
           <button :disabled="current_image_data.discarded" class="btn transparent-btn" @click="selectLocation(true)" :class="{'selected-location-btn': current_image_data.location[current_image_data.single_location]===true}"><i class="icon icon-check"></i>&nbsp;Yes</button>
           <button :disabled="current_image_data.discarded" class="btn transparent-btn" @click="selectLocation(false)" :class="{'selected-location-btn': current_image_data.location[current_image_data.single_location]===false}"><i class="icon icon-cross"></i>&nbsp;No</button>
           <button :disabled="current_image_index>=cached_image_data.length" class="btn transparent-btn" @click="nextImage()">Next&nbsp;<i class="icon icon-forward"></i></button>
         </div>
-        <span class="h3 floating-label">{{current_image_data.single_location}}</span>
+        <span v-show="!hide_controls" class="h3 floating-label">{{current_image_data.single_location}}</span>
       </template>
       
       <div v-if="loading" class="loading loading-lg floating"></div>
-      <div id="map"></div>
+      <div id="map" ref="map" v-show="current_panel=='imageviewer'" :style="{height: innerHeight}"></div>
     </div>
     </div>
   </div>
@@ -1064,8 +1096,7 @@ api.export(new ImJoyPlugin())
 
   #map{
     max-height: 100%;
-    height: 100vh;
-    min-height: 100px!important;
+    min-height: 50vh!important;
   }
   .icon::before {
     position: relative;
