@@ -655,15 +655,14 @@ const app = new Vue({
       }
     },
     async toggleDiscard(){
-      this.current_task_name.location_changed = true;
+      this.current_image_data.location_changed = true;
       if(this.current_image_data.discarded){
         this.current_image_data.discarded = false;
       }
       else{
-        this.current_image_data.discarded = true;
-        this.draw_mask_mode = false;
-        await this.nextImage();
+        this.current_image_data.discarded = true;        
       }
+      await this.nextImage();
       this.$forceUpdate()
     },
     async showMaskAnnotation(mask_geojson){
