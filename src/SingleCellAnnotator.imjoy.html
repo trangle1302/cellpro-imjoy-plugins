@@ -610,10 +610,11 @@ const app = new Vue({
       this.current_image_index = this.cached_image_data.indexOf(this.current_image_data);
       const cell_id = this.current_image_data.cell_id;
       const imageData = await this.fetchCellImage(cell_id, true)
-      this.cached_image_data[this.current_image_index] = imageData;
-      this.current_image_data = imageData
-      await this.showImage(imageData)
-      await this.showMaskAnnotation(imageData.mask_geojson);
+      this.current_image_data.mask_geojson = imageData.mask_geojson;
+      this.current_image_data.channels = imageData.channels;
+      this.current_image_data.extended = imageData.extended;
+      await this.showImage(this.current_image_data)
+      await this.showMaskAnnotation(this.current_image_data.mask_geojson);
       this.loading = false;
     },
     async uploadAnnotation(){
@@ -721,6 +722,7 @@ const app = new Vue({
       this.$forceUpdate()
     },
     async showMaskAnnotation(mask_geojson){
+      debugger
       this.vector_source.clear()
       features = (new GeoJSON()).readFeatures(mask_geojson)
       this.vector_source.addFeatures(features)
@@ -882,7 +884,6 @@ const app = new Vue({
       }
       this.snapInteraction = new Snap({source: source});
       this.map.addInteraction(this.snapInteraction);
-      this.draw_mask_mode = true;
     },
     stopMaskAnnotation(){
       if(!this.map) return;
