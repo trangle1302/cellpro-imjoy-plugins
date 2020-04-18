@@ -8,7 +8,7 @@
   "type": "window",
   "tags": [],
   "ui": "",
-  "version": "0.1.30",
+  "version": "0.1.31",
   "api_version": "0.1.7",
   "description": "Annotate images for HPA single-cell image classification",
   "icon": "extension",
@@ -429,7 +429,7 @@ const app = new Vue({
     async chooseTask (task_name){
       this.current_task_name = task_name;
       this.loading = true;
-      this.getNewImageBatch(this.current_task_name);
+      this.getNewImageBatch(this.current_task_name, true);
     },
     async fetchCellImage(cell_id){
       const imageData = JSON.parse(JSON.stringify(imageDataTemplate));
@@ -455,7 +455,7 @@ const app = new Vue({
       }
       return imageData
     },
-    async getNewImageBatch(task_name){
+    async getNewImageBatch(task_name, init){
       if(!this.isMobile) api.showStatus('Loading a new batch...')
       if(this.loading_cache){
         if(task_name === this.loading_cache){
@@ -468,7 +468,11 @@ const app = new Vue({
       }
       try{
         this.loading_cache = task_name;
-        const response = await this.fetchURLData("/tasks/" + task_name + "?cell_num=" + this.cell_per_batch);
+        let url = "/tasks/" + task_name + "?cell_num=" + this.cell_per_batch
+        if(init){
+          url = url + '&init=1'
+        }
+        const response = await this.fetchURLData(url);
         this.loaded_image_list  =response.cells;
         if(this.loaded_image_list.length<=0){
           api.showMessage('No more images in this task.')
