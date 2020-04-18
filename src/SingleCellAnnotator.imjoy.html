@@ -338,6 +338,13 @@ const app = new Vue({
         this.$forceUpdate()
       }
     })
+    // make sure the key binding works
+    document.addEventListener('mouseenter', e => {
+      window.focus();
+    });
+    document.addEventListener('click', e => {
+      window.focus();
+    });
   },
   methods: {
     info(){
