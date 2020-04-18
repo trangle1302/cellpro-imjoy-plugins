@@ -214,6 +214,7 @@ const app = new Vue({
     alpha: 0.5,
     hide_controls: false,
     default_extend_value: 300,
+    current_extend_value: 300,
     // from here this is communication to backend, to develop/activate
     tasks: null,
     current_task_name: null,
@@ -278,12 +279,12 @@ const app = new Vue({
           this.home()
         }
         else if(event.code === 'KeyB'){
-          this.default_extend_value = parseInt(await api.prompt("Please enter a pixel number for extending the image area surrounding the cell:", "300"))
-          if( !this.default_extend_value || this.default_extend_value<=0){
-            this.default_extend_value = 300
+          this.current_extend_value = parseInt(await api.prompt("Please enter a pixel number for extending the image area surrounding the cell:", "300"))
+          if( !this.current_extend_value || this.current_extend_value<=0){
+            this.current_extend_value = this.default_extend_value
           }
-          else if(this.default_extend_value>2048){
-            this.default_extend_value = 2048
+          else if(this.current_extend_value>2048){
+            this.current_extend_value = this.default_extend_value
           }
           this.extendImage()
         }
@@ -430,7 +431,7 @@ const app = new Vue({
       const imageData = JSON.parse(JSON.stringify(imageDataTemplate));
       imageData.cell_id = cell_id;
       let image_url = "/images/" + this.current_task_name + "/" + imageData.cell_id;
-      imageData.extend = this.default_extend_value;
+      imageData.extend = this.current_extend_value;
       image_url += "?extend="+imageData.extend+"&maskout=1";
       const response = await this.fetchURLData(image_url)
       imageData.mask_geojson.bbox = response.bbox;
@@ -584,7 +585,7 @@ const app = new Vue({
       if(!this.draw_mask_mode){
         this.stopMaskAnnotation()
       }
-      if(this.draw_mask_mode && imageData.extend != this.default_extend_value){
+      if(this.draw_mask_mode && imageData.extend != this.current_extend_value){
         this.extendImage()
       }
       else{
