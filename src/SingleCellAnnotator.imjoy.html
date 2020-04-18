@@ -520,18 +520,7 @@ const app = new Vue({
       return [new_coordinates]
     },
     async previousImage(){
-      if(this.current_image_data.mask_adjusted){
-        const anwser = await api.confirm("Would you like to save the mask annotation?")
-        if(anwser){
-          if(!await this.saveMaskAnnotation()){
-            return
-          }
-        }
-        else{
-          this.stopMaskAnnotation()
-          this.current_image_data.mask_adjusted = false;
-        }
-      };
+      await this.checkNewMask()
       if(this.current_image_data.location_changed){
         await this.uploadAnnotation();
       }
@@ -553,7 +542,19 @@ const app = new Vue({
     },
     async nextImage(){
       this.loadMoreIfNeeded();
-      if(this.current_image_data.mask_adjusted){
+      await this.checkNewMask()
+      if(this.current_image_data.location_changed){
+        await this.uploadAnnotation();
+      }
+      this.current_image_index++;
+      if(this.cached_image_data[this.current_image_index])
+      await this.showImage(this.cached_image_data[this.current_image_index]);
+    },
+    async checkNewMask(){
+      if(!this.current_image_data.mask_adjusted){
+       return 
+      }
+      if(this.vector_source && this.vector_source.getFeatures().length>0){
         const anwser = await api.confirm("Would you like to save the mask annotation?")
         if(anwser){
           if(!await this.saveMaskAnnotation()){
@@ -565,12 +566,9 @@ const app = new Vue({
           this.current_image_data.mask_adjusted = false;
         }
       }
-      if(this.current_image_data.location_changed){
-        await this.uploadAnnotation();
+      else{
+        this.stopMaskAnnotation()
       }
-      this.current_image_index++;
-      if(this.cached_image_data[this.current_image_index])
-      await this.showImage(this.cached_image_data[this.current_image_index]);
     },
     async showImage(imageData){
       if(!imageData){
@@ -705,15 +703,7 @@ const app = new Vue({
         }
       }
       else{
-        if(this.current_image_data.mask_adjusted){
-          const anwser = await api.confirm("Would you like to save the mask annotation?")
-          if(anwser){
-            this.saveMaskAnnotation()
-          }
-          else{
-            this.current_image_data.mask_adjusted = false;
-          }
-        };
+        this.checkNewMask()
         this.stopMaskAnnotation()
       }
     },
@@ -848,7 +838,6 @@ const app = new Vue({
           minZoom: -10
         })
       });
-      this.drawMaskModeChanged();
       this.map.addControl(new MousePosition({
           coordinateFormat: createStringXY(0)
       }));
