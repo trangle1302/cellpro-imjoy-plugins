@@ -884,8 +884,14 @@ const app = new Vue({
       }
       this.snapInteraction = new Snap({source: source});
       this.map.addInteraction(this.snapInteraction);
+      if(this.channel_settings['Mask'])
+      this.channel_settings['Mask'].show = false
+      this.displayMap(this.current_image_data.channels, this.channel_settings);
     },
     stopMaskAnnotation(){
+      if(this.channel_settings['Mask'])
+      this.channel_settings['Mask'].show = true
+      this.displayMap(this.current_image_data.channels, this.channel_settings);
       if(!this.map) return;
       if(this.drawInteraction)
       this.map.removeInteraction(this.drawInteraction);
