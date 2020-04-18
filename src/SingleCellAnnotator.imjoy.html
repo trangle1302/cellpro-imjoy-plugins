@@ -213,7 +213,8 @@ const app = new Vue({
     channel_settings: {},
     alpha: 0.5,
     hide_controls: false,
-  // from here this is communication to backend, to develop/activate
+    default_extend_value: 300,
+    // from here this is communication to backend, to develop/activate
     tasks: null,
     current_task_name: null,
     cell_per_batch: 10,
@@ -238,7 +239,7 @@ const app = new Vue({
     }
     window.onresize();
     this.selected_server_url = this.servers['production']
-    document.addEventListener('keydown', (event)=>{
+    document.addEventListener('keydown', async (event)=>{
       if(this.current_panel==='imageviewer'){
         if(event.shiftKey && event.code ==='Equal' || ['+', 'Plus', 'NumpadAdd'].includes(event.code)){
           if(this.alpha<1){
@@ -287,6 +288,16 @@ const app = new Vue({
         }
         else if(event.code === 'Escape'){
           this.home()
+        }
+        else if(event.code === 'KeyB'){
+          this.default_extend_value = parseInt(await api.prompt("Please enter a pixel number for extending the image area surrounding the cell:", "300"))
+          if( !this.default_extend_value || this.default_extend_value<=0){
+            this.default_extend_value = 300
+          }
+          else if(this.default_extend_value>2048){
+            this.default_extend_value = 2048
+          }
+          this.extendImage()
         }
         // alpha channel mask
         else if(event.code === 'KeyA'){
@@ -353,6 +364,7 @@ const app = new Vue({
       D: Discard (toggle)
       R: Redraw mask
       S: Save mask
+      B: Extend image region
       A: Alpha mask channel (toggle)
       E: ER channel (toggle)
       T: Microtubule channel (toggle)
@@ -424,11 +436,9 @@ const app = new Vue({
       imageData.cell_id = cell_id;
       let image_url = "/images/" + this.current_task_name + "/" + imageData.cell_id;
       if (extend_image){
-        imageData.extended = true;
-        imageData.extend = 500;
+        imageData.extend = this.default_extend_value;
       }else{
         imageData.extend = 20;
-        imageData.extended = false;
       }
       image_url += "?extend="+imageData.extend+"&maskout=1";
       const response = await this.fetchURLData(image_url)
@@ -585,7 +595,7 @@ const app = new Vue({
       if(!this.draw_mask_mode){
         this.stopMaskAnnotation()
       }
-      if(this.draw_mask_mode && !imageData.extended){
+      if(this.draw_mask_mode && imageData.extend != this.default_extend_value){
         this.extendImage()
       }
       else{
@@ -613,7 +623,6 @@ const app = new Vue({
       const imageData = await this.fetchCellImage(cell_id, true)
       this.current_image_data.mask_geojson = imageData.mask_geojson;
       this.current_image_data.channels = imageData.channels;
-      this.current_image_data.extended = imageData.extended;
       this.current_image_data.extend = imageData.extend;
       this.current_image_data.mask_adjusted = imageData.mask_adjusted;
 
