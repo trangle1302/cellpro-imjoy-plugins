@@ -242,22 +242,10 @@ const app = new Vue({
     document.addEventListener('keydown', async (event)=>{
       if(this.current_panel==='imageviewer'){
         if(event.shiftKey && event.code ==='Equal' || ['+', 'Plus', 'NumpadAdd'].includes(event.code)){
-          if(this.alpha<1){
-            this.alpha = this.alpha+0.1;
-          }
-          else{
-            this.alpha = 1;
-          }
           this.current_image_data.brightness = this.current_image_data.brightness + 0.3
           this.displayMap(this.current_image_data.channels, this.channel_settings, this.current_image_data.brightness);
         }
         else if(['-', 'Minus', 'NumpadSubtract'].includes(event.code)){
-          if(this.alpha>0){
-            this.alpha = this.alpha-0.1;
-          }
-          else{
-            this.alpha = 0;
-          }
           this.current_image_data.brightness = this.current_image_data.brightness - 0.3
           this.displayMap(this.current_image_data.channels, this.channel_settings, this.current_image_data.brightness);
         }
@@ -729,7 +717,6 @@ const app = new Vue({
       }
       else{
         this.current_image_data.discarded = true;
-        await this.nextImage();    
       }
       this.$forceUpdate()
     },
@@ -1019,15 +1006,15 @@ api.export(new ImJoyPlugin())
           <span v-if="!current_image_data.mask_adjusted"><i class="icon icon-edit"></i>&nbsp;Mask</span>
           <span v-else>Remove</span>
         </button>&nbsp;&nbsp;
-        <button class="btn" :class="{'transparent-btn': current_image_data.discarded!==true}" @click="toggleDiscard()">Discard</button>&nbsp;&nbsp;
         <button class="btn transparent-btn btn-action s-circle" title="home" @click="home()"><i class="icon icon-cross"></i></button>&nbsp;&nbsp;
       </div>
       <div v-show="!hide_controls" class="form-group floating-channel-btn">
-        <label v-for="ch in channel_settings" class="form-checkbox">
+        <label v-for="ch in channel_settings" class="form-checkbox channel-controls">
           <input v-model="ch.show" :name="ch.name" @change="channelSettingsUpdated" type="checkbox">
           <i class="form-icon"></i> {{ch.name}}
         </label>
-        <button class="btn btn-sm s-circle" style="background-color: transparent;" title="info" @click="info()"><i class="icon icon-message"></i></button>
+        <button class="btn btn-sm s-circle channel-controls" style="background-color: transparent;" title="info" @click="info()"><i class="icon icon-message"></i></button>
+        <button class="btn btn-sm s-circle channel-controls" style="background-color: transparent;" :class="{'discarded-btn': current_image_data.discarded}" title="discard" @click="toggleDiscard()"><i class="icon icon-delete"></i></button>
       </div>
       <template v-if="current_image_data.label_display_mode==='multiple'">
         <div v-show="!hide_controls" class="floating-right-btn">
@@ -1099,21 +1086,43 @@ api.export(new ImJoyPlugin())
   
   .floating-switch{
     position: absolute;
-    right: 10px;
+    right: 5px;
     z-index: 999;
-    top: 20px;
+    top: 10px;
   }
 
   .ol-mouse-position{
     top:unset;
     bottom: 3px;
   }
+  @media all and (max-width: 600px) {
+    .floating-channel-btn{
+      text-align: left!important;
+      top: 10px!important;
+      bottom: unset!important;
+      left: 5px!important;
+      -webkit-transform:unset!important;
+      -moz-transform:unset!important;
+      transform: unset!important;
+      bottom: 60px;
+    }
+    .channel-controls{
+      display: block!important;
+    }
+  }
   .floating-channel-btn{
-    text-align: left;
+    text-align: center;
+    width: 100%;
     position: absolute;
-    left: 5px;
-    top: 10px;
+    left: 50%;
+    -webkit-transform: translate3d(-50%, -50%, 0);
+    -moz-transform: translate3d(-50%, -50%, 0);
+    transform: translate3d(-50%, -50%, 0);
+    bottom: 20px;
     z-index: 666;
+  }
+  .channel-controls{
+    display: inline-block;
   }
 
   .floating-bottom-btn {
@@ -1144,6 +1153,9 @@ api.export(new ImJoyPlugin())
     flex: none;
     width: 110px;
     background-color:#fff3;
+  }
+  .discarded-btn{
+    background-color: rgb(248, 27, 2)!important;
   }
   .location-btn:hover, .location-btn:focus{
     background-color:rgba(255, 255, 255, 0.42);
