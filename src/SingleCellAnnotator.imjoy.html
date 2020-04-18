@@ -286,7 +286,7 @@ const app = new Vue({
           else if(this.current_extend_value>2048){
             this.current_extend_value = this.default_extend_value
           }
-          this.extendImage()
+          this.reloadImage()
         }
         // alpha channel mask
         else if(event.code === 'KeyA'){
@@ -590,7 +590,7 @@ const app = new Vue({
         this.stopMaskAnnotation()
       }
       if(this.draw_mask_mode && imageData.extend != this.current_extend_value){
-        this.extendImage()
+        this.reloadImage()
       }
       else{
         this.$nextTick(async ()=>{
@@ -610,7 +610,7 @@ const app = new Vue({
       }
     },
     // extend Image
-    async extendImage(){
+    async reloadImage(){
       this.loading = true;
       this.current_image_index = this.cached_image_data.indexOf(this.current_image_data);
       const cell_id = this.current_image_data.cell_id;
@@ -698,7 +698,7 @@ const app = new Vue({
         this.loading = true;
         try{
           this.current_image_data.mask_adjusted=false;
-          await this.extendImage();
+          await this.reloadImage();
         }
         catch(e){
           console.error(e)
@@ -744,6 +744,7 @@ const app = new Vue({
       this.current_image_data.mask_adjusted = true;
       await this.uploadAnnotation()
       this.stopMaskAnnotation()
+      await this.reloadImage()
       return true
     },
     async exportAnnotation() {
