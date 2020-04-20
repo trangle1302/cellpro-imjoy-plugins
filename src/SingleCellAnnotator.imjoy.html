@@ -8,7 +8,7 @@
   "type": "window",
   "tags": [],
   "ui": "",
-  "version": "0.1.31",
+  "version": "0.1.32",
   "api_version": "0.1.7",
   "description": "Annotate images for HPA single-cell image classification",
   "icon": "extension",
@@ -163,19 +163,7 @@ async function composeChannels(channels, channel_settings, alpha, brightness){
 const imageDataTemplate = {
   extend: null,
   cell_id: null,
-  mask_geojson:{
-  'type':'FeatureCollection',
-  'features':[
-    {
-      'type':'Feature',
-      'geometry':{
-      'type':'Polygon',
-      'coordinates':null
-      },
-      'properties':null
-    }],
-  'bbox':null,
-  },
+  mask_geojson: null,
   label_display_mode: null,
   channels: null,
   location: null,
@@ -438,8 +426,8 @@ const app = new Vue({
       imageData.extend = this.current_extend_value;
       image_url += "?extend="+imageData.extend+"&maskout=1";
       const response = await this.fetchURLData(image_url)
-      imageData.mask_geojson.bbox = response.bbox;
-      imageData.mask_geojson.features[0].geometry.coordinates = response.mask.geometry.coordinates;
+      imageData.bbox = response.bbox;
+      imageData.mask_geojson = response.mask;
       //ER, Microtubule, Nuclei, Protein,
       imageData.channels = response.images;
       locations = Object.keys(response.location);
@@ -660,11 +648,8 @@ const app = new Vue({
   
         if (this.current_image_data.mask_adjusted){
           sendData.extend = this.current_image_data.extend;
-          sendData.bbox = this.current_image_data.mask_geojson.bbox;
-          for (item in sendData.bbox){
-            sendData.bbox[item] = Number(sendData.bbox[item].toFixed(1))
-          };
-          sendData.mask = this.current_image_data.mask_geojson.features;
+          sendData.bbox = this.current_image_data.bbox;
+          sendData.mask = this.current_image_data.mask_geojson;
           // now adjust the digit to 1 decimal for cooridinates
           let coordinates = this.current_image_data.mask_geojson.features[0].geometry.coordinates[0]
           for (let index = 0; index < coordinates.length; index++){
@@ -1013,11 +998,6 @@ api.export(new ImJoyPlugin())
           <input type="checkbox" v-model="draw_mask_mode" @change="drawMaskModeChanged">
           <i class="form-icon"></i> <span class="hide-on-mobile">Redraw Mask</span>
         </label> -->
-        <button v-show="current_image_data.mask_adjusted" class="btn transparent-btn" v-if="draw_mask_mode" @click="saveMaskAnnotation()">Save</button>&nbsp;&nbsp;
-        <button class="btn transparent-btn" title="annotation mode" v-if="draw_mask_mode" @click="startRedrawAnnotation()">
-          <span v-if="!current_image_data.mask_adjusted"><i class="icon icon-edit"></i>&nbsp;Mask</span>
-          <span v-else>Remove</span>
-        </button>&nbsp;&nbsp;
         <button class="btn transparent-btn btn-action s-circle" title="home" @click="home()"><i class="icon icon-cross"></i></button>&nbsp;&nbsp;
       </div>
       <div v-show="!hide_controls" class="form-group floating-channel-btn">
@@ -1025,18 +1005,24 @@ api.export(new ImJoyPlugin())
           <input v-model="ch.show" :name="ch.name" @change="channelSettingsUpdated" type="checkbox">
           <i class="form-icon"></i> {{ch.name}}
         </label>
+        
+        <button class="btn btn-sm small-btn channel-controls" :class="{'discarded-btn': current_image_data.discarded}" title="discard" @click="toggleDiscard()">Discard</button>
+        <button class="btn btn-sm small-btn channel-controls" title="annotation mode" v-if="draw_mask_mode" @click="startRedrawAnnotation()">
+          <span v-if="!current_image_data.mask_adjusted"><i class="icon icon-edit"></i>&nbsp;Mask</span>
+          <span v-else>Remove</span>
+        </button>
+        <button v-show="current_image_data.mask_adjusted" style="background-color:white" class="btn btn-sm small-btn channel-controls" @click="saveMaskAnnotation()">Save</button>
         <button class="btn btn-sm s-circle channel-controls" style="background-color: transparent;" title="info" @click="info()"><i class="icon icon-message"></i></button>
-        <button class="btn btn-sm s-circle channel-controls" style="background-color: transparent;" :class="{'discarded-btn': current_image_data.discarded}" title="discard" @click="toggleDiscard()"><i class="icon icon-delete"></i></button>
       </div>
       <template v-if="current_image_data.label_display_mode==='multiple'">
         <div v-show="!hide_controls" class="floating-right-btn">
+          <div class="columns">
+            <button :disabled="current_image_data.discarded" v-for="(loc, k) in current_image_data.location" @click="toggleLocation(k)" class="column btn location-btn" :class="{'selected-location-btn': loc}">{{k.slice(0,12)+(k.length>12?'.': '')}}</button>
+          </div>
+           <br>
           <div class="btn-group">
             <button :disabled="current_image_index===0" class="btn transparent-btn" @click="previousImage()"><i class="icon icon-back"></i>&nbsp;Back</button>
             <button :disabled="current_image_index>=cached_image_data.length" class="btn transparent-btn" @click="nextImage()">Next&nbsp;<i class="icon icon-forward"></i></button>
-          </div>
-          <br>
-          <div class="columns">
-            <button :disabled="current_image_data.discarded" v-for="(loc, k) in current_image_data.location" @click="toggleLocation(k)" class="column btn location-btn" :class="{'selected-location-btn': loc}">{{k.slice(0,12)+(k.length>12?'.': '')}}</button>
           </div>
         </div>
       </template>
@@ -1119,9 +1105,16 @@ api.export(new ImJoyPlugin())
       bottom: 60px;
     }
     .channel-controls{
-      display: block!important;
+      display: block;
     }
   }
+
+  @media all and (min-width: 600px) {
+    .channel-controls{
+      display: inline-block;
+    }
+  }
+
   .floating-channel-btn{
     text-align: center;
     width: 100%;
@@ -1133,9 +1126,7 @@ api.export(new ImJoyPlugin())
     bottom: 20px;
     z-index: 666;
   }
-  .channel-controls{
-    display: inline-block;
-  }
+
 
   .floating-bottom-btn {
     position: absolute;
@@ -1187,6 +1178,13 @@ api.export(new ImJoyPlugin())
   }
   .transparent-btn:hover {
     background-color:rgba(255, 255, 255, 0.42);
+  }
+  .small-btn{
+    width: 60px;
+    background: transparent;
+    border: none;
+    background-color:#fff3;
+    margin-bottom: 3px;
   }
   .floating {
     position: absolute;
