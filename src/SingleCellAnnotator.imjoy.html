@@ -629,8 +629,7 @@ const app = new Vue({
               }
             };
           };
-        }
-
+        };
         if (this.current_image_data.mask_adjusted){
           sendData.extend = this.current_image_data.extend;
           sendData.bbox = this.current_image_data.bbox;
@@ -639,7 +638,7 @@ const app = new Vue({
           let features = this.current_image_data.mask_geojson.features
           api.alert(JSON.stringify(features))
           for (let i = 0; i < features.length; i++){
-            //features[i].properties.label = 'cell'; // keep the label as cell
+            features[i].properties ={'label': 'cell'}; // keep the label as cell
             let coordinates = features[i].geometry.coordinates[0]
             for (let index = 0; index < coordinates.length; index++){
               coordinates[index][0] = Number(coordinates[index][0].toFixed(1));
@@ -648,13 +647,10 @@ const app = new Vue({
           };
         };
       }
-      debugger
       // this is the url to send the current annotation
-      api.alert(this.current_task_name)
-      if(this.current_task_name == 'segmentation'){
-        let sub_url = "/annotations/" + this.current_image_data.cell_id;
-      }else{
-        let sub_url = "/annotations/" + this.current_task_name + "/" + this.current_image_data.cell_id;
+      let sub_url = "/annotations/" + this.current_task_name + "/" + this.current_image_data.cell_id;
+      if(this.current_task_name === 'segmentation'){
+        sub_url = "/annotations/" + this.current_image_data.cell_id;
       }
       const url_post = this.selected_server_url + sub_url;
       const response = await fetch(url_post, {
