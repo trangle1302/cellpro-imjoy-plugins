@@ -194,8 +194,8 @@ const app = new Vue({
     select: null,
     current_panel: 'login',
     user:{
-      username: "hao",
-      password: "GshQvF3GPzeoPAWBpalq",
+      username: "",
+      password: "",
       access_token: null
     },
     channel_settings: {},
@@ -227,7 +227,7 @@ const app = new Vue({
       this.$forceUpdate()
     }
     window.onresize();
-    this.selected_server_url = this.servers['localhost']
+    this.selected_server_url = this.servers['production']
     document.addEventListener('keydown', async (event)=>{
       if(this.current_panel==='imageviewer'){
         if(event.shiftKey && event.code ==='Equal' || ['+', 'Plus', 'NumpadAdd'].includes(event.code)){
@@ -843,6 +843,35 @@ const app = new Vue({
       };
       this.startMaskAnnotation(this.vector_source, this.freehand_mode)
     },
+    // to remove selected annotation
+    async deleteAnnotation() {
+      if (this.vector_source) {
+        const features = this.select.getFeatures()
+        if(features.getLength()>0){
+            features.forEach((feature)=>{
+                console.log('removing ', feature)
+                this.vector_source.removeFeature(feature);
+                this.select.getFeatures().remove(feature);
+            });
+        }
+        else{
+            try {
+                const answer = await api.confirm({content: "Do you really want to delete the annotations?", confirm_text: 'Yes, delete it.'})
+                if (answer) {
+                  const features = this.vector_source.getFeatures();
+                  features.forEach((feature) => {
+                    const ann = this.annotation_types[feature.get('label')]
+                    this.vector_source.removeFeature(feature);
+                  });
+                  this.undo_button_flag = false
+                }else{return}
+            } catch (err) {
+              return;
+            }
+        }
+      //await this.saveAnnotation()
+      }
+    },
     startMaskAnnotation(source, freehand){
       if(!source){
         console.error("Please specify an annotation layer source")
@@ -1025,8 +1054,9 @@ api.export(new ImJoyPlugin())
           <button :disabled="current_image_data.discarded" class="btn transparent-btn" @click="selectLocation(true)" :class="{'selected-location-btn': current_image_data.location[current_image_data.single_location]===true}"><i class="icon icon-check"></i>&nbsp;Yes</button>
           <button :disabled="current_image_data.discarded" class="btn transparent-btn" @click="selectLocation(false)" :class="{'selected-location-btn': current_image_data.location[current_image_data.single_location]===false}"><i class="icon icon-cross"></i>&nbsp;No</button>
           <button :disabled="current_image_index>=cached_image_data.length" class="btn transparent-btn" @click="nextImage()">Next&nbsp;<i class="icon icon-forward"></i></button>
+          <button v-show="current_task_name==='segmentation'" style="background-color:rgb(219, 194, 52)" class="btn btn-sm small-btn channel-controls" @click="deleteAnnotation()">delSingle</button>
         </div>
-        <span v-show="!hide_controls" class="h3 floating-label">{{current_image_data.single_location}}</span>
+        <span v-show="(!hide_controls)&&(current_task_name!=='segmentation')" class="h3 floating-label">{{current_image_data.single_location}}</span>
       </template>
       
       <div v-if="loading" class="loading loading-lg floating"></div>
