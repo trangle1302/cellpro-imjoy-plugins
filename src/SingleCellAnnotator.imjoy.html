@@ -187,6 +187,7 @@ const app = new Vue({
     draw_mask_mode: true,
     freehand_mode: true,
     vector_source: null,
+    selected_single_mask: null,
     single_cell_mode: null,
     loading: false,
     // develop image parsing
@@ -844,10 +845,24 @@ const app = new Vue({
       };
       this.startMaskAnnotation(this.vector_source, this.freehand_mode)
     },
+
+    async restoreAnnotation() {
+      const features = (new GeoJSON()).readFeatures(this.selected_single_mask)
+      this.vector_source.clear()
+      this.vector_source.addFeatures(features)
+    },
+
     // to remove selected annotation
     async deleteAnnotation() {
       if (this.vector_source) {
         const features = this.select.getFeatures()
+        const allFeatures = this.vector_source.getFeatures();
+        const format = new ol.format.GeoJSON();
+        const routeFeatures = format.writeFeaturesObject(allFeatures, {decimals: 1});
+        routeFeatures['bbox'] = this.current_image_data.mask_geojson.bbox;
+        this.selected_single_mask = routeFeatures;
+
+        // const features = this.select.getFeatures()
         if(features.getLength()>0){
             features.forEach((feature)=>{
                 console.log('removing ', feature)
@@ -1055,6 +1070,7 @@ api.export(new ImJoyPlugin())
           <button v-show="single_cell_mode" :disabled="current_image_data.discarded" class="btn transparent-btn" @click="selectLocation(true)" :class="{'selected-location-btn': current_image_data.location[current_image_data.single_location]===true}"><i class="icon icon-check"></i>&nbsp;Yes</button>
           <button v-show="single_cell_mode" :disabled="current_image_data.discarded" class="btn transparent-btn" @click="selectLocation(false)" :class="{'selected-location-btn': current_image_data.location[current_image_data.single_location]===false}"><i class="icon icon-cross"></i>&nbsp;No</button>
           <button v-show="!single_cell_mode" :disabled="current_image_data.discarded" class="btn transparent-btn" @click="deleteAnnotation()" ><i class="icon icon-cross"></i>&nbsp;Delete</button>
+          <button v-show="!single_cell_mode" :disabled="current_image_data.discarded" class="btn transparent-btn" @click="restoreAnnotation()" ><i class="icon icon-check"></i>&nbsp;Withdraw</button>
           <button :disabled="current_image_index>=cached_image_data.length" class="btn transparent-btn" @click="nextImage()">Next&nbsp;<i class="icon icon-forward"></i></button>
         </div>
         <span v-show="(!hide_controls)&&(!single_cell_mode)" class="h3 floating-label">{{current_image_data.single_location}}</span>
