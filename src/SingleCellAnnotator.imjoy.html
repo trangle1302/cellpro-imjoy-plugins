@@ -506,7 +506,7 @@ const app = new Vue({
         await this.uploadAnnotation();
       }
       this.current_image_index = this.cached_image_data.indexOf(this.current_image_data)
-      if(this.current_image_index<=0){
+      if(this.current_image_index<0){
         this.current_image_index = 0;
       }
       else{
@@ -611,7 +611,7 @@ const app = new Vue({
       if(!sendData.discarded){
         if(this.current_image_data.location_changed){
           sendData.location = {};
-          if (this.current_task_name !== 'segmentation'){
+          if (!this.current_image_data.location){
             sendData.location = this.current_image_data.location;
             let noLocation = true;
             for (loc in sendData.location){
@@ -649,7 +649,7 @@ const app = new Vue({
       }
       // this is the url to send the current annotation
       let sub_url = "/annotations/" + this.current_task_name + "/" + this.current_image_data.cell_id;
-      if(this.current_task_name === 'segmentation'){
+      if(!this.current_image_data.location){
         sub_url = "/annotations/" + this.current_image_data.cell_id;
       }
       const url_post = this.selected_server_url + sub_url;
@@ -715,7 +715,7 @@ const app = new Vue({
         api.alert('Please draw a cell mask before saving!');
         return false
       }
-      if((routeFeatures.features.length>1)&&(this.current_task_name!=='segmentation')){
+      if((routeFeatures.features.length>1)&&this.current_image_data.location){
         api.alert('Only one cell mask is allowed!');
         return false
       }
@@ -838,7 +838,7 @@ const app = new Vue({
     },
     startRedrawAnnotation() {
       this.current_image_data.mask_adjusted = true;
-      if (this.current_task_name !== 'segmentation'){
+      if (!this.current_image_data.location){
         this.vector_source.clear()
       };
       this.startMaskAnnotation(this.vector_source, this.freehand_mode)
@@ -1054,9 +1054,9 @@ api.export(new ImJoyPlugin())
           <button :disabled="current_image_data.discarded" class="btn transparent-btn" @click="selectLocation(true)" :class="{'selected-location-btn': current_image_data.location[current_image_data.single_location]===true}"><i class="icon icon-check"></i>&nbsp;Yes</button>
           <button :disabled="current_image_data.discarded" class="btn transparent-btn" @click="selectLocation(false)" :class="{'selected-location-btn': current_image_data.location[current_image_data.single_location]===false}"><i class="icon icon-cross"></i>&nbsp;No</button>
           <button :disabled="current_image_index>=cached_image_data.length" class="btn transparent-btn" @click="nextImage()">Next&nbsp;<i class="icon icon-forward"></i></button>
-          <button v-show="current_task_name==='segmentation'" style="background-color:rgb(219, 194, 52)" class="btn btn-sm small-btn channel-controls" @click="deleteAnnotation()">delSingle</button>
+          <button v-show="!this.current_image_data.location'" style="background-color:rgb(219, 194, 52)" class="btn btn-sm small-btn channel-controls" @click="deleteAnnotation()">delSingle</button>
         </div>
-        <span v-show="(!hide_controls)&&(current_task_name!=='segmentation')" class="h3 floating-label">{{current_image_data.single_location}}</span>
+        <span v-show="(!hide_controls)&&this.current_image_data.location" class="h3 floating-label">{{current_image_data.single_location}}</span>
       </template>
       
       <div v-if="loading" class="loading loading-lg floating"></div>
