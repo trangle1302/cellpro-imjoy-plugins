@@ -8,7 +8,7 @@
   "type": "window",
   "tags": [],
   "ui": "",
-  "version": "0.1.32",
+  "version": "0.1.33",
   "api_version": "0.1.7",
   "description": "Annotate images for HPA single-cell image classification",
   "icon": "extension",
@@ -194,8 +194,8 @@ const app = new Vue({
     select: null,
     current_panel: 'login',
     user:{
-      username: "",
-      password: "",
+      username: "hao",
+      password: "GshQvF3GPzeoPAWBpalq",
       access_token: null
     },
     channel_settings: {},
@@ -227,7 +227,7 @@ const app = new Vue({
       this.$forceUpdate()
     }
     window.onresize();
-    this.selected_server_url = this.servers['production']
+    this.selected_server_url = this.servers['localhost']
     document.addEventListener('keydown', async (event)=>{
       if(this.current_panel==='imageviewer'){
         if(event.shiftKey && event.code ==='Equal' || ['+', 'Plus', 'NumpadAdd'].includes(event.code)){
@@ -611,40 +611,51 @@ const app = new Vue({
       if(!sendData.discarded){
         if(this.current_image_data.location_changed){
           sendData.location = {};
-          sendData.location = this.current_image_data.location;
-          let noLocation = true;
-          for (loc in sendData.location){
-            if(sendData.location[loc] === null){
-              sendData.location[loc] = false
+          if (this.current_task_name !== 'segmentation'){
+            sendData.location = this.current_image_data.location;
+            let noLocation = true;
+            for (loc in sendData.location){
+              if(sendData.location[loc] === null){
+                sendData.location[loc] = false
+              }
+              else{
+                noLocation = false;
+              }
             }
-            else{
-              noLocation = false;
-            }
-          }
-          if (noLocation && this.current_image_data.label_display_mode==='multiple'){
-            const anwser = await api.confirm("No location label selected, is that correct?")
-            if (!anwser){
-              return
-            }
+            if (noLocation && this.current_image_data.label_display_mode==='multiple'){
+              const anwser = await api.confirm("No location label selected, is that correct?")
+              if (!anwser){
+                return
+              }
+            };
           };
         }
-        
-  
+
         if (this.current_image_data.mask_adjusted){
           sendData.extend = this.current_image_data.extend;
           sendData.bbox = this.current_image_data.bbox;
           sendData.mask = this.current_image_data.mask_geojson;
           // now adjust the digit to 1 decimal for cooridinates
-          let coordinates = this.current_image_data.mask_geojson.features[0].geometry.coordinates[0]
-          for (let index = 0; index < coordinates.length; index++){
-            coordinates[index][0] = Number(coordinates[index][0].toFixed(1));
-            coordinates[index][1] = Number(coordinates[index][1].toFixed(1));
+          let features = this.current_image_data.mask_geojson.features
+          api.alert(JSON.stringify(features))
+          for (let i = 0; i < features.length; i++){
+            //features[i].properties.label = 'cell'; // keep the label as cell
+            let coordinates = features[i].geometry.coordinates[0]
+            for (let index = 0; index < coordinates.length; index++){
+              coordinates[index][0] = Number(coordinates[index][0].toFixed(1));
+              coordinates[index][1] = Number(coordinates[index][1].toFixed(1));
+            };
           };
-        }
-    
+        };
       }
+      debugger
       // this is the url to send the current annotation
-      const sub_url = "/annotations/" + this.current_task_name + "/" + this.current_image_data.cell_id;
+      api.alert(this.current_task_name)
+      if(this.current_task_name == 'segmentation'){
+        let sub_url = "/annotations/" + this.current_image_data.cell_id;
+      }else{
+        let sub_url = "/annotations/" + this.current_task_name + "/" + this.current_image_data.cell_id;
+      }
       const url_post = this.selected_server_url + sub_url;
       const response = await fetch(url_post, {
           method: 'POST',
@@ -708,7 +719,7 @@ const app = new Vue({
         api.alert('Please draw a cell mask before saving!');
         return false
       }
-      if(routeFeatures.features.length>1){
+      if((routeFeatures.features.length>1)&&(this.current_task_name!=='segmentation')){
         api.alert('Only one cell mask is allowed!');
         return false
       }
@@ -831,7 +842,9 @@ const app = new Vue({
     },
     startRedrawAnnotation() {
       this.current_image_data.mask_adjusted = true;
-      this.vector_source.clear()
+      if (this.current_task_name !== 'segmentation'){
+        this.vector_source.clear()
+      };
       this.startMaskAnnotation(this.vector_source, this.freehand_mode)
     },
     startMaskAnnotation(source, freehand){
