@@ -1052,10 +1052,10 @@ api.export(new ImJoyPlugin())
       <template v-if="current_image_data.label_display_mode==='single'">
         <div v-show="!hide_controls" class="btn-group floating-bottom-btn">
           <button :disabled="current_image_index===0" class="btn transparent-btn" @click="previousImage()"><i class="icon icon-back"></i>&nbsp;Back</button>
-          <button :disabled="current_image_data.discarded" class="btn transparent-btn" @click="selectLocation(true)" :class="{'selected-location-btn': current_image_data.location[current_image_data.single_location]===true}"><i class="icon icon-check"></i>&nbsp;Yes</button>
-          <button :disabled="current_image_data.discarded" class="btn transparent-btn" @click="selectLocation(false)" :class="{'selected-location-btn': current_image_data.location[current_image_data.single_location]===false}"><i class="icon icon-cross"></i>&nbsp;No</button>
+          <button v-show="single_cell_mode" :disabled="current_image_data.discarded" class="btn transparent-btn" @click="selectLocation(true)" :class="{'selected-location-btn': current_image_data.location[current_image_data.single_location]===true}"><i class="icon icon-check"></i>&nbsp;Yes</button>
+          <button v-show="single_cell_mode" :disabled="current_image_data.discarded" class="btn transparent-btn" @click="selectLocation(false)" :class="{'selected-location-btn': current_image_data.location[current_image_data.single_location]===false}"><i class="icon icon-cross"></i>&nbsp;No</button>
+          <button v-show="!single_cell_mode" :disabled="current_image_data.discarded" class="btn transparent-btn" @click="deleteAnnotation()" ><i class="icon icon-cross"></i>&nbsp;Delete</button>
           <button :disabled="current_image_index>=cached_image_data.length" class="btn transparent-btn" @click="nextImage()">Next&nbsp;<i class="icon icon-forward"></i></button>
-          <button v-show="!single_cell_mode" style="background-color:rgb(219, 194, 52)" class="btn btn-sm small-btn channel-controls" @click="deleteAnnotation()">delSingle</button>
         </div>
         <span v-show="(!hide_controls)&&(!single_cell_mode)" class="h3 floating-label">{{current_image_data.single_location}}</span>
       </template>
