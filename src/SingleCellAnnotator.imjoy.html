@@ -500,29 +500,13 @@ const app = new Vue({
         this.loading_cache = false;
       }
     },
-    async processCoordinates (coordinates){
-      // in priniciple, bbox should pass the crop starting points, and do this processing
-      var new_coordinates = coordinates[0]
-      const length = new_coordinates.length - 1;
-      var minx = new_coordinates[length][0];
-      var miny = new_coordinates[length][1];
-      for (index = 0; index < new_coordinates.length; index++){
-        if (minx > new_coordinates[index][0]){minx = new_coordinates[index][0]}
-        if (miny > new_coordinates[index][1]){miny = new_coordinates[index][1]}
-      };
-      for (index = 0; index < new_coordinates.length; index++){
-        new_coordinates[index][0] = new_coordinates[index][0] - minx;
-        new_coordinates[index][1] = new_coordinates[index][1] - miny;
-      };
-      return [new_coordinates]
-    },
     async previousImage(){
       await this.checkNewMask()
       if(this.current_image_data.location_changed){
         await this.uploadAnnotation();
       }
       this.current_image_index = this.cached_image_data.indexOf(this.current_image_data)
-      if(this.current_image_index<=-1){
+      if(this.current_image_index<=0){
         this.current_image_index = 0;
       }
       else{
