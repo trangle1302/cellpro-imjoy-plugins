@@ -645,7 +645,10 @@ const app = new Vue({
           // now adjust the digit to 1 decimal for cooridinates
           let features = this.current_image_data.mask_geojson.features
           for (let i = 0; i < features.length; i++){
-            features[i].properties ={'label': 'cell'}; // keep the label as cell
+            features[i].properties = features[i].properties || {}
+            if(!features[i].properties.label){
+              features[i].properties.label = 'cell'
+            }
           };
         };
       }
