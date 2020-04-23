@@ -651,9 +651,6 @@ const app = new Vue({
       }
       // this is the url to send the current annotation
       let sub_url = "/annotations/" + this.current_task_name + "/" + this.current_image_data.cell_id;
-      if(!this.single_cell_mode){
-        sub_url = "/annotations/" + this.current_image_data.cell_id;
-      }
       const url_post = this.selected_server_url + sub_url;
       const response = await fetch(url_post, {
           method: 'POST',
@@ -847,7 +844,11 @@ const app = new Vue({
     },
 
     async restoreAnnotation() {
-      const features = (new GeoJSON()).readFeatures(this.selected_single_mask)
+      if (!this.selected_single_mask){
+        const features = (new GeoJSON()).readFeatures(this.current_image_data.mask_geojson)
+      }else{
+        const features = (new GeoJSON()).readFeatures(this.selected_single_mask)
+      }
       this.vector_source.clear()
       this.vector_source.addFeatures(features)
     },
