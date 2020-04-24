@@ -665,10 +665,7 @@ const app = new Vue({
         };
       }
       // this is the url to send the current annotation
-      let sub_url = "/annotations/" + this.current_task_name + "/" + this.current_image_data.cell_id;
-      if(!this.single_cell_mode){
-        sub_url = "/annotations/" + this.current_image_data.cell_id;
-      }
+      const sub_url = "/annotations/" + this.current_task_name + "/" + this.current_image_data.cell_id;
       const url_post = this.selected_server_url + sub_url;
       const response = await fetch(url_post, {
           method: 'POST',
