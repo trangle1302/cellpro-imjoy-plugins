@@ -8,7 +8,7 @@
   "type": "window",
   "tags": [],
   "ui": "",
-  "version": "0.1.38",
+  "version": "0.1.39",
   "api_version": "0.1.7",
   "description": "Annotate images for HPA single-cell image classification",
   "icon": "extension",
@@ -177,6 +177,7 @@ const imageDataTemplate = {
   channels: null,
   location: null,
   discarded: false,
+  confirm_unsure: null,
   mask_adjusted: false,
   location_changed: false,
   brightness: 1.0,
@@ -207,8 +208,8 @@ const app = new Vue({
     select: null,
     current_panel: 'login',
     user:{
-      username: "",
-      password: "",
+      username: "hao",
+      password: "GshQvF3GPzeoPAWBpalq",
       access_token: null
     },
     channel_settings: {},
@@ -541,12 +542,24 @@ const app = new Vue({
       }
     },
     async confirmAnnotation(){
-      this.confirm_unsure = "confirm";
-      await this.nextImage();
+      if (!this.current_image_data.confirm_unsure){
+        this.confirm_unsure = "confirm";
+        this.current_image_data.confirm_unsure = "confirm";
+        await this.nextImage();
+      }else{
+        this.confirm_unsure = false;
+        this.current_image_data.confirm_unsure = false
+      }
     },
     async unsureAnnotation(){
-      this.confirm_unsure = "unsure";
-      await this.nextImage();
+      if (!this.current_image_data.confirm_unsure){
+        this.confirm_unsure = "unsure";
+        this.current_image_data.confirm_unsure = "unsure";
+        await this.nextImage();
+      }else{
+        this.confirm_unsure = false;
+        this.current_image_data.confirm_unsure = false 
+      }
     },
     async nextImage(){
       this.loadMoreIfNeeded();
@@ -666,7 +679,7 @@ const app = new Vue({
             };
           };
         };
-        if (this.confirm_unsure === 'confirm' && (this.current_image_data.label_display_mode==='mask')){
+        if ((this.confirm_unsure === 'confirm') && (this.current_image_data.label_display_mode==='mask')){
           sendData = this.current_image_data;
         } else if (this.current_image_data.mask_adjusted){
           // now adjust the digit to 1 decimal for cooridinates
@@ -703,6 +716,7 @@ const app = new Vue({
         };
       }
       // this is the url to send the current annotation
+      api.alert(JSON.stringify(sendData))
       const sub_url = "/annotations/" + this.current_task_name + "/" + this.current_image_data.cell_id;
       const url_post = this.selected_server_url + sub_url;
       const response = await fetch(url_post, {
@@ -1122,8 +1136,8 @@ api.export(new ImJoyPlugin())
           </div>
            <br>
           <div class="btn-group">
-            <button :disabled="current_image_data.location_changed" class="btn transparent-btn" @click="confirmAnnotation()">&nbsp;Confirm</button>
-            <button :disabled="current_image_data.location_changed" class="btn transparent-btn" @click="unsureAnnotation()">Unsure&nbsp;</button>
+            <button :disabled="current_image_data.location_changed" class="btn transparent-btn" :class="{'confirmed-btn': current_image_data.confirm_unsure==='confirm'}" @click="confirmAnnotation()">&nbsp;Confirm</button>
+            <button :disabled="current_image_data.location_changed" class="btn transparent-btn" :class="{'unsured-btn': current_image_data.confirm_unsure==='unsure'}" @click="unsureAnnotation()">Unsure&nbsp;</button>
           </div>
           <br>
           <div class="btn-group">
@@ -1139,7 +1153,7 @@ api.export(new ImJoyPlugin())
           <button :disabled="current_image_data.discarded" class="btn transparent-btn" @click="selectLocation(false)" :class="{'selected-location-btn': current_image_data.location[current_image_data.single_location]===false}"><i class="icon icon-cross"></i>&nbsp;No</button>
           <button :disabled="current_image_index>=cached_image_data.length" class="btn transparent-btn" @click="nextImage()">Next&nbsp;<i class="icon icon-forward"></i></button>
         </div>
-        <span v-show="(!hide_controls)&&(current_image_data.label_display_mode==='mask')" class="h3 floating-label">{{current_image_data.single_location}}</span>
+        <span v-show="(!hide_controls)&&(current_image_data.label_display_mode==='single')" class="h3 floating-label">{{current_image_data.single_location}}</span>
       </template>
       <template v-if="current_image_data.label_display_mode==='mask'">
         <div v-show="!hide_controls" class="btn-group floating-bottom-btn">
@@ -1278,9 +1292,10 @@ api.export(new ImJoyPlugin())
     width: 110px;
     background-color:#fff3;
   }
-  .discarded-btn{
+  .discarded-btn, .confirmed-btn, .unsured-btn{
     background-color: rgb(248, 27, 2)!important;
   }
+
   .location-btn:hover, .location-btn:focus{
     background-color:rgba(255, 255, 255, 0.42);
   }
