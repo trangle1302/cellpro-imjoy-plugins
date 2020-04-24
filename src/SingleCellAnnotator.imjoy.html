@@ -8,7 +8,7 @@
   "type": "window",
   "tags": [],
   "ui": "",
-  "version": "0.1.40",
+  "version": "0.1.41",
   "api_version": "0.1.7",
   "description": "Annotate images for HPA single-cell image classification",
   "icon": "extension",
@@ -67,7 +67,6 @@ const Layer = ol.layer.Layer;
 const fromLonLat = ol.proj.fromLonLat;
 const toLonLat = ol.proj.toLonLat;
 const CircleStyle = ol.style.Circle;
-const Snap = ol.interaction.Snap;
 const defaultControls = ol.control.defaults;
 
 function mobileAndTabletcheck() {
@@ -191,12 +190,11 @@ const app = new Vue({
     renderer: null,
     modifyInteraction: null,
     drawInteraction: null,
-    snapInteraction: null,
     itkInteraction: null,
     draw_mask_mode: true,
     freehand_mode: true,
     vector_source: null,
-    selected_single_mask: null,
+    selected_feature: null,
     loading: false,
     // develop image parsing
     selected_server_url: null,
@@ -272,7 +270,12 @@ const app = new Vue({
           this.startRedrawAnnotation()
         }
         else if(event.code === 'KeyS'){
-          this.saveMaskAnnotation()
+          if(this.current_image_data.location_changed){
+            this.uploadAnnotation();
+          }
+          if(this.current_image_data.mask_adjusted){
+            this.saveMaskAnnotation()
+          }
         }
         else if(event.code === 'Escape'){
           this.home()
@@ -369,8 +372,10 @@ const app = new Vue({
       N: No
       D: Discard (toggle)
       ======Mask=====
-      R: Redraw mask
       S: Save mask
+      Delete: delete selected mask
+      Ctrl+Z: Undo
+      R: Redraw mask
       B: Extend image region
       ======Channels=====
       A: Alpha mask channel (toggle)
@@ -482,10 +487,12 @@ const app = new Vue({
       imageData.saved_cell_idx_list = []
       const features = imageData.mask_geojson.features;
       for (let i = 0; i < features.length; i++){
-        if(typeof features[i].properties.cell_idx !== 'number'){
-          features[i].properties.cell_idx = i;
+        if(features[i].properties){
+          if(typeof features[i].properties.cell_idx !== 'number'){
+            features[i].properties.cell_idx = i;
+          }
+          imageData.saved_cell_idx_list.push(features[i].properties.cell_idx)
         }
-        imageData.saved_cell_idx_list.push(features[i].properties.cell_idx)
       }
     },
     getMaskDiff(imageData){
@@ -616,21 +623,27 @@ const app = new Vue({
       if(!this.current_image_data.mask_adjusted){
        return 
       }
-      if(this.vector_source && this.vector_source.getFeatures().length>0){
-        const anwser = await api.confirm("Would you like to save the mask annotation?")
-        if(anwser){
-          if(!await this.saveMaskAnnotation()){
-            return
+      if(this.current_task_name === 'segmentation'){
+         await this.uploadAnnotation();
+      }
+      else{
+        if(this.vector_source && this.vector_source.getFeatures().length>0){
+          const anwser = await api.confirm("Would you like to save the mask annotation?")
+          if(anwser){
+            if(!await this.saveMaskAnnotation()){
+              return
+            }
+          }
+          else{
+            this.stopMaskAnnotation()
+            this.current_image_data.mask_adjusted = false;
           }
         }
         else{
           this.stopMaskAnnotation()
-          this.current_image_data.mask_adjusted = false;
         }
       }
-      else{
-        this.stopMaskAnnotation()
-      }
+
     },
     async showImage(imageData){
       if(!imageData){
@@ -791,22 +804,26 @@ const app = new Vue({
       const allFeatures = this.vector_source.getFeatures();
       const format = new ol.format.GeoJSON();
       const routeFeatures = format.writeFeaturesObject(allFeatures, {decimals: 1});
-      if (!routeFeatures.features.length){
-        api.alert('Please draw a cell mask before saving!');
-        return false
+      if(this.current_task_name !== 'segmentation'){
+        if (!routeFeatures.features.length){
+          api.alert('Please draw a cell mask before saving!');
+          return false
+        }
+        if(routeFeatures.features.length>1){
+          api.alert('Only one cell mask is allowed!');
+          return false
+        }
       }
-      if((routeFeatures.features.length>1)&&(this.current_image_data.label_display_mode!=='mask')){
-        api.alert('Only one cell mask is allowed!');
-        return false
-      }
+
       routeFeatures['bbox'] = this.current_image_data.mask_geojson.bbox;
       this.current_image_data.mask_geojson = routeFeatures;
       this.current_image_data.mask_adjusted = true;
       await this.uploadAnnotation()
-      if (this.current_image_data.label_display_mode!=='mask'){
+      api.showMessage('Cell mask saved.')
+      if (this.current_task_name !== 'segmentation'){
         this.stopMaskAnnotation()
-        await this.reloadImage()
       }
+      await this.reloadImage()
       return true
     },
     async exportAnnotation() {
@@ -940,7 +957,14 @@ const app = new Vue({
       }));
       this.map.addInteraction(select);
       this.select = select
-      if(this.current_image_data.label_display_mode==='mask'){
+      select.on('select', (e)=>{
+        if(e.selected && e.selected.length>0)
+            this.selected_feature = e.selected
+          else{
+             this.selected_feature = null
+          }
+      })
+      if(this.current_task_name === 'segmentation'){
         this.startMaskAnnotation(this.vector_source, this.freehand_mode)
       }
     },
@@ -949,7 +973,7 @@ const app = new Vue({
       this.startMaskAnnotation(this.vector_source, this.freehand_mode)
     },
     freehandChanged(){
-        if (this.current_image_data.label_display_mode!=='mask') return
+        if (this.current_task_name !== 'segmentation') return
         this.startMaskAnnotation(this.vector_source, this.freehand_mode)
     },
     async undoAnnotation() {
@@ -975,13 +999,7 @@ const app = new Vue({
     async deleteAnnotation() {
       if (this.vector_source) {
         const features = this.select.getFeatures()
-        const allFeatures = this.vector_source.getFeatures();
-        const format = new ol.format.GeoJSON();
-        const routeFeatures = format.writeFeaturesObject(allFeatures, {decimals: 1});
-        routeFeatures['bbox'] = this.current_image_data.mask_geojson.bbox;
-        this.selected_single_mask = routeFeatures;
         features.forEach((feature)=>{
-            console.log('removing ', feature)
             this.vector_source.removeFeature(feature);
             this.select.getFeatures().remove(feature);
         });
@@ -1008,12 +1026,7 @@ const app = new Vue({
             
         });
       this.map.addInteraction(this.drawInteraction);
-      if (this.snapInteraction) {
-        this.map.removeInteraction(this.snapInteraction)
-      }
-      this.snapInteraction = new Snap({source: source});
-      this.map.addInteraction(this.snapInteraction);
-      if(this.current_image_data.label_display_mode!=='mask'){
+      if(this.current_task_name !== 'segmentation'){
         if(this.channel_settings['Mask'])
          this.channel_settings['Mask'].show = false
         this.displayMap(this.current_image_data.channels, this.channel_settings);
@@ -1026,8 +1039,6 @@ const app = new Vue({
       if(!this.map) return;
       if(this.drawInteraction)
       this.map.removeInteraction(this.drawInteraction);
-      if(this.snapInteraction)
-      this.map.removeInteraction(this.snapInteraction);
       if(this.modifyInteraction)
       this.map.removeInteraction(this.modifyInteraction);
     },
@@ -1141,7 +1152,7 @@ api.export(new ImJoyPlugin())
           <input type="checkbox" v-model="draw_mask_mode" @change="drawMaskModeChanged">
           <i class="form-icon"></i> <span class="hide-on-mobile">Redraw Mask</span>
         </label> -->
-        <label class="form-switch " v-show="current_image_data.label_display_mode==='mask'">
+        <label class="form-switch " v-show="current_task_name === 'segmentation'">
           <input type="checkbox" v-model="freehand_mode" @change="freehandChanged">
           <i class="form-icon"></i> <span class="hide-on-mobile">Freehand</span>
         </label>
@@ -1154,12 +1165,12 @@ api.export(new ImJoyPlugin())
         </label>
         
         <button class="btn btn-sm small-btn channel-controls" :disabled="current_image_data.unsure" :class="{'discarded-btn': current_image_data.discarded}" title="discard" @click="toggleDiscard()">Discard</button>
-        <button class="btn btn-sm small-btn channel-controls" title="annotation mode" v-if="draw_mask_mode && (current_image_data.label_display_mode!=='mask')" @click="startRedrawAnnotation()">
+        <button class="btn btn-sm small-btn channel-controls" title="annotation mode" v-if="draw_mask_mode && (current_task_name !== 'segmentation')" @click="startRedrawAnnotation()">
           <span v-if="!current_image_data.mask_adjusted"><i class="icon icon-edit"></i>&nbsp;Mask</span>
           <span v-else>Remove</span>
         </button>
-        <button v-show="(current_image_data.label_display_mode!=='mask')&&current_image_data.mask_adjusted" style="background-color:white" class="btn btn-sm small-btn channel-controls" @click="saveMaskAnnotation()">Save</button>
-        <button v-show="(current_image_data.label_display_mode==='mask')&&selected_single_mask" style="background-color:white" class="btn btn-sm small-btn channel-controls" @click="undoAnnotation()">Undo</button>
+        <button v-show="(current_task_name !== 'segmentation')&&current_image_data.mask_adjusted" style="background-color:white" class="btn btn-sm small-btn channel-controls" @click="saveMaskAnnotation()">Save</button>
+        <button v-show="current_task_name === 'segmentation'" style="background-color:white" class="btn btn-sm small-btn channel-controls" @click="undoAnnotation()">Undo</button>
         <button class="btn btn-sm s-circle channel-controls" style="background-color: transparent;" title="info" @click="info()"><i class="icon icon-message"></i></button>
       </div>
       <template v-if="current_image_data.label_display_mode==='multiple'">
@@ -1188,13 +1199,12 @@ api.export(new ImJoyPlugin())
         </div>
         <span v-show="!hide_controls" class="h3 floating-label">{{current_image_data.single_location}}</span>
       </template>
-      <template v-if="current_image_data.label_display_mode==='mask'">
+      <template v-if="current_task_name === 'segmentation'">
         <div v-show="!hide_controls" class="btn-group floating-bottom-btn">
           <button :disabled="current_image_index===0" class="btn transparent-btn" @click="previousImage()"><i class="icon icon-back"></i>&nbsp;Back</button>
-          <button :disabled="current_image_data.discarded" class="btn transparent-btn" @click="deleteAnnotation()" ><i class="icon icon-cross"></i>Remove&nbsp;</button>
-          <button v-show="!current_image_data.discarded" class="btn transparent-btn"  @click="saveMaskAnnotation()"><i class="icon icon-check"></i>
-            <span v-if="current_image_data.mask_adjusted">Save</span>
-            <span v-else>Confirm</span>
+          <button :disabled="current_image_data.discarded || !selected_feature" class="btn transparent-btn" @click="deleteAnnotation()" ><i class="icon icon-cross"></i>Remove&nbsp;</button>
+          <button :disabled="current_image_data.discarded" class="btn transparent-btn"  @click="saveMaskAnnotation()"><i class="icon icon-check"></i>
+            Save
           </button>
           <button :disabled="current_image_index>=cached_image_data.length" class="btn transparent-btn" @click="nextImage()">Next&nbsp;<i class="icon icon-forward"></i></button>
         </div>
