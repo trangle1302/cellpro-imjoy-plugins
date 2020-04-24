@@ -200,16 +200,14 @@ const app = new Vue({
     selected_single_mask: null,
     cell_idx_list: null,
     loading: false,
-    // confirm, unsure status
-    confirm_unsure: null,
     // develop image parsing
     selected_server_url: null,
     servers: servers,
     select: null,
     current_panel: 'login',
     user:{
-      username: "hao",
-      password: "GshQvF3GPzeoPAWBpalq",
+      username: "",
+      password: "",
       access_token: null
     },
     channel_settings: {},
@@ -542,29 +540,25 @@ const app = new Vue({
       }
     },
     async confirmAnnotation(){
-      if (!this.current_image_data.confirm_unsure){
-        this.confirm_unsure = "confirm";
+      if (this.current_image_data.confirm_unsure !== 'confirm'){
         this.current_image_data.confirm_unsure = "confirm";
         await this.nextImage();
       }else{
-        this.confirm_unsure = false;
-        this.current_image_data.confirm_unsure = false
+        this.current_image_data.confirm_unsure = false;
       }
     },
     async unsureAnnotation(){
-      if (!this.current_image_data.confirm_unsure){
-        this.confirm_unsure = "unsure";
+      if (this.current_image_data.confirm_unsure !== 'unsure'){
         this.current_image_data.confirm_unsure = "unsure";
         await this.nextImage();
       }else{
-        this.confirm_unsure = false;
-        this.current_image_data.confirm_unsure = false 
+        this.current_image_data.confirm_unsure = false;
       }
     },
     async nextImage(){
       this.loadMoreIfNeeded();
       await this.checkNewMask()
-      if(this.current_image_data.location_changed||this.confirm_unsure){
+      if(this.current_image_data.location_changed||this.current_image_data.confirm_unsure){
         await this.uploadAnnotation();
       }
       this.current_image_index++;
@@ -592,7 +586,7 @@ const app = new Vue({
       }
     },
     async showImage(imageData){
-      this.confirm_unsure = null;
+      this.selected_single_mask = null;
       if(!imageData){
         api.showStatus('No more image to show.')
         console.error('no image data to show.')
@@ -649,16 +643,16 @@ const app = new Vue({
     },
     async uploadAnnotation(){
       // skip upload annotation if image is annotated and no new change
-      if ((!this.current_image_data.mask_adjusted)&&(!this.current_image_data.location_changed)&&(!this.confirm_unsure)){
+      if ((!this.current_image_data.mask_adjusted)&&(!this.current_image_data.location_changed)&&(!this.current_image_data.confirm_unsure)){
         return
       }
       // Default options are marked with *
       const sendData = {}
       sendData.discarded = this.current_image_data.discarded;
       if(!sendData.discarded){
-        if (this.confirm_unsure==='unsure'){
+        if (this.current_image_data.confirm_unsure==='unsure'){
           sendData.location = "unsure";
-        } else if (this.current_image_data.location_changed||((this.confirm_unsure==='confirm')&&(this.current_image_data.label_display_mode!=='mask'))){
+        } else if (this.current_image_data.location_changed||((this.current_image_data.confirm_unsure==='confirm')&&(this.current_image_data.label_display_mode!=='mask'))){
           sendData.location = {};
           if (this.current_image_data.label_display_mode!=='mask'){
             sendData.location = this.current_image_data.location;
@@ -679,8 +673,11 @@ const app = new Vue({
             };
           };
         };
-        if ((this.confirm_unsure === 'confirm') && (this.current_image_data.label_display_mode==='mask')){
-          sendData = this.current_image_data;
+        if ((this.current_image_data.confirm_unsure === 'confirm') && (this.current_image_data.label_display_mode==='mask')){
+          sendData.extend = this.current_image_data.extend;
+          sendData.bbox = this.current_image_data.bbox;
+          sendData.mask = this.current_image_data.mask_geojson;
+          sendData.location = null;
         } else if (this.current_image_data.mask_adjusted){
           // now adjust the digit to 1 decimal for cooridinates
           let features = this.current_image_data.mask_geojson.features;
@@ -716,7 +713,6 @@ const app = new Vue({
         };
       }
       // this is the url to send the current annotation
-      api.alert(JSON.stringify(sendData))
       const sub_url = "/annotations/" + this.current_task_name + "/" + this.current_image_data.cell_id;
       const url_post = this.selected_server_url + sub_url;
       const response = await fetch(url_post, {
@@ -733,7 +729,6 @@ const app = new Vue({
       if(res.success){
         this.current_image_data.mask_adjusted = false;
         this.current_image_data.location_changed = false;
-        this.confirm_unsure = null;
       }
       else{
         alert('Failed to upload the annotaiton, error: ' + res.error);
@@ -1159,7 +1154,7 @@ api.export(new ImJoyPlugin())
         <div v-show="!hide_controls" class="btn-group floating-bottom-btn">
           <button :disabled="current_image_index===0" class="btn transparent-btn" @click="previousImage()"><i class="icon icon-back"></i>&nbsp;Back</button>
           <button :disabled="current_image_data.discarded" class="btn transparent-btn" @click="deleteAnnotation()" ><i class="icon icon-cross"></i>&nbsp;Remove&nbsp;</button>
-          <button v-show="!confirm_unsure" class="btn transparent-btn"  @click="confirmAnnotation()"><i class="icon icon-check"></i>&nbsp;Confirm&nbsp;</button>
+          <button v-show="!current_image_data.mask_adjusted||current_image_data.confirm_unsure" class="btn transparent-btn" :class="{'confirmed-btn': current_image_data.confirm_unsure==='confirm'}" @click="confirmAnnotation()"><i class="icon icon-check"></i>&nbsp;Confirm&nbsp;</button>
           <button v-show="(!current_image_data.discarded)&&current_image_data.mask_adjusted" class="btn transparent-btn"  @click="saveMaskAnnotation()"><i class="icon icon-check"></i>&nbsp;Save</button>
           <button :disabled="current_image_index>=cached_image_data.length" class="btn transparent-btn" @click="nextImage()">Next&nbsp;<i class="icon icon-forward"></i></button>
         </div>
