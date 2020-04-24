@@ -886,6 +886,7 @@ const app = new Vue({
       this.vector_source.clear()
       this.vector_source.addFeatures(features)
       this.current_image_data.mask_adjusted = false;
+      this.selected_single_mask = null
     },
 
     // to remove selected annotation
@@ -1075,7 +1076,7 @@ api.export(new ImJoyPlugin())
           <span v-else>Remove</span>
         </button>
         <button v-show="single_cell_mode&&current_image_data.mask_adjusted" style="background-color:white" class="btn btn-sm small-btn channel-controls" @click="saveMaskAnnotation()">Save</button>
-        <button v-show="!single_cell_mode&&current_image_data.mask_adjusted" style="background-color:white" class="btn btn-sm small-btn channel-controls" @click="restoreAnnotation()">Reset</button>
+        <button v-show="!single_cell_mode&&selected_single_mask" style="background-color:white" class="btn btn-sm small-btn channel-controls" @click="restoreAnnotation()">Reset</button>
         <button class="btn btn-sm s-circle channel-controls" style="background-color: transparent;" title="info" @click="info()"><i class="icon icon-message"></i></button>
       </div>
       <template v-if="current_image_data.label_display_mode==='multiple'">
