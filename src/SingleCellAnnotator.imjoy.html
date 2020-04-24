@@ -885,7 +885,6 @@ const app = new Vue({
       const features = (new GeoJSON()).readFeatures(this.selected_single_mask)
       this.vector_source.clear()
       this.vector_source.addFeatures(features)
-      this.current_image_data.mask_adjusted = false;
       this.selected_single_mask = null
     },
 
