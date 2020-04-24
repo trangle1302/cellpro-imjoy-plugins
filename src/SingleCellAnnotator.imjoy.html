@@ -8,7 +8,7 @@
   "type": "window",
   "tags": [],
   "ui": "",
-  "version": "0.1.39",
+  "version": "0.1.40",
   "api_version": "0.1.7",
   "description": "Annotate images for HPA single-cell image classification",
   "icon": "extension",
@@ -197,7 +197,6 @@ const app = new Vue({
     freehand_mode: true,
     vector_source: null,
     selected_single_mask: null,
-    cell_idx_list: null,
     loading: false,
     // develop image parsing
     selected_server_url: null,
@@ -209,6 +208,7 @@ const app = new Vue({
       password: "",
       access_token: null
     },
+    mask_history: [],
     channel_settings: {},
     alpha: 0.2,
     hide_controls: false,
@@ -335,6 +335,16 @@ const app = new Vue({
             this.hide_controls = true
           }
         }
+        else if(event.code ==='Backspace' || event.code ==='Delete'){
+          if(this.current_task_name==='segmentation'){
+            this.deleteAnnotation()
+          }
+        }
+        else if(event.code ==='KeyZ' && (event.metaKey || event.ctrlKey)){
+          if(this.current_task_name==='segmentation'){
+            this.undoAnnotation()
+          }
+        }
         this.$forceUpdate()
       }
     })
@@ -377,26 +387,31 @@ const app = new Vue({
       const formData = new FormData();
       formData.append('username', this.user.username);
       formData.append('password', this.user.password);
-      const response = await fetch(this.selected_server_url + "/login", {
-        method: 'POST',
-        mode: 'cors',
-        body: formData
-      })
-      if(response.status === 200){
-        const res = await response.json()
-        if(res.success){
-          if(!res.access_token){
-            api.alert('JWT access token required, please make sure you are using the latest backend.');
-            return
+      try{
+         const response = await fetch(this.selected_server_url + "/login", {
+          method: 'POST',
+          mode: 'cors',
+          body: formData
+        })
+        if(response.status === 200){
+          const res = await response.json()
+          if(res.success){
+            if(!res.access_token){
+              api.alert('JWT access token required, please make sure you are using the latest backend.');
+              return
+            }
+            this.user.access_token = res.access_token
+            this.current_panel = 'task_selection';
+            await this.getTaskList()
+          }else{
+            api.alert('Failed to login, error: ' + res.error);
           }
-          this.user.access_token = res.access_token
-          this.current_panel = 'task_selection';
-          await this.getTaskList()
         }else{
-          api.alert('Failed to login, error: ' + res.error);
+          api.alert('Response Status' + response.status)
         }
-      }else{
-        api.alert('Response Status' + response.status)
+      }
+      catch(e){
+        api.alert("Cannot login to the server, error: " + e)
       }
     },
     async getTaskList(){
@@ -458,8 +473,45 @@ const app = new Vue({
       else{
         imageData.label_display_mode = 'mask'
       }
+      // record the current cell indice list
+      this.updateSavedCellIdx(imageData)
 
       return imageData
+    },
+    updateSavedCellIdx(imageData){
+      imageData.saved_cell_idx_list = []
+      const features = imageData.mask_geojson.features;
+      for (let i = 0; i < features.length; i++){
+        if(typeof features[i].properties.cell_idx !== 'number'){
+          features[i].properties.cell_idx = i;
+        }
+        imageData.saved_cell_idx_list.push(features[i].properties.cell_idx)
+      }
+    },
+    getMaskDiff(imageData){
+      const cell_idx_max = Math.max(...imageData.saved_cell_idx_list)
+      let new_cell_idx = cell_idx_max + 1;
+      const new_cell_idx_list = [];
+      for (let i = 0; i < features.length; i++){
+        features[i].properties = features[i].properties || {}
+        if(!features[i].properties.label){
+          features[i].properties.cell_idx = new_cell_idx;
+          new_cell_idx += 1
+          features[i].properties.label = 'cell'
+        };
+        new_cell_idx_list.push(features[i].properties.cell_idx)            
+      };
+      const removed = [];
+      const added = [];
+      for (let i=0; i < imageData.saved_cell_idx_list.length; i++){
+        if(!(new_cell_idx_list.includes(imageData.saved_cell_idx_list[i]))){
+          removed.push(imageData.saved_cell_idx_list[i])
+        }
+      };
+      for (let i = cell_idx_max + 1; i < new_cell_idx; i++){
+        added.push(i)
+      };
+      return {added, removed}
     },
     async getNewImageBatch(task_name, init){
       if(!this.isMobile) api.showStatus('Loading a new batch...')
@@ -613,12 +665,6 @@ const app = new Vue({
           }
         })
       };
-      // record the current cell indice list
-      this.cell_idx_list = []
-      const features = this.current_image_data.mask_geojson.features;
-      for (let i = 0; i < features.length; i++){
-        this.cell_idx_list.push(features[i].properties.cell_idx)
-      }
     },
     // extend Image
     async reloadImage(){
@@ -672,35 +718,11 @@ const app = new Vue({
         if (this.current_image_data.mask_adjusted){
           // now adjust the digit to 1 decimal for cooridinates
           let features = this.current_image_data.mask_geojson.features;
-          const cell_idx_max = Math.max(...this.cell_idx_list)
-          let new_cell_idx = cell_idx_max + 1;
-          const new_cell_idx_list = [];
-          for (let i = 0; i < features.length; i++){
-            features[i].properties = features[i].properties || {}
-            if(!features[i].properties.label){
-              features[i].properties.cell_idx = new_cell_idx;
-              new_cell_idx += 1
-              features[i].properties.label = 'cell'
-            };
-            new_cell_idx_list.push(features[i].properties.cell_idx)            
-          };
-          const removed = [];
-          const added = [];
-          for (let i=0; i < this.cell_idx_list.length; i++){
-            if(!(new_cell_idx_list.includes(this.cell_idx_list[i]))){
-              removed.push(this.cell_idx_list[i])
-            }
-          };
-          for (let i = cell_idx_max + 1; i < new_cell_idx; i++){
-            added.push(i)
-          };
           // sendData
           sendData.extend = this.current_image_data.extend;
           sendData.bbox = this.current_image_data.bbox;
           sendData.mask = this.current_image_data.mask_geojson;
-          sendData.mask.mask_changed = {};
-          sendData.mask.mask_changed.removed = removed;
-          sendData.mask.mask_changed.added = added;
+          sendData.mask_diff = this.getMaskDiff(this.current_image_data);
         };
       }
       // this is the url to send the current annotation
@@ -721,6 +743,8 @@ const app = new Vue({
         this.current_image_data.mask_adjusted = false;
         this.current_image_data.location_changed = false;
         this.current_image_data.saved_location = Object.assign({}, this.current_image_data.location)
+
+        this.updateSavedCellIdx(this.current_image_data)
       }
       else{
         alert('Failed to upload the annotaiton, error: ' + res.error);
@@ -761,6 +785,7 @@ const app = new Vue({
       features = (new GeoJSON()).readFeatures(mask_geojson)
       this.vector_source.addFeatures(features)
       this.current_image_data.mask_adjusted = false;
+      this.mask_history = []
     },
     async saveMaskAnnotation(){
       const allFeatures = this.vector_source.getFeatures();
@@ -852,10 +877,24 @@ const app = new Vue({
       })
 
       this.vector_source = new VectorSource();
+      this.mask_history = []
       this.vector_source.on('addfeature', (event)=>{
+        if(event.feature._undoing){
+          delete event.feature._undoing
+        }
+        else{
+          this.mask_history.push({'add': event.feature})
+        }
         this.current_image_data.mask_adjusted = true
       });
       this.vector_source.on('removefeature', (event)=>{
+        if(event.feature._undoing){
+          delete event.feature._undoing
+        }
+        else{
+          this.mask_history.push({'remove': event.feature})
+        }
+        // this.current_image_data.mask_changed.removed.push(event.feature.values_.cell_idx)
         this.current_image_data.mask_adjusted = true
       });
       var vector_layer = new VectorLayer({
@@ -865,7 +904,7 @@ const app = new Vue({
             color: 'rgba(255, 255, 255, 0)'
           }),
           stroke: new Stroke({
-            color: '#448aff53',
+            color: this.current_task_name ==='segmentation'? '#f5d80b91': '#448aff53',
             width: 2
           }),
           image: new CircleStyle({
@@ -900,12 +939,6 @@ const app = new Vue({
           coordinateFormat: createStringXY(0)
       }));
       this.map.addInteraction(select);
-      select.on('select', (e) => {
-          console.log(e.selected, '&nbsp;' +
-              e.target.getFeatures().getLength() +
-              ' selected features (last operation selected ' + e.selected.length +
-              ' and deselected ' + e.deselected.length + ' features)')
-      });
       this.select = select
       if(this.current_image_data.label_display_mode==='mask'){
         this.startMaskAnnotation(this.vector_source, this.freehand_mode)
@@ -919,13 +952,25 @@ const app = new Vue({
         if (this.current_image_data.label_display_mode!=='mask') return
         this.startMaskAnnotation(this.vector_source, this.freehand_mode)
     },
-    async restoreAnnotation() {
-      const features = (new GeoJSON()).readFeatures(this.selected_single_mask)
-      this.vector_source.clear()
-      this.vector_source.addFeatures(features)
-      this.selected_single_mask = null
+    async undoAnnotation() {
+      if(this.mask_history.length>0){
+        const action = this.mask_history.pop()
+        if(action.add){
+           const allFeatures = this.vector_source.getFeatures();
+          allFeatures.forEach((feature)=>{
+            if(action.add === feature){
+              feature._undoing = true
+              this.vector_source.removeFeature(feature);
+              this.select.getFeatures().remove(feature);
+            }
+          });
+        }
+        else if(action.remove){
+          action.remove._undoing = true
+          this.vector_source.addFeature(action.remove)
+        }
+      }
     },
-
     // to remove selected annotation
     async deleteAnnotation() {
       if (this.vector_source) {
@@ -1114,7 +1159,7 @@ api.export(new ImJoyPlugin())
           <span v-else>Remove</span>
         </button>
         <button v-show="(current_image_data.label_display_mode!=='mask')&&current_image_data.mask_adjusted" style="background-color:white" class="btn btn-sm small-btn channel-controls" @click="saveMaskAnnotation()">Save</button>
-        <button v-show="(current_image_data.label_display_mode==='mask')&&selected_single_mask" style="background-color:white" class="btn btn-sm small-btn channel-controls" @click="restoreAnnotation()">Reset</button>
+        <button v-show="(current_image_data.label_display_mode==='mask')&&selected_single_mask" style="background-color:white" class="btn btn-sm small-btn channel-controls" @click="undoAnnotation()">Undo</button>
         <button class="btn btn-sm s-circle channel-controls" style="background-color: transparent;" title="info" @click="info()"><i class="icon icon-message"></i></button>
       </div>
       <template v-if="current_image_data.label_display_mode==='multiple'">
@@ -1146,8 +1191,8 @@ api.export(new ImJoyPlugin())
       <template v-if="current_image_data.label_display_mode==='mask'">
         <div v-show="!hide_controls" class="btn-group floating-bottom-btn">
           <button :disabled="current_image_index===0" class="btn transparent-btn" @click="previousImage()"><i class="icon icon-back"></i>&nbsp;Back</button>
-          <button :disabled="current_image_data.discarded" class="btn transparent-btn" @click="deleteAnnotation()" ><i class="icon icon-cross"></i>&nbsp;Remove&nbsp;</button>
-          <button v-show="!current_image_data.discarded" class="btn transparent-btn"  @click="saveMaskAnnotation()"><i class="icon icon-check"></i>&nbsp;
+          <button :disabled="current_image_data.discarded" class="btn transparent-btn" @click="deleteAnnotation()" ><i class="icon icon-cross"></i>Remove&nbsp;</button>
+          <button v-show="!current_image_data.discarded" class="btn transparent-btn"  @click="saveMaskAnnotation()"><i class="icon icon-check"></i>
             <span v-if="current_image_data.mask_adjusted">Save</span>
             <span v-else>Confirm</span>
           </button>
