@@ -8,7 +8,7 @@
   "type": "window",
   "tags": [],
   "ui": "",
-  "version": "0.1.41",
+  "version": "0.1.42",
   "api_version": "0.1.7",
   "description": "Annotate images for HPA single-cell image classification",
   "icon": "extension",
@@ -1170,7 +1170,7 @@ api.export(new ImJoyPlugin())
           <span v-else>Remove</span>
         </button>
         <button v-show="(current_task_name !== 'segmentation')&&current_image_data.mask_adjusted" style="background-color:white" class="btn btn-sm small-btn channel-controls" @click="saveMaskAnnotation()">Save</button>
-        <button v-show="current_task_name === 'segmentation'" style="background-color:white" class="btn btn-sm small-btn channel-controls" @click="undoAnnotation()">Undo</button>
+        <button :disabled="!mask_history||mask_history.length<=0" v-show="current_task_name === 'segmentation'" class="btn btn-sm small-btn channel-controls" @click="undoAnnotation()">Undo</button>
         <button class="btn btn-sm s-circle channel-controls" style="background-color: transparent;" title="info" @click="info()"><i class="icon icon-message"></i></button>
       </div>
       <template v-if="current_image_data.label_display_mode==='multiple'">
