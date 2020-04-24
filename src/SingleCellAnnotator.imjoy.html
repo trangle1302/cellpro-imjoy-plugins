@@ -8,7 +8,7 @@
   "type": "window",
   "tags": [],
   "ui": "",
-  "version": "0.1.42",
+  "version": "0.1.43",
   "api_version": "0.1.7",
   "description": "Annotate images for HPA single-cell image classification",
   "icon": "extension",
@@ -485,14 +485,26 @@ const app = new Vue({
     },
     updateSavedCellIdx(imageData){
       imageData.saved_cell_idx_list = []
+      
       const features = imageData.mask_geojson.features;
+      imageData.max_cell_id = -1
+      debugger
       for (let i = 0; i < features.length; i++){
-        if(features[i].properties){
-          if(typeof features[i].properties.cell_idx !== 'number'){
-            features[i].properties.cell_idx = i;
+        if(features[i].properties && typeof features[i].properties.cell_idx === 'number'){
+          if(imageData.max_cell_id< features[i].properties.cell_idx){
+            imageData.max_cell_id = features[i].properties.cell_idx
           }
-          imageData.saved_cell_idx_list.push(features[i].properties.cell_idx)
         }
+      }
+
+      for (let i = 0; i < features.length; i++){
+        features[i].properties = features[i].properties || {type: 'cell'}
+        // make sure one cell has one id
+        if(typeof features[i].properties.cell_idx !== 'number'){
+          imageData.max_cell_id++;
+          features[i].properties.cell_idx = imageData.max_cell_id;
+        }
+        imageData.saved_cell_idx_list.push(features[i].properties.cell_idx)
       }
     },
     getMaskDiff(imageData){
@@ -901,6 +913,11 @@ const app = new Vue({
         }
         else{
           this.mask_history.push({'add': event.feature})
+          if(!event.feature.get('cell_idx') && event.feature.get('cell_idx') !== 0){
+            event.feature.set('label', 'cell')
+            this.current_image_data.max_cell_id++      
+            event.feature.set('cell_idx', this.current_image_data.max_cell_id)
+          }
         }
         this.current_image_data.mask_adjusted = true
       });
@@ -915,23 +932,32 @@ const app = new Vue({
         this.current_image_data.mask_adjusted = true
       });
       var vector_layer = new VectorLayer({
-        source: this.vector_source,
-        style: new Style({
-          fill: new Fill({
-            color: 'rgba(255, 255, 255, 0)'
-          }),
-          stroke: new Stroke({
-            color: this.current_task_name ==='segmentation'? '#f5d80b91': '#448aff53',
-            width: 2
-          }),
-          image: new CircleStyle({
-            radius: 7,
-            fill: new Fill({
-              color: '#ffcc33'
-            })
-          })
-        })
+        source: this.vector_source
       });
+
+      vector_layer.setStyle((feature) => {
+        let color_style = new Style({
+            fill: new Fill({
+              color: 'rgba(255, 255, 255, 0)'
+            }),
+            stroke: new Stroke({
+                color: this.current_task_name ==='segmentation'? '#f5d80b91': '#448aff53',
+                width: 2
+            }),
+            text: new Text({
+                text: this.current_task_name ==='segmentation'? String(feature.get('cell_idx')): '',
+                font: '14px Calibri,sans-serif',
+                fill: new Fill({
+                    color: '#03346f'
+                }),
+                stroke: new Stroke({
+                    color: '#d6d37ea6',
+                    width: 4
+                })
+            })
+        });
+        return color_style;      
+      })
       const select = new Select({
           wrapX: false
       });
