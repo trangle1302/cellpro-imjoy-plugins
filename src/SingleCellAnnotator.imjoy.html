@@ -197,6 +197,7 @@ const app = new Vue({
     freehand_mode: true,
     vector_source: null,
     selected_single_mask: null,
+    cell_idx_list: null,
     loading: false,
     // develop image parsing
     selected_server_url: null,
@@ -599,7 +600,15 @@ const app = new Vue({
             this.loading = false;
           }
         })
+      };
+      // record the current cell indice list
+      //api.alert(JSON.stringify(this.current_image_data))
+      this.cell_idx_list = []
+      const features = this.current_image_data.mask_geojson.features;
+      for (let i = 0; i < features.length; i++){
+        this.cell_idx_list.push(features[i].properties.cell_idx)
       }
+      api.alert("current_list: " + JSON.stringify(this.cell_idx_list))
     },
     // extend Image
     async reloadImage(){
@@ -647,14 +656,37 @@ const app = new Vue({
           };
         };
         if (this.current_image_data.mask_adjusted){
+          // now adjust the digit to 1 decimal for cooridinates
+          let features = this.current_image_data.mask_geojson.features;
+          const cell_idx_max = Math.max(...this.cell_idx_list)
+          let new_cell_idx = cell_idx_max + 1;
+          const new_cell_idx_list = [];
+          for (let i = 0; i < features.length; i++){
+            features[i].properties = features[i].properties || {}
+            if(!features[i].properties.label){
+              features[i].properties.cell_idx = new_cell_idx;
+              new_cell_idx += 1
+              features[i].properties.label = 'cell'
+            };
+            new_cell_idx_list.push(features[i].properties.cell_idx)            
+          };
+          const removed = [];
+          const added = [];
+          for (let i=0; i < this.cell_idx_list.length; i++){
+            if(!(new_cell_idx_list.includes(this.cell_idx_list[i]))){
+              removed.push(this.cell_idx_list[i])
+            }
+          };
+          for (let i = cell_idx_max + 1; i < new_cell_idx; i++){
+            added.push(i)
+          };
+          // sendData
           sendData.extend = this.current_image_data.extend;
           sendData.bbox = this.current_image_data.bbox;
           sendData.mask = this.current_image_data.mask_geojson;
-          // now adjust the digit to 1 decimal for cooridinates
-          let features = this.current_image_data.mask_geojson.features
-          for (let i = 0; i < features.length; i++){
-            features[i].properties ={'label': 'cell'}; // keep the label as cell
-          };
+          sendData.mask.mask_changed = {};
+          sendData.mask.mask_changed.removed = removed;
+          sendData.mask.mask_changed.added = added;
         };
       }
       // this is the url to send the current annotation
