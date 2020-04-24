@@ -199,6 +199,8 @@ const app = new Vue({
     selected_single_mask: null,
     cell_idx_list: null,
     loading: false,
+    // confirm, unsure status
+    confirm_unsure: null,
     // develop image parsing
     selected_server_url: null,
     servers: servers,
@@ -538,6 +540,14 @@ const app = new Vue({
         this.getNewImageBatch(this.current_task_name)
       }
     },
+    async confirmAnnotation(){
+      this.confirm_unsure = "confirm";
+      await this.nextImage();
+    },
+    async unsureAnnotation(){
+      this.confirm_unsure = "unsure";
+      await this.nextImage();
+    },
     async nextImage(){
       this.loadMoreIfNeeded();
       await this.checkNewMask()
@@ -608,7 +618,6 @@ const app = new Vue({
       for (let i = 0; i < features.length; i++){
         this.cell_idx_list.push(features[i].properties.cell_idx)
       }
-      api.alert("current_list: " + JSON.stringify(this.cell_idx_list))
     },
     // extend Image
     async reloadImage(){
@@ -634,7 +643,9 @@ const app = new Vue({
       const sendData = {}
       sendData.discarded = this.current_image_data.discarded;
       if(!sendData.discarded){
-        if(this.current_image_data.location_changed){
+        if (this.confirm_unsure==='unsure'){
+          sendData.location = "unsure";
+        } else if (this.current_image_data.location_changed||((this.confirm_unsure==='confirm')&&(this.current_image_data.label_display_mode!=='mask'))){
           sendData.location = {};
           if (this.current_image_data.label_display_mode!=='mask'){
             sendData.location = this.current_image_data.location;
@@ -655,7 +666,9 @@ const app = new Vue({
             };
           };
         };
-        if (this.current_image_data.mask_adjusted){
+        if (this.confirm_unsure === 'confirm' && (this.current_image_data.label_display_mode==='mask')){
+          sendData = this.current_image_data;
+        } else if (this.current_image_data.mask_adjusted){
           // now adjust the digit to 1 decimal for cooridinates
           let features = this.current_image_data.mask_geojson.features;
           const cell_idx_max = Math.max(...this.cell_idx_list)
@@ -706,6 +719,7 @@ const app = new Vue({
       if(res.success){
         this.current_image_data.mask_adjusted = false;
         this.current_image_data.location_changed = false;
+        this.confirm_unsure = null;
       }
       else{
         alert('Failed to upload the annotaiton, error: ' + res.error);
@@ -1108,6 +1122,11 @@ api.export(new ImJoyPlugin())
           </div>
            <br>
           <div class="btn-group">
+            <button :disabled="current_image_data.location_changed" class="btn transparent-btn" @click="nextImage()">&nbsp;Confirm</button>
+            <button :disabled="current_image_data.location_changed" class="btn transparent-btn" @click="nextImage()">Unsure&nbsp;</button>
+          </div>
+          <br>
+          <div class="btn-group">
             <button :disabled="current_image_index===0" class="btn transparent-btn" @click="previousImage()"><i class="icon icon-back"></i>&nbsp;Back</button>
             <button :disabled="current_image_index>=cached_image_data.length" class="btn transparent-btn" @click="nextImage()">Next&nbsp;<i class="icon icon-forward"></i></button>
           </div>
@@ -1125,8 +1144,9 @@ api.export(new ImJoyPlugin())
       <template v-if="current_image_data.label_display_mode==='mask'">
         <div v-show="!hide_controls" class="btn-group floating-bottom-btn">
           <button :disabled="current_image_index===0" class="btn transparent-btn" @click="previousImage()"><i class="icon icon-back"></i>&nbsp;Back</button>
-          <button :disabled="current_image_data.discarded" class="btn transparent-btn" @click="deleteAnnotation()" ><i class="icon icon-cross"></i>&nbsp;Remove</button>
-          <button :disabled="current_image_data.discarded||!current_image_data.mask_adjusted" class="btn transparent-btn"  @click="saveMaskAnnotation()"><i class="icon icon-check"></i>&nbsp;Save</button>
+          <button :disabled="current_image_data.discarded" class="btn transparent-btn" @click="deleteAnnotation()" ><i class="icon icon-cross"></i>&nbsp;Remove&nbsp;</button>
+          <button v-show="!confirm_unsure" class="btn transparent-btn"  @click="confirmAnnotation()"><i class="icon icon-check"></i>&nbsp;Confirm&nbsp;</button>
+          <button v-show="(!current_image_data.discarded)&&current_image_data.mask_adjusted" class="btn transparent-btn"  @click="saveMaskAnnotation()"><i class="icon icon-check"></i>&nbsp;Save</button>
           <button :disabled="current_image_index>=cached_image_data.length" class="btn transparent-btn" @click="nextImage()">Next&nbsp;<i class="icon icon-forward"></i></button>
         </div>
         <span v-show="(!hide_controls)&&(current_image_data.label_display_mode==='mask')" class="h3 floating-label">{{current_image_data.single_location}}</span>
