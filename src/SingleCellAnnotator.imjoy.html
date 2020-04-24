@@ -8,7 +8,7 @@
   "type": "window",
   "tags": [],
   "ui": "",
-  "version": "0.1.38",
+  "version": "0.1.39",
   "api_version": "0.1.7",
   "description": "Annotate images for HPA single-cell image classification",
   "icon": "extension",
@@ -199,8 +199,6 @@ const app = new Vue({
     selected_single_mask: null,
     cell_idx_list: null,
     loading: false,
-    // confirm, unsure status
-    confirm_unsure: null,
     // develop image parsing
     selected_server_url: null,
     servers: servers,
@@ -455,6 +453,7 @@ const app = new Vue({
           imageData.label_display_mode = 'multiple'
           imageData.location = response.location;
         }
+        imageData.saved_location = Object.assign({}, imageData.location)
       }
       else{
         imageData.label_display_mode = 'mask'
@@ -541,17 +540,20 @@ const app = new Vue({
       }
     },
     async confirmAnnotation(){
-      this.confirm_unsure = "confirm";
+      this.current_image_data.unsure = false;
+      this.current_image_data.location_changed = true;
       await this.nextImage();
     },
     async unsureAnnotation(){
-      this.confirm_unsure = "unsure";
+      this.current_image_data.unsure = true;
+      this.current_image_data.location = Object.assign({}, this.current_image_data.saved_location)
+      this.current_image_data.location_changed = true;
       await this.nextImage();
     },
     async nextImage(){
       this.loadMoreIfNeeded();
       await this.checkNewMask()
-      if(this.current_image_data.location_changed||this.confirm_unsure){
+      if(this.current_image_data.location_changed){
         await this.uploadAnnotation();
       }
       this.current_image_index++;
@@ -579,7 +581,6 @@ const app = new Vue({
       }
     },
     async showImage(imageData){
-      this.confirm_unsure = null;
       if(!imageData){
         api.showStatus('No more image to show.')
         console.error('no image data to show.')
@@ -636,19 +637,21 @@ const app = new Vue({
     },
     async uploadAnnotation(){
       // skip upload annotation if image is annotated and no new change
-      if ((!this.current_image_data.mask_adjusted)&&(!this.current_image_data.location_changed)&&(!this.confirm_unsure)){
+      if ((!this.current_image_data.mask_adjusted)&&(!this.current_image_data.location_changed)){
         return
       }
       // Default options are marked with *
       const sendData = {}
       sendData.discarded = this.current_image_data.discarded;
       if(!sendData.discarded){
-        if (this.confirm_unsure==='unsure'){
-          sendData.location = "unsure";
-        } else if (this.current_image_data.location_changed||((this.confirm_unsure==='confirm')&&(this.current_image_data.label_display_mode!=='mask'))){
-          sendData.location = {};
-          if (this.current_image_data.label_display_mode!=='mask'){
+        if (this.current_image_data.location_changed){
+          if(this.current_image_data.unsure){
+            sendData.location = 'unsure'
+          }
+          else{
             sendData.location = this.current_image_data.location;
+          }
+          if(typeof sendData.location === 'object'){
             let noLocation = true;
             for (loc in sendData.location){
               if(sendData.location[loc] === null){
@@ -664,11 +667,9 @@ const app = new Vue({
                 return
               }
             };
-          };
+          }
         };
-        if (this.confirm_unsure === 'confirm' && (this.current_image_data.label_display_mode==='mask')){
-          sendData = this.current_image_data;
-        } else if (this.current_image_data.mask_adjusted){
+        if (this.current_image_data.mask_adjusted){
           // now adjust the digit to 1 decimal for cooridinates
           let features = this.current_image_data.mask_geojson.features;
           const cell_idx_max = Math.max(...this.cell_idx_list)
@@ -719,7 +720,7 @@ const app = new Vue({
       if(res.success){
         this.current_image_data.mask_adjusted = false;
         this.current_image_data.location_changed = false;
-        this.confirm_unsure = null;
+        this.current_image_data.saved_location = Object.assign({}, this.current_image_data.location)
       }
       else{
         alert('Failed to upload the annotaiton, error: ' + res.error);
@@ -992,6 +993,7 @@ const app = new Vue({
       else{
         this.current_image_data.location[k]=true
       }
+      this.current_image_data.unsure = false;
       this.current_image_data.location_changed = true;
     },
     home(){
@@ -1106,7 +1108,7 @@ api.export(new ImJoyPlugin())
           <i class="form-icon"></i> {{ch.name}}
         </label>
         
-        <button class="btn btn-sm small-btn channel-controls" :class="{'discarded-btn': current_image_data.discarded}" title="discard" @click="toggleDiscard()">Discard</button>
+        <button class="btn btn-sm small-btn channel-controls" :disabled="current_image_data.unsure" :class="{'discarded-btn': current_image_data.discarded}" title="discard" @click="toggleDiscard()">Discard</button>
         <button class="btn btn-sm small-btn channel-controls" title="annotation mode" v-if="draw_mask_mode && (current_image_data.label_display_mode!=='mask')" @click="startRedrawAnnotation()">
           <span v-if="!current_image_data.mask_adjusted"><i class="icon icon-edit"></i>&nbsp;Mask</span>
           <span v-else>Remove</span>
@@ -1118,12 +1120,12 @@ api.export(new ImJoyPlugin())
       <template v-if="current_image_data.label_display_mode==='multiple'">
         <div v-show="!hide_controls" class="floating-right-btn">
           <div class="columns">
-            <button :disabled="current_image_data.discarded" v-for="(loc, k) in current_image_data.location" @click="toggleLocation(k)" class="column btn location-btn" :class="{'selected-location-btn': loc}">{{k.slice(0,12)+(k.length>12?'.': '')}}</button>
+            <button :disabled="current_image_data.discarded || current_image_data.unsure" v-for="(loc, k) in current_image_data.location" @click="toggleLocation(k)" class="column btn location-btn" :class="{'selected-location-btn': loc}">{{k.slice(0,12)+(k.length>12?'.': '')}}</button>
           </div>
            <br>
           <div class="btn-group">
-            <button :disabled="current_image_data.location_changed" class="btn transparent-btn" @click="confirmAnnotation()">&nbsp;Confirm</button>
-            <button :disabled="current_image_data.location_changed" class="btn transparent-btn" @click="unsureAnnotation()">Unsure&nbsp;</button>
+            <button :disabled="current_image_data.location_changed || current_image_data.discarded" class="btn transparent-btn" @click="confirmAnnotation()">&nbsp;Confirm</button>
+            <button :disabled="current_image_data.discarded" :class="{'unsure-btn': current_image_data.unsure}" class="btn transparent-btn" @click="unsureAnnotation()">Unsure&nbsp;</button>
           </div>
           <br>
           <div class="btn-group">
@@ -1139,17 +1141,18 @@ api.export(new ImJoyPlugin())
           <button :disabled="current_image_data.discarded" class="btn transparent-btn" @click="selectLocation(false)" :class="{'selected-location-btn': current_image_data.location[current_image_data.single_location]===false}"><i class="icon icon-cross"></i>&nbsp;No</button>
           <button :disabled="current_image_index>=cached_image_data.length" class="btn transparent-btn" @click="nextImage()">Next&nbsp;<i class="icon icon-forward"></i></button>
         </div>
-        <span v-show="(!hide_controls)&&(current_image_data.label_display_mode==='mask')" class="h3 floating-label">{{current_image_data.single_location}}</span>
+        <span v-show="!hide_controls" class="h3 floating-label">{{current_image_data.single_location}}</span>
       </template>
       <template v-if="current_image_data.label_display_mode==='mask'">
         <div v-show="!hide_controls" class="btn-group floating-bottom-btn">
           <button :disabled="current_image_index===0" class="btn transparent-btn" @click="previousImage()"><i class="icon icon-back"></i>&nbsp;Back</button>
           <button :disabled="current_image_data.discarded" class="btn transparent-btn" @click="deleteAnnotation()" ><i class="icon icon-cross"></i>&nbsp;Remove&nbsp;</button>
-          <button v-show="!confirm_unsure" class="btn transparent-btn"  @click="confirmAnnotation()"><i class="icon icon-check"></i>&nbsp;Confirm&nbsp;</button>
-          <button v-show="(!current_image_data.discarded)&&current_image_data.mask_adjusted" class="btn transparent-btn"  @click="saveMaskAnnotation()"><i class="icon icon-check"></i>&nbsp;Save</button>
+          <button v-show="!current_image_data.discarded" class="btn transparent-btn"  @click="saveMaskAnnotation()"><i class="icon icon-check"></i>&nbsp;
+            <span v-if="current_image_data.mask_adjusted">Save</span>
+            <span v-else>Confirm</span>
+          </button>
           <button :disabled="current_image_index>=cached_image_data.length" class="btn transparent-btn" @click="nextImage()">Next&nbsp;<i class="icon icon-forward"></i></button>
         </div>
-        <span v-show="(!hide_controls)&&(current_image_data.label_display_mode==='mask')" class="h3 floating-label">{{current_image_data.single_location}}</span>
       </template>
       
       <div v-if="loading" class="loading loading-lg floating"></div>
@@ -1281,6 +1284,9 @@ api.export(new ImJoyPlugin())
   .discarded-btn{
     background-color: rgb(248, 27, 2)!important;
   }
+  .unsure-btn{
+    background-color: white!important;
+  }
   .location-btn:hover, .location-btn:focus{
     background-color:rgba(255, 255, 255, 0.42);
   }
@@ -1346,4 +1352,3 @@ api.export(new ImJoyPlugin())
     }
   }
 </style>
-    
