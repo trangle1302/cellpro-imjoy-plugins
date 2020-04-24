@@ -876,6 +876,7 @@ const app = new Vue({
       this.startMaskAnnotation(this.vector_source, this.freehand_mode)
     },
     freehandChanged(){
+        if (single_cell_mode) return
         this.startMaskAnnotation(this.vector_source, this.freehand_mode)
     },
     async restoreAnnotation() {
@@ -1054,7 +1055,7 @@ api.export(new ImJoyPlugin())
           <input type="checkbox" v-model="draw_mask_mode" @change="drawMaskModeChanged">
           <i class="form-icon"></i> <span class="hide-on-mobile">Redraw Mask</span>
         </label> -->
-        <label class="form-switch ">
+        <label class="form-switch " v-show="!single_cell_mode">
           <input type="checkbox" v-model="freehand_mode" @change="freehandChanged">
           <i class="form-icon"></i> <span class="hide-on-mobile">Freehand</span>
         </label>
