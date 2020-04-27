@@ -8,7 +8,7 @@
   "type": "window",
   "tags": [],
   "ui": "",
-  "version": "0.1.44",
+  "version": "0.1.45",
   "api_version": "0.1.7",
   "description": "Annotate images for HPA single-cell image classification",
   "icon": "extension",
@@ -998,8 +998,11 @@ const app = new Vue({
              this.selected_feature = null
           }
       })
-      if(this.current_task_name === 'segmentation'){
+      if(this.current_task_name === 'segmentation' && !this.isMobile){
         this.startMaskAnnotation(this.vector_source, this.freehand_mode)
+      }
+      else{
+        this.freehand_mode = false;
       }
     },
     startRedrawAnnotation() {
@@ -1008,7 +1011,13 @@ const app = new Vue({
     },
     freehandChanged(){
         if (this.current_task_name !== 'segmentation') return
+        if(this.freehand_mode)
         this.startMaskAnnotation(this.vector_source, this.freehand_mode)
+        else{
+          if(this.isMobile){
+            this.stopMaskAnnotation()
+          }
+        }
     },
     async undoAnnotation() {
       if(this.mask_history.length>0){
