@@ -8,7 +8,7 @@
   "type": "window",
   "tags": [],
   "ui": "",
-  "version": "0.1.47",
+  "version": "0.1.48",
   "api_version": "0.1.7",
   "description": "Annotate images for HPA single-cell image classification",
   "icon": "extension",
@@ -22,7 +22,8 @@
       "https://static.imjoy.io/spectre.css/spectre-exp.min.css",
       "https://static.imjoy.io/spectre.css/spectre-icons.min.css",
       "https://cdn.jsdelivr.net/gh/openlayers/openlayers.github.io@master/en/v6.1.1/css/ol.css",
-      "https://cdn.jsdelivr.net/gh/openlayers/openlayers.github.io@master/en/v6.1.1/build/ol.js"
+      "https://cdn.jsdelivr.net/gh/openlayers/openlayers.github.io@master/en/v6.1.1/build/ol.js", 
+      "https://bernii.github.io/gauge.js/dist/gauge.min.js"
   ],
   "dependencies": [],
   "defaults": {"fullscreen": true},
@@ -304,6 +305,7 @@ const app = new Vue({
     show_segmentation: true,
     default_extend_value: 50,
     current_extend_value: 50,
+    statistics: {},
     // from here this is communication to backend, to develop/activate
     tasks: null,
     current_task_name: null,
@@ -521,6 +523,7 @@ const app = new Vue({
               api.alert('JWT access token required, please make sure you are using the latest backend.');
               return
             }
+            this.user.role = res.role
             this.user.access_token = res.access_token
             this.current_panel = 'task_selection';
             await this.getTaskList()
@@ -534,6 +537,15 @@ const app = new Vue({
       catch(e){
         api.alert("Cannot login to the server, error: " + e)
       }
+    },
+    async getStatistics(){
+      const response2 = await fetch(this.selected_server_url + "/statistics", {
+        method: 'GET',
+        headers: {'Authorization': `Bearer ${this.user.access_token}`},
+      })
+      const res2 = await response2.json()
+      this.statistics = res2.statistics
+      console.log( this.statistics )
     },
     async getTaskList(){
       const response2 = await fetch(this.selected_server_url + "/tasks", {
@@ -1241,6 +1253,10 @@ const app = new Vue({
       }
       this.$forceUpdate()
       this.displayMap(this.current_image_data.channels, this.channel_settings);
+    },
+    async showStatistics(){
+      await this.getStatistics()
+      this.current_panel = 'statistics'
     }
   }
 })
@@ -1304,8 +1320,29 @@ api.export(new ImJoyPlugin())
           <br>
           <br>
         </div>
+        <br>
+        <button v-if="user.role === 'admin'" class="btn" style="width: 280px" @click="showStatistics()">Statistics</button>
       </div>
       <div class="panel-footer">
+      </div>
+    </div>
+
+    <div class="panel" v-if="current_panel=='statistics'&&statistics">
+      <button style="right: 0px;position: absolute;" class="btn transparent-btn btn-action s-circle" title="home" @click="home()"><i class="icon icon-cross"></i></button>&nbsp;&nbsp;
+      <div v-for="(s, k) in statistics">
+        <div class="card" style="width: 500px;max-width:100%;">
+          <div class="card-body">
+            <div class="card-header">
+              <div class="card-title h5">{{k}}</div>
+            </div>  
+            <div v-for="(v, task_name) in s">
+              <div class="card-subtitle text-gray">{{task_name}}</div>
+              <div v-for="(t, ann_name) in v">
+              <span class="chip">{{ann_name}}: {{t}}</span>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   
