@@ -8,7 +8,7 @@
   "type": "window",
   "tags": [],
   "ui": "",
-  "version": "0.1.48",
+  "version": "0.1.49",
   "api_version": "0.1.7",
   "description": "Annotate images for HPA single-cell image classification",
   "icon": "extension",
@@ -576,6 +576,7 @@ const app = new Vue({
     async chooseTask (task_name){
       this.current_task_name = task_name;
       this.loading = true;
+      this.channel_settings = {};
       this.getNewImageBatch(this.current_task_name, true);
     },
     async fetchCellImage(cell_id){
@@ -801,6 +802,7 @@ const app = new Vue({
       if(!this.isMobile) api.showStatus(imageData.cell_id)
       console.log('current image: ', imageData)
       this.current_image_data = imageData;
+      imageData.start_time = new Date().getTime();
       // annotation viewer
       this.current_panel = 'imageviewer';
       if(!this.draw_mask_mode){
@@ -849,6 +851,12 @@ const app = new Vue({
       // Default options are marked with *
       const sendData = {}
       sendData.discarded = this.current_image_data.discarded;
+      if(this.current_image_data.start_time){
+        this.current_image_data.time_elapsed = new Date().getTime() - this.current_image_data.start_time;
+        sendData.start_time = this.current_image_data.start_time;
+        sendData.time_elapsed = this.current_image_data.time_elapsed;
+      }
+
       if(!sendData.discarded){
         if (this.current_image_data.location_changed){
           if(this.current_image_data.unsure){
