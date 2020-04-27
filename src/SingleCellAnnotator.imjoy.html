@@ -589,7 +589,6 @@ const app = new Vue({
       imageData.mask_geojson = response.mask;
       //ER, Microtubule, Nuclei, Protein,
       imageData.channels = response.images;
-      debugger
       if(response.location){
         locations = Object.keys(response.location);
         if(locations.length==1){
