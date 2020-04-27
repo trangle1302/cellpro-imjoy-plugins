@@ -8,7 +8,7 @@
   "type": "window",
   "tags": [],
   "ui": "",
-  "version": "0.1.49",
+  "version": "0.1.50",
   "api_version": "0.1.7",
   "description": "Annotate images for HPA single-cell image classification",
   "icon": "extension",
@@ -1333,7 +1333,8 @@ api.export(new ImJoyPlugin())
     </div>
 
     <div class="panel" v-if="current_panel=='statistics'&&statistics">
-      <button style="right: 0px;position: absolute;" class="btn transparent-btn btn-action s-circle" title="home" @click="home()"><i class="icon icon-cross"></i></button>&nbsp;&nbsp;
+       <button style="right: 52px; top: 10px; position: absolute;" class="btn btn-action s-circle" title="refresh" @click="getStatistics()"><i class="icon icon-refresh"></i></button>&nbsp;&nbsp;
+      <button style="right: 10px; top: 10px; position: absolute;" class="btn btn-action s-circle" title="home" @click="home()"><i class="icon icon-cross"></i></button>&nbsp;&nbsp;
       <div v-for="(s, k) in statistics">
         <div class="card" style="width: 500px;max-width:100%;">
           <div class="card-body">
@@ -1361,7 +1362,7 @@ api.export(new ImJoyPlugin())
           <input type="checkbox" v-model="freehand_mode" @change="freehandChanged">
           <i class="form-icon"></i> <span class="hide-on-mobile">Freehand</span>
         </label>
-        <button class="btn transparent-btn btn-action s-circle" title="home" @click="home()"><i class="icon icon-cross"></i></button>&nbsp;&nbsp;
+        <button style="background-color:transparent" class="btn btn-action s-circle" title="home" @click="home()"><i class="icon icon-cross"></i></button>&nbsp;&nbsp;
       </div>
       <div v-show="!hide_controls" class="form-group floating-channel-btn">
         <label v-if="current_task_name === 'segmentation'" class="form-checkbox channel-controls">
