@@ -181,6 +181,97 @@ const imageDataTemplate = {
   brightness: 1.0,
 };
 
+const LIMS_LOCATION_LABELS = {
+    "Nuclear localizations":
+    [
+        "Nucleoplasm",
+        "Nuc membrane",
+        "Nucleoli",
+        "Nucleoli Fibrillar center",
+        "Nucl speckles",
+        "Nuclear bodies",
+        "Kinetochore",
+        "Mitotic chromosome",
+    ],
+  "Secretory":
+    [
+        "ER",
+        "Golgi",
+        "Vesicles",
+        "Peroxisomes",
+        "Endosomes",
+        "Lysosomes",
+    ],
+  "Cytoskeletal localizations":
+    [
+        "Csk(Int Fil)",
+        "Csk(actin)",
+        "Focal Adhesions",
+        "Csk(mt)",
+        "Csk(mt end)",
+        "Csk(cyt bridge)",
+        "Midbody",
+        "Midbody ring",
+        "Cleavage furrow",
+        "Mitotic spindle",
+        "Primary cilia",
+        "Centriolar satelite",
+        "Centrosome",
+    ],
+  "Others":
+    [
+        "Lipid droplets",
+        "Plasma membrane",
+        "Cell Junctions",
+        "Mitochondria",
+        "Aggresome",
+        "Cytosol",
+        "Cytoplasmic bodies",
+        "Rods & Rings",
+  ],
+}
+
+const LIMS_TO_IF_CSV = {
+  "Nucleoplasm": "Nucleoplasm",
+  "Nuc membrane": "Nuclear membrane",
+  "Nucleoli": "Nucleoli",
+  "Nucleoli Fibrillar center": "Nucleoli fibrillar center",
+  "Nucl speckles": "Nuclear speckles",
+  "Nuclear bodies": "Nuclear bodies",
+  "Kinetochore": null,
+  "Mitotic chromosome": "Mitotic chromosome",
+
+  "ER": "Endoplasmic reticulum",
+  "Golgi": "Golgi apparatus",
+  "Vesicles": "Vesicles",
+  "Peroxisomes": "Peroxisomes",
+  "Endosomes": "Endosomes",
+  "Lysosomes": "Lysosomes",
+
+  "Csk(Int Fil)": "Intermediate filaments",
+  "Csk(actin)": "Actin filaments",
+  "Focal Adhesions": "Focal adhesion sites",
+  "Csk(mt)": "Microtubules",
+  "Csk(mt end)": "Microtubule ends",
+  "Csk(cyt bridge)": "Cytokinetic bridge",
+  "Midbody": "Midbody",
+  "Midbody ring": "Midbody ring",
+  "Cleavage furrow": "Cleavage furrow",
+  "Mitotic spindle": "Mitotic spindle",
+  "Primary cilia": null,
+  "Centriolar satalite": "Centriolar satellite",
+  "Centrosome": "Centrosome",
+  "Lipid droplets": "Lipid droplets",
+  "Plasma membrane": "Plasma membrane",
+  "Cell Junctions": "Cell Junctions",
+  "Mitochondria": "Mitochondria",
+  "Aggresome": "Aggresome",
+  "Cytosol": "Cytosol",
+  "Cytoplasmic bodies": "Cytoplasmic bodies",
+  "Rods & Rings": "Rods & Rings",
+    
+}
+
 const app = new Vue({
   el: '#app',
   data: {
@@ -224,7 +315,10 @@ const app = new Vue({
     loading_cache: false,
     innerHeight: '100vh',
     isMobile: false,
-    version: null
+    version: null,
+    LIMS_LOCATION_LABELS: LIMS_LOCATION_LABELS,
+    LIMS_TO_IF_CSV: LIMS_TO_IF_CSV,
+    LIMS_VALUES: Object.values(LIMS_TO_IF_CSV)
   },
   mounted(){
     this.$nextTick(async()=>{
@@ -367,6 +461,19 @@ const app = new Vue({
       window.focus();
     });
   },
+  computed: {
+    unsupported_locations: function(){
+      const locs = {}
+      if(this.current_image_data.location){
+        for(let k in this.current_image_data.location){
+          if(!this.LIMS_VALUES.includes(k)){
+            locs[k] = this.current_image_data.location[k]
+          }
+        }
+      }
+      return locs      
+    }
+  },
   methods: {
     info(){
       api.alert(`====== Hot keys ======
@@ -470,6 +577,7 @@ const app = new Vue({
       imageData.mask_geojson = response.mask;
       //ER, Microtubule, Nuclei, Protein,
       imageData.channels = response.images;
+      debugger
       if(response.location){
         locations = Object.keys(response.location);
         if(locations.length==1){
@@ -483,6 +591,8 @@ const app = new Vue({
           imageData.location = response.location;
         }
         imageData.saved_location = Object.assign({}, imageData.location)
+
+        
       }
       else{
         imageData.label_display_mode = 'mask'
@@ -629,6 +739,12 @@ const app = new Vue({
       this.current_image_data.location_changed = true;
       await this.nextImage();
     },
+    async negativeAnnotation(){
+      this.current_image_data.negative = true;
+      this.current_image_data.location = Object.assign({}, this.current_image_data.saved_location)
+      this.current_image_data.location_changed = true;
+      await this.nextImage();
+    },
     async nextImage(){
       this.loadMoreIfNeeded();
       await this.checkNewMask()
@@ -726,6 +842,9 @@ const app = new Vue({
         if (this.current_image_data.location_changed){
           if(this.current_image_data.unsure){
             sendData.location = 'unsure'
+          }
+          else if(this.current_image_data.negative){
+            sendData.location = 'negative'
           }
           else{
             sendData.location = this.current_image_data.location;
@@ -1093,6 +1212,7 @@ const app = new Vue({
         this.current_image_data.location[k]=true
       }
       this.current_image_data.unsure = false;
+      this.current_image_data.negative = false;
       this.current_image_data.location_changed = true;
     },
     home(){
@@ -1211,9 +1331,7 @@ api.export(new ImJoyPlugin())
           <i class="form-icon"></i> {{ch.name}}
         </label>
         
-        
-        
-        <button class="btn btn-sm small-btn channel-controls" :disabled="current_image_data.unsure" :class="{'discarded-btn': current_image_data.discarded}" title="discard" @click="toggleDiscard()">Discard</button>
+        <button class="btn btn-sm small-btn channel-controls" :disabled="current_image_data.unsure || current_image_data.negative" :class="{'discarded-btn': current_image_data.discarded}" title="discard" @click="toggleDiscard()">Discard</button>
         <button class="btn btn-sm small-btn channel-controls" title="annotation mode" v-if="draw_mask_mode && (current_task_name !== 'segmentation')" @click="startRedrawAnnotation()">
           <span v-if="!current_image_data.mask_adjusted"><i class="icon icon-edit"></i>&nbsp;Mask</span>
           <span v-else>Remove</span>
@@ -1225,12 +1343,22 @@ api.export(new ImJoyPlugin())
       <template v-if="current_image_data.label_display_mode==='multiple'">
         <div v-show="!hide_controls" class="floating-right-btn">
           <div class="columns">
-            <button :disabled="current_image_data.discarded || current_image_data.unsure" v-for="(loc, k) in current_image_data.location" @click="toggleLocation(k)" class="column btn location-btn" :class="{'selected-location-btn': loc}">{{k.slice(0,12)+(k.length>12?'.': '')}}</button>
+            <template v-for="group in LIMS_LOCATION_LABELS">
+              <template v-for="label in group">
+                <button v-if="LIMS_TO_IF_CSV[label] && current_image_data.location[LIMS_TO_IF_CSV[label]] !== undefined" :disabled="current_image_data.discarded || current_image_data.unsure || current_image_data.negative" @click="toggleLocation(LIMS_TO_IF_CSV[label])" class="column btn location-btn" :class="{'selected-location-btn': current_image_data.location[LIMS_TO_IF_CSV[label]]}">{{label.slice(0,12)+(label.length>12?'.': '')}}</button>
+              </template>
+              <!-- <div class="break hide-on-mobile"></div> -->
+            </template>
+            <template v-for="(loc, k) in unsupported_locations">
+              <button  :disabled="current_image_data.discarded || current_image_data.unsure || current_image_data.negative"  @click="toggleLocation(k)" class="column btn location-btn" :class="{'selected-location-btn': loc}">{{k.slice(0,12)+(k.length>12?'.': '')}}</button>
+            </template>
+            
           </div>
            <br>
           <div class="btn-group">
             <button :disabled="current_image_data.location_changed || current_image_data.discarded" class="btn transparent-btn" @click="confirmAnnotation()">&nbsp;Confirm</button>
-            <button :disabled="current_image_data.discarded" :class="{'unsure-btn': current_image_data.unsure}" class="btn transparent-btn" @click="unsureAnnotation()">Unsure&nbsp;</button>
+            <button :disabled="current_image_data.discarded || current_image_data.unsure" :class="{'highlight-btn': current_image_data.negative}" class="btn transparent-btn" @click="negativeAnnotation()">Negative&nbsp;</button>
+            <button :disabled="current_image_data.discarded || current_image_data.negative" :class="{'highlight-btn': current_image_data.unsure}" class="btn transparent-btn" @click="unsureAnnotation()">Unsure&nbsp;</button>
           </div>
           <br>
           <div class="btn-group">
@@ -1388,7 +1516,7 @@ api.export(new ImJoyPlugin())
   .discarded-btn{
     background-color: rgb(248, 27, 2)!important;
   }
-  .unsure-btn{
+  .highlight-btn{
     background-color: white!important;
   }
   .location-btn:hover, .location-btn:focus{
@@ -1397,6 +1525,10 @@ api.export(new ImJoyPlugin())
   .selected-location-btn{
     background-color: #3580ff7d!important;
     color: white!important;
+  }
+  .break {
+    flex-basis: 100%;
+    height: 0;
   }
   .transparent-btn, .transparent-btn:focus {
     width: 90px;
