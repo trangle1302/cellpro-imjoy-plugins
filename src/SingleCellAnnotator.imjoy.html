@@ -949,7 +949,7 @@ const app = new Vue({
               color: 'rgba(255, 255, 255, 0)'
             }),
             stroke: new Stroke({
-                color: this.show_segmentation? '#00000000' : (this.current_task_name ==='segmentation'? '#f5d80b91': '#448aff53'),
+                color: this.current_task_name ==='segmentation'? (this.show_segmentation? '#f5d80b91': '#00000000'): '#448aff53',
                 width: 2
             }),
             text: new Text({
