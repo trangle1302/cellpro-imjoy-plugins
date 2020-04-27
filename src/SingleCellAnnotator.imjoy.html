@@ -1068,7 +1068,7 @@ const app = new Vue({
               color: 'rgba(255, 255, 255, 0)'
             }),
             stroke: new Stroke({
-                color: this.show_segmentation? (this.current_task_name ==='segmentation'? '#f5d80b91': '#448aff53'): '#00000000' ,
+                color: this.current_task_name ==='segmentation'? (this.show_segmentation? '#f5d80b91': '#00000000'): '#448aff53',
                 width: 2
             }),
             text: new Text({
@@ -1331,8 +1331,6 @@ api.export(new ImJoyPlugin())
           <i class="form-icon"></i> {{ch.name}}
         </label>
         
-        
-        
         <button class="btn btn-sm small-btn channel-controls" :disabled="current_image_data.unsure || current_image_data.negative" :class="{'discarded-btn': current_image_data.discarded}" title="discard" @click="toggleDiscard()">Discard</button>
         <button class="btn btn-sm small-btn channel-controls" title="annotation mode" v-if="draw_mask_mode && (current_task_name !== 'segmentation')" @click="startRedrawAnnotation()">
           <span v-if="!current_image_data.mask_adjusted"><i class="icon icon-edit"></i>&nbsp;Mask</span>
@@ -1359,8 +1357,8 @@ api.export(new ImJoyPlugin())
            <br>
           <div class="btn-group">
             <button :disabled="current_image_data.location_changed || current_image_data.discarded" class="btn transparent-btn" @click="confirmAnnotation()">&nbsp;Confirm</button>
-            <button :disabled="current_image_data.discarded" :class="{'highlight-btn': current_image_data.negative}" class="btn transparent-btn" @click="negativeAnnotation()">Negative&nbsp;</button>
-            <button :disabled="current_image_data.discarded" :class="{'highlight-btn': current_image_data.unsure}" class="btn transparent-btn" @click="unsureAnnotation()">Unsure&nbsp;</button>
+            <button :disabled="current_image_data.discarded || current_image_data.unsure" :class="{'highlight-btn': current_image_data.negative}" class="btn transparent-btn" @click="negativeAnnotation()">Negative&nbsp;</button>
+            <button :disabled="current_image_data.discarded || current_image_data.negative" :class="{'highlight-btn': current_image_data.unsure}" class="btn transparent-btn" @click="unsureAnnotation()">Unsure&nbsp;</button>
           </div>
           <br>
           <div class="btn-group">
