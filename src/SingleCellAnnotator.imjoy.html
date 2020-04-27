@@ -8,7 +8,7 @@
   "type": "window",
   "tags": [],
   "ui": "",
-  "version": "0.1.45",
+  "version": "0.1.46",
   "api_version": "0.1.7",
   "description": "Annotate images for HPA single-cell image classification",
   "icon": "extension",
@@ -443,7 +443,7 @@ const app = new Vue({
             this.undoAnnotation()
           }
         }
-        else if(event.code ==='Space'){
+        else if(event.code ==='KeyM'){
           if(this.current_task_name==='segmentation'){
             if(this.show_segmentation) this.show_segmentation = false
             else this.show_segmentation = true
@@ -492,7 +492,7 @@ const app = new Vue({
       Ctrl+Z: Undo
       R: Redraw mask
       B: Extend image region
-      Space: Show/hide segmentation mask
+      M: Show/hide segmentation mask
       ======Channels=====
       A: Alpha mask channel (toggle)
       E: ER channel (toggle)
