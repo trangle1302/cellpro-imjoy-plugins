@@ -8,7 +8,7 @@
   "type": "window",
   "tags": [],
   "ui": "",
-  "version": "0.1.50",
+  "version": "0.1.51",
   "api_version": "0.1.7",
   "description": "Annotate images for HPA single-cell image classification",
   "icon": "extension",
@@ -745,16 +745,16 @@ const app = new Vue({
       await this.nextImage();
     },
     async unsureAnnotation(){
-      this.current_image_data.unsure = true;
+      this.current_image_data.unsure = !this.current_image_data.unsure;
       this.current_image_data.location = Object.assign({}, this.current_image_data.saved_location)
       this.current_image_data.location_changed = true;
-      await this.nextImage();
+      await this.uploadAnnotation();
     },
     async negativeAnnotation(){
-      this.current_image_data.negative = true;
+      this.current_image_data.negative = !this.current_image_data.negative;
       this.current_image_data.location = Object.assign({}, this.current_image_data.saved_location)
       this.current_image_data.location_changed = true;
-      await this.nextImage();
+      await this.uploadAnnotation();
     },
     async nextImage(){
       this.loadMoreIfNeeded();
@@ -949,6 +949,7 @@ const app = new Vue({
         this.current_image_data.discarded = true;
       }
       this.$forceUpdate()
+      await this.uploadAnnotation();
     },
     async showMaskAnnotation(mask_geojson){
       this.vector_source.clear()
@@ -1399,7 +1400,7 @@ api.export(new ImJoyPlugin())
           </div>
            <br>
           <div class="btn-group">
-            <button :disabled="current_image_data.location_changed || current_image_data.discarded" class="btn transparent-btn" @click="confirmAnnotation()">&nbsp;Confirm</button>
+            <button :disabled="current_image_data.location_changed || current_image_data.discarded || current_image_data.unsure || current_image_data.negative" class="btn transparent-btn" @click="confirmAnnotation()">&nbsp;Confirm</button>
             <button :disabled="current_image_data.discarded || current_image_data.unsure" :class="{'highlight-btn': current_image_data.negative}" class="btn transparent-btn" @click="negativeAnnotation()">Negative&nbsp;</button>
             <button :disabled="current_image_data.discarded || current_image_data.negative" :class="{'highlight-btn': current_image_data.unsure}" class="btn transparent-btn" @click="unsureAnnotation()">Unsure&nbsp;</button>
           </div>
