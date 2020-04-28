@@ -363,7 +363,9 @@ const app = new Vue({
           this.toggleDiscard()
         }
         else if(event.code === 'KeyR'){
-          this.startRedrawAnnotation()
+          if(this.current_task_name === 'segmentation'){
+            this.startRedrawAnnotation()
+          }
         }
         else if(event.code === 'KeyS'){
           if(this.current_image_data.location_changed){
@@ -1382,11 +1384,11 @@ api.export(new ImJoyPlugin())
         </label>
         
         <button class="btn btn-sm small-btn channel-controls" :disabled="current_image_data.unsure || current_image_data.negative" :class="{'discarded-btn': current_image_data.discarded}" title="discard" @click="toggleDiscard()">Discard</button>
-        <button class="btn btn-sm small-btn channel-controls" title="annotation mode" v-if="draw_mask_mode && (current_task_name !== 'segmentation')" @click="startRedrawAnnotation()">
+        <!--<button class="btn btn-sm small-btn channel-controls" title="annotation mode" v-if="draw_mask_mode && (current_task_name !== 'segmentation')" @click="startRedrawAnnotation()">
           <span v-if="!current_image_data.mask_adjusted"><i class="icon icon-edit"></i>&nbsp;Mask</span>
           <span v-else>Remove</span>
         </button>
-        <button v-show="(current_task_name !== 'segmentation')&&current_image_data.mask_adjusted" style="background-color:white" class="btn btn-sm small-btn channel-controls" @click="saveMaskAnnotation()">Save</button>
+        <button v-show="(current_task_name !== 'segmentation')&&current_image_data.mask_adjusted" style="background-color:white" class="btn btn-sm small-btn channel-controls" @click="saveMaskAnnotation()">Save</button>-->
         <button :disabled="!mask_history||mask_history.length<=0" v-show="current_task_name === 'segmentation'" class="btn btn-sm small-btn channel-controls" @click="undoAnnotation()">Undo</button>
         <button class="btn btn-sm s-circle channel-controls" style="background-color: transparent;" title="info" @click="info()"><i class="icon icon-message"></i></button>
       </div>
