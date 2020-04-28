@@ -637,14 +637,20 @@ const app = new Vue({
       }
     },
     getMaskDiff(imageData){
-      const cell_idx_max = Math.max(...imageData.saved_cell_idx_list)
-      let new_cell_idx = cell_idx_max + 1;
+      const cell_idx_max = Math.max(...imageData.saved_cell_idx_list);
+      const features = this.current_image_data.mask_geojson.features;
+      let new_cell_idx = 0;
+      for (let k = 0; k < features.length; k++){
+        if(features[k].properties && typeof features[k].properties.cell_idx === 'number'&& features[k].properties.cell_idx > new_cell_idx){
+          new_cell_idx = features[k].properties.cell_idx
+        }
+      };
       const new_cell_idx_list = [];
       for (let i = 0; i < features.length; i++){
         features[i].properties = features[i].properties || {}
         if(!features[i].properties.label){
-          features[i].properties.cell_idx = new_cell_idx;
           new_cell_idx += 1
+          features[i].properties.cell_idx = new_cell_idx;   
           features[i].properties.label = 'cell'
         };
         new_cell_idx_list.push(features[i].properties.cell_idx)            
@@ -656,8 +662,10 @@ const app = new Vue({
           removed.push(imageData.saved_cell_idx_list[i])
         }
       };
-      for (let i = cell_idx_max + 1; i < new_cell_idx; i++){
-        added.push(i)
+      for (let j = 0; j < new_cell_idx_list.length; j++){
+        if (!(imageData.saved_cell_idx_list.includes(new_cell_idx_list[j]))){
+          added.push(new_cell_idx_list[j])
+        }
       };
       return {added, removed}
     },
@@ -886,8 +894,6 @@ const app = new Vue({
           }
         };
         if (this.current_image_data.mask_adjusted){
-          // now adjust the digit to 1 decimal for cooridinates
-          let features = this.current_image_data.mask_geojson.features;
           // sendData
           sendData.extend = this.current_image_data.extend;
           sendData.bbox = this.current_image_data.bbox;
@@ -1060,9 +1066,9 @@ const app = new Vue({
         else{
           this.mask_history.push({'add': event.feature})
           if(!event.feature.get('cell_idx') && event.feature.get('cell_idx') !== 0){
-            event.feature.set('label', 'cell')
             this.current_image_data.max_cell_id++      
             event.feature.set('cell_idx', this.current_image_data.max_cell_id)
+            event.feature.set('label', 'cell')
           }
         }
         this.current_image_data.mask_adjusted = true
