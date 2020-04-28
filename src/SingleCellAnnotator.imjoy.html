@@ -899,6 +899,12 @@ const app = new Vue({
           // sendData
           sendData.extend = this.current_image_data.extend;
           sendData.bbox = this.current_image_data.bbox;
+          // set the masks
+          const allFeatures = this.vector_source.getFeatures();
+          const format = new ol.format.GeoJSON();
+          const routeFeatures = format.writeFeaturesObject(allFeatures, {decimals: 1});
+          routeFeatures['bbox'] = this.current_image_data.mask_geojson.bbox;
+          this.current_image_data.mask_geojson = routeFeatures;
           sendData.mask = this.current_image_data.mask_geojson;
           sendData.mask_diff = this.getMaskDiff(this.current_image_data);
         };
