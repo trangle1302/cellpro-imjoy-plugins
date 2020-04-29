@@ -287,6 +287,7 @@ const app = new Vue({
     vector_source: null,
     selected_feature: null,
     loading: false,
+    showimage_loading: null,
     // develop image parsing
     selected_server_url: null,
     servers: servers,
@@ -815,8 +816,10 @@ const app = new Vue({
           this.loading = true;
           window.onresize();
           try{
+              this.showimage_loading = true
               await this.displayMap(this.current_image_data.channels, this.channel_settings);
               this.showMaskAnnotation(this.current_image_data.mask_geojson);
+              this.showimage_loading = false
             }
           catch(e){
             console.error(e)
@@ -838,8 +841,10 @@ const app = new Vue({
         this.current_image_data.channels = imageData.channels;
         this.current_image_data.extend = imageData.extend;
         this.current_image_data.mask_adjusted = imageData.mask_adjusted;
+        this.showimage_loading = true
         await this.showImage(this.current_image_data)
         this.showMaskAnnotation(this.current_image_data.mask_geojson);
+        this.showimage_loading = false
       }
       this.loading = false;
     },
@@ -960,6 +965,7 @@ const app = new Vue({
       this.mask_history = []
     },
     async saveMaskAnnotation(){
+      if (this.showimage_loading) {return }
       const allFeatures = this.vector_source.getFeatures();
       const format = new ol.format.GeoJSON();
       const routeFeatures = format.writeFeaturesObject(allFeatures, {decimals: 1});
@@ -1425,7 +1431,7 @@ api.export(new ImJoyPlugin())
         <div v-show="!hide_controls" class="btn-group floating-bottom-btn">
           <button :disabled="current_image_index===0" class="btn transparent-btn" @click="previousImage()"><i class="icon icon-back"></i>&nbsp;Back</button>
           <button :disabled="current_image_data.discarded || !selected_feature" class="btn transparent-btn" @click="deleteAnnotation()" ><i class="icon icon-cross"></i>Remove&nbsp;</button>
-          <button :disabled="current_image_data.discarded" class="btn transparent-btn"  @click="saveMaskAnnotation()"><i class="icon icon-check"></i>
+          <button :disabled="current_image_data.discarded||showimage_loading" class="btn transparent-btn"  @click="saveMaskAnnotation()"><i class="icon icon-check"></i>
             Save
           </button>
           <button :disabled="current_image_index>=cached_image_data.length" class="btn transparent-btn" @click="nextImage()">Next&nbsp;<i class="icon icon-forward"></i></button>
