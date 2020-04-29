@@ -8,7 +8,7 @@
   "type": "window",
   "tags": [],
   "ui": "",
-  "version": "0.1.52",
+  "version": "0.1.53",
   "api_version": "0.1.7",
   "description": "Annotate images for HPA single-cell image classification",
   "icon": "extension",
@@ -363,7 +363,9 @@ const app = new Vue({
           this.toggleDiscard()
         }
         else if(event.code === 'KeyR'){
-          this.startRedrawAnnotation()
+          if(this.current_task_name === 'segmentation'){
+            this.startRedrawAnnotation()
+          }
         }
         else if(event.code === 'KeyS'){
           if(this.current_image_data.location_changed){
@@ -637,14 +639,20 @@ const app = new Vue({
       }
     },
     getMaskDiff(imageData){
-      const cell_idx_max = Math.max(...imageData.saved_cell_idx_list)
-      let new_cell_idx = cell_idx_max + 1;
+      const cell_idx_max = Math.max(...imageData.saved_cell_idx_list);
+      const features = this.current_image_data.mask_geojson.features;
+      let new_cell_idx = 0;
+      for (let k = 0; k < features.length; k++){
+        if(features[k].properties && typeof features[k].properties.cell_idx === 'number'&& features[k].properties.cell_idx > new_cell_idx){
+          new_cell_idx = features[k].properties.cell_idx
+        }
+      };
       const new_cell_idx_list = [];
       for (let i = 0; i < features.length; i++){
         features[i].properties = features[i].properties || {}
         if(!features[i].properties.label){
-          features[i].properties.cell_idx = new_cell_idx;
           new_cell_idx += 1
+          features[i].properties.cell_idx = new_cell_idx;   
           features[i].properties.label = 'cell'
         };
         new_cell_idx_list.push(features[i].properties.cell_idx)            
@@ -656,8 +664,10 @@ const app = new Vue({
           removed.push(imageData.saved_cell_idx_list[i])
         }
       };
-      for (let i = cell_idx_max + 1; i < new_cell_idx; i++){
-        added.push(i)
+      for (let j = 0; j < new_cell_idx_list.length; j++){
+        if (!(imageData.saved_cell_idx_list.includes(new_cell_idx_list[j]))){
+          added.push(new_cell_idx_list[j])
+        }
       };
       return {added, removed}
     },
@@ -724,7 +734,7 @@ const app = new Vue({
         await this.uploadAnnotation();
       }
       this.current_image_index = this.cached_image_data.indexOf(this.current_image_data)
-      if(this.current_image_index<0){
+      if(this.current_image_index<=0){
         this.current_image_index = 0;
       }
       else{
@@ -886,11 +896,15 @@ const app = new Vue({
           }
         };
         if (this.current_image_data.mask_adjusted){
-          // now adjust the digit to 1 decimal for cooridinates
-          let features = this.current_image_data.mask_geojson.features;
           // sendData
           sendData.extend = this.current_image_data.extend;
           sendData.bbox = this.current_image_data.bbox;
+          // set the masks
+          const allFeatures = this.vector_source.getFeatures();
+          const format = new ol.format.GeoJSON();
+          const routeFeatures = format.writeFeaturesObject(allFeatures, {decimals: 1});
+          routeFeatures['bbox'] = this.current_image_data.mask_geojson.bbox;
+          this.current_image_data.mask_geojson = routeFeatures;
           sendData.mask = this.current_image_data.mask_geojson;
           sendData.mask_diff = this.getMaskDiff(this.current_image_data);
         };
@@ -1060,9 +1074,9 @@ const app = new Vue({
         else{
           this.mask_history.push({'add': event.feature})
           if(!event.feature.get('cell_idx') && event.feature.get('cell_idx') !== 0){
-            event.feature.set('label', 'cell')
             this.current_image_data.max_cell_id++      
             event.feature.set('cell_idx', this.current_image_data.max_cell_id)
+            event.feature.set('label', 'cell')
           }
         }
         this.current_image_data.mask_adjusted = true
@@ -1376,11 +1390,11 @@ api.export(new ImJoyPlugin())
         </label>
         
         <button class="btn btn-sm small-btn channel-controls" :disabled="current_image_data.unsure || current_image_data.negative" :class="{'discarded-btn': current_image_data.discarded}" title="discard" @click="toggleDiscard()">Discard</button>
-        <button class="btn btn-sm small-btn channel-controls" title="annotation mode" v-if="draw_mask_mode && (current_task_name !== 'segmentation')" @click="startRedrawAnnotation()">
+        <!--<button class="btn btn-sm small-btn channel-controls" title="annotation mode" v-if="draw_mask_mode && (current_task_name !== 'segmentation')" @click="startRedrawAnnotation()">
           <span v-if="!current_image_data.mask_adjusted"><i class="icon icon-edit"></i>&nbsp;Mask</span>
           <span v-else>Remove</span>
         </button>
-        <button :disabled="loading" v-show="(current_task_name !== 'segmentation')&&current_image_data.mask_adjusted" style="background-color:white" class="btn btn-sm small-btn channel-controls" @click="saveMaskAnnotation()">Save</button>
+        <button :disabled="loading" v-show="(current_task_name !== 'segmentation')&&current_image_data.mask_adjusted" style="background-color:white" class="btn btn-sm small-btn channel-controls" @click="saveMaskAnnotation()">Save</button>-->
         <button :disabled="!mask_history||mask_history.length<=0" v-show="current_task_name === 'segmentation'" class="btn btn-sm small-btn channel-controls" @click="undoAnnotation()">Undo</button>
         <button class="btn btn-sm s-circle channel-controls" style="background-color: transparent;" title="info" @click="info()"><i class="icon icon-message"></i></button>
       </div>
