@@ -734,7 +734,7 @@ const app = new Vue({
         await this.uploadAnnotation();
       }
       this.current_image_index = this.cached_image_data.indexOf(this.current_image_data)
-      if(this.current_image_index<0){
+      if(this.current_image_index<=0){
         this.current_image_index = 0;
       }
       else{
