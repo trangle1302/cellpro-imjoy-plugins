@@ -815,9 +815,9 @@ const app = new Vue({
           this.loading = true;
           window.onresize();
           try{
-              await this.displayMap(this.current_image_data.channels, this.channel_settings);
-              this.showMaskAnnotation(this.current_image_data.mask_geojson);
-            }
+              await this.displayMap(imageData.channels, this.channel_settings);
+              this.showMaskAnnotation(imageData.mask_geojson);
+          }
           catch(e){
             console.error(e)
           }
@@ -838,8 +838,9 @@ const app = new Vue({
         this.current_image_data.channels = imageData.channels;
         this.current_image_data.extend = imageData.extend;
         this.current_image_data.mask_adjusted = imageData.mask_adjusted;
+        // store it to avoid changing the mask during display
+        const mask_geojson = this.current_image_data.mask_geojson;
         await this.showImage(this.current_image_data)
-        this.showMaskAnnotation(this.current_image_data.mask_geojson);
       }
       this.loading = false;
     },
