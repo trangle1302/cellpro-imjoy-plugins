@@ -19,8 +19,8 @@ a localization pattern.
     "name": "Nucleolus-UMAP",
     "type": "window",
     "tags": [],
-    "ui": "Explore protein localization patterns in HPA images (Nucleolus).",
-    "version": "0.9.0",
+    "ui": "Explore protein localization patterns in HPA images.",
+    "version": "0.9.1",
     "api_version": "0.1.2",
     "description": "Explore protein localization patterns in HPA images.",
     "icon": "photo",
@@ -300,16 +300,16 @@ class ImJoyPlugin {
                     if(locs.includes(2) || locs.includes(3) || locs.includes(4)){
                         return color_map[3]
                     }
-                    return '#e0e0e0d5'
+                    return '#FFFF00FF'
                 }
                 else if(index === 2){
-                    return color_map[0]
+                    return '#ff0000ff'
                 }
                 else if(index === 3){
-                    return color_map[1]
+                    return '#00ff00ff'
                 }
                 else if(index === 4){
-                    return color_map[2]
+                    return '#0000ffff'
                 }
                 else{
                     return '#e0e0e0d5'
