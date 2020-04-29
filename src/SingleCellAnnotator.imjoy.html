@@ -8,7 +8,7 @@
   "type": "window",
   "tags": [],
   "ui": "",
-  "version": "0.1.51",
+  "version": "0.1.52",
   "api_version": "0.1.7",
   "description": "Annotate images for HPA single-cell image classification",
   "icon": "extension",
@@ -815,9 +815,9 @@ const app = new Vue({
           this.loading = true;
           window.onresize();
           try{
-              await this.displayMap(this.current_image_data.channels, this.channel_settings);
-              this.showMaskAnnotation(this.current_image_data.mask_geojson);
-            }
+              await this.displayMap(imageData.channels, this.channel_settings);
+              this.showMaskAnnotation(imageData.mask_geojson);
+          }
           catch(e){
             console.error(e)
           }
@@ -831,15 +831,15 @@ const app = new Vue({
     async reloadImage(){
       this.loading = true;
       this.current_image_index = this.cached_image_data.indexOf(this.current_image_data);
-      const cell_id = this.current_image_data.cell_id;
-      const imageData = await this.fetchCellImage(cell_id)
-      this.current_image_data.mask_geojson = imageData.mask_geojson;
-      this.current_image_data.channels = imageData.channels;
-      this.current_image_data.extend = imageData.extend;
-      this.current_image_data.mask_adjusted = imageData.mask_adjusted;
-
-      await this.showImage(this.current_image_data)
-      await this.showMaskAnnotation(this.current_image_data.mask_geojson);
+      const imageDataOld = this.current_image_data;
+      const imageData = await this.fetchCellImage(imageDataOld.cell_id)
+      imageDataOld.mask_geojson = imageData.mask_geojson;
+      imageDataOld.channels = imageData.channels;
+      imageDataOld.extend = imageData.extend;
+      imageDataOld.mask_adjusted = imageData.mask_adjusted;
+      if(this.current_image_data.cell_id === imageDataOld.cell_id){
+        await this.showImage(imageDataOld)
+      }
       this.loading = false;
     },
     async uploadAnnotation(){
@@ -951,7 +951,7 @@ const app = new Vue({
       this.$forceUpdate()
       await this.uploadAnnotation();
     },
-    async showMaskAnnotation(mask_geojson){
+    showMaskAnnotation(mask_geojson){
       this.vector_source.clear()
       features = (new GeoJSON()).readFeatures(mask_geojson)
       this.vector_source.addFeatures(features)
@@ -1380,7 +1380,7 @@ api.export(new ImJoyPlugin())
           <span v-if="!current_image_data.mask_adjusted"><i class="icon icon-edit"></i>&nbsp;Mask</span>
           <span v-else>Remove</span>
         </button>
-        <button v-show="(current_task_name !== 'segmentation')&&current_image_data.mask_adjusted" style="background-color:white" class="btn btn-sm small-btn channel-controls" @click="saveMaskAnnotation()">Save</button>
+        <button :disabled="loading" v-show="(current_task_name !== 'segmentation')&&current_image_data.mask_adjusted" style="background-color:white" class="btn btn-sm small-btn channel-controls" @click="saveMaskAnnotation()">Save</button>
         <button :disabled="!mask_history||mask_history.length<=0" v-show="current_task_name === 'segmentation'" class="btn btn-sm small-btn channel-controls" @click="undoAnnotation()">Undo</button>
         <button class="btn btn-sm s-circle channel-controls" style="background-color: transparent;" title="info" @click="info()"><i class="icon icon-message"></i></button>
       </div>
@@ -1406,28 +1406,28 @@ api.export(new ImJoyPlugin())
           </div>
           <br>
           <div class="btn-group">
-            <button :disabled="current_image_index===0" class="btn transparent-btn" @click="previousImage()"><i class="icon icon-back"></i>&nbsp;Back</button>
-            <button :disabled="current_image_index>=cached_image_data.length" class="btn transparent-btn" @click="nextImage()">Next&nbsp;<i class="icon icon-forward"></i></button>
+            <button :disabled="current_image_index===0  || loading" class="btn transparent-btn" @click="previousImage()"><i class="icon icon-back"></i>&nbsp;Back</button>
+            <button :disabled="current_image_index>=cached_image_data.length  || loading" class="btn transparent-btn" @click="nextImage()">Next&nbsp;<i class="icon icon-forward"></i></button>
           </div>
         </div>
       </template>
       <template v-if="current_image_data.label_display_mode==='single'">
         <div v-show="!hide_controls" class="btn-group floating-bottom-btn">
-          <button :disabled="current_image_index===0" class="btn transparent-btn" @click="previousImage()"><i class="icon icon-back"></i>&nbsp;Back</button>
+          <button :disabled="current_image_index===0 || loading" class="btn transparent-btn" @click="previousImage()"><i class="icon icon-back"></i>&nbsp;Back</button>
           <button :disabled="current_image_data.discarded" class="btn transparent-btn" @click="selectLocation(true)" :class="{'selected-location-btn': current_image_data.location[current_image_data.single_location]===true}"><i class="icon icon-check"></i>&nbsp;Yes</button>
           <button :disabled="current_image_data.discarded" class="btn transparent-btn" @click="selectLocation(false)" :class="{'selected-location-btn': current_image_data.location[current_image_data.single_location]===false}"><i class="icon icon-cross"></i>&nbsp;No</button>
-          <button :disabled="current_image_index>=cached_image_data.length" class="btn transparent-btn" @click="nextImage()">Next&nbsp;<i class="icon icon-forward"></i></button>
+          <button :disabled="current_image_index>=cached_image_data.length || loading" class="btn transparent-btn" @click="nextImage()">Next&nbsp;<i class="icon icon-forward"></i></button>
         </div>
         <span v-show="!hide_controls" class="h3 floating-label">{{current_image_data.single_location}}</span>
       </template>
       <template v-if="current_task_name === 'segmentation'">
         <div v-show="!hide_controls" class="btn-group floating-bottom-btn">
-          <button :disabled="current_image_index===0" class="btn transparent-btn" @click="previousImage()"><i class="icon icon-back"></i>&nbsp;Back</button>
+          <button :disabled="current_image_index===0 || loading" class="btn transparent-btn" @click="previousImage()"><i class="icon icon-back"></i>&nbsp;Back</button>
           <button :disabled="current_image_data.discarded || !selected_feature" class="btn transparent-btn" @click="deleteAnnotation()" ><i class="icon icon-cross"></i>Remove&nbsp;</button>
-          <button :disabled="current_image_data.discarded" class="btn transparent-btn"  @click="saveMaskAnnotation()"><i class="icon icon-check"></i>
+          <button :disabled="current_image_data.discarded || loading" class="btn transparent-btn"  @click="saveMaskAnnotation()"><i class="icon icon-check"></i>
             Save
           </button>
-          <button :disabled="current_image_index>=cached_image_data.length" class="btn transparent-btn" @click="nextImage()">Next&nbsp;<i class="icon icon-forward"></i></button>
+          <button :disabled="current_image_index>=cached_image_data.length || loading" class="btn transparent-btn" @click="nextImage()">Next&nbsp;<i class="icon icon-forward"></i></button>
         </div>
       </template>
       
