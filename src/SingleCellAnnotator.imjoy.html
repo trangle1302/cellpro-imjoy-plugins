@@ -8,7 +8,7 @@
   "type": "window",
   "tags": [],
   "ui": "",
-  "version": "0.1.53",
+  "version": "0.1.54",
   "api_version": "0.1.7",
   "description": "Annotate images for HPA single-cell image classification",
   "icon": "extension",
@@ -512,7 +512,7 @@ const app = new Vue({
       formData.append('username', this.user.username);
       formData.append('password', this.user.password);
       try{
-         const response = await fetch(this.selected_server_url + "/login", {
+          const response = await fetch(this.selected_server_url + "/login", {
           method: 'POST',
           mode: 'cors',
           body: formData
@@ -751,17 +751,13 @@ const app = new Vue({
     },
     async confirmAnnotation(){
       this.current_image_data.unsure = false;
+      this.current_image_data.discarded = false;
       this.current_image_data.location_changed = true;
       await this.nextImage();
     },
     async unsureAnnotation(){
       this.current_image_data.unsure = !this.current_image_data.unsure;
-      this.current_image_data.location = Object.assign({}, this.current_image_data.saved_location)
-      this.current_image_data.location_changed = true;
-      await this.uploadAnnotation();
-    },
-    async negativeAnnotation(){
-      this.current_image_data.negative = !this.current_image_data.negative;
+      this.current_image_data.discarded = false;
       this.current_image_data.location = Object.assign({}, this.current_image_data.saved_location)
       this.current_image_data.location_changed = true;
       await this.uploadAnnotation();
@@ -778,10 +774,10 @@ const app = new Vue({
     },
     async checkNewMask(){
       if(!this.current_image_data.mask_adjusted){
-       return 
+        return 
       }
       if(this.current_task_name === 'segmentation'){
-         await this.uploadAnnotation();
+          await this.uploadAnnotation();
       }
       else{
         if(this.vector_source && this.vector_source.getFeatures().length>0){
@@ -871,9 +867,6 @@ const app = new Vue({
           if(this.current_image_data.unsure){
             sendData.location = 'unsure'
           }
-          else if(this.current_image_data.negative){
-            sendData.location = 'negative'
-          }
           else{
             sendData.location = this.current_image_data.location;
           }
@@ -960,7 +953,35 @@ const app = new Vue({
         this.current_image_data.discarded = false;
       }
       else{
-        this.current_image_data.discarded = true;
+        
+        const reasons = [
+          "negative",
+          "out of focus", 
+          "artifact",
+          "missing channels",
+        ]
+        let question = "Why do you want to discard this cell?\nPlease type the corresponding number bellow:\n"
+        let index = 0
+        for(let r of reasons){
+          index++;
+          question = question + index + ': ' + r + '\n'
+        }
+        question = question + "\nFor other reason, please specify."
+        let reason = await api.prompt(question, "")
+        index = parseInt(reason);
+        if(!isNaN(index)){
+          if(index>0 && index<=reasons.length)
+          reason = reasons[index-1]
+          else{
+            await api.alert('Please type a valid number.')
+            return
+          }
+        }
+        if(!reason){
+          api.showMessage("Not discarded.")
+          return
+        }
+        this.current_image_data.discarded = reason
       }
       this.$forceUpdate()
       await this.uploadAnnotation();
@@ -1147,7 +1168,7 @@ const app = new Vue({
         if(e.selected && e.selected.length>0)
             this.selected_feature = e.selected
           else{
-             this.selected_feature = null
+              this.selected_feature = null
           }
       })
       if(this.current_task_name === 'segmentation' && !this.isMobile){
@@ -1175,7 +1196,7 @@ const app = new Vue({
       if(this.mask_history.length>0){
         const action = this.mask_history.pop()
         if(action.add){
-           const allFeatures = this.vector_source.getFeatures();
+            const allFeatures = this.vector_source.getFeatures();
           allFeatures.forEach((feature)=>{
             if(action.add === feature){
               feature._undoing = true
@@ -1223,7 +1244,7 @@ const app = new Vue({
       this.map.addInteraction(this.drawInteraction);
       if(this.current_task_name !== 'segmentation'){
         if(this.channel_settings['Mask'])
-         this.channel_settings['Mask'].show = false
+          this.channel_settings['Mask'].show = false
         this.displayMap(this.current_image_data.channels, this.channel_settings);
       }
     },
@@ -1245,7 +1266,7 @@ const app = new Vue({
         this.current_image_data.location[k]=true
       }
       this.current_image_data.unsure = false;
-      this.current_image_data.negative = false;
+      this.current_image_data.discarded = false;
       this.current_image_data.location_changed = true;
     },
     home(){
@@ -1348,7 +1369,7 @@ api.export(new ImJoyPlugin())
     </div>
 
     <div class="panel" v-if="current_panel=='statistics'&&statistics">
-       <button style="right: 52px; top: 10px; position: absolute;" class="btn btn-action s-circle" title="refresh" @click="getStatistics()"><i class="icon icon-refresh"></i></button>&nbsp;&nbsp;
+        <button style="right: 52px; top: 10px; position: absolute;" class="btn btn-action s-circle" title="refresh" @click="getStatistics()"><i class="icon icon-refresh"></i></button>&nbsp;&nbsp;
       <button style="right: 10px; top: 10px; position: absolute;" class="btn btn-action s-circle" title="home" @click="home()"><i class="icon icon-cross"></i></button>&nbsp;&nbsp;
       <div v-for="(s, k) in statistics">
         <div class="card" style="width: 500px;max-width:100%;">
@@ -1379,7 +1400,9 @@ api.export(new ImJoyPlugin())
         </label>
         <button style="background-color:transparent" class="btn btn-action s-circle" title="home" @click="home()"><i class="icon icon-cross"></i></button>&nbsp;&nbsp;
       </div>
-      <div v-show="!hide_controls" class="form-group floating-channel-btn">
+
+      <!-- channels -->
+      <div v-show="!hide_controls" :style="{bottom: current_image_data.label_display_mode==='multiple'?'-20px': '20px'}" class="form-group floating-channel-btn">
         <label v-if="current_task_name === 'segmentation'" class="form-checkbox channel-controls">
           <input v-model="show_segmentation" @change="vector_source.changed()" name="hide segmentation mask" type="checkbox">
           <i class="form-icon"></i> Segmentation
@@ -1389,7 +1412,7 @@ api.export(new ImJoyPlugin())
           <i class="form-icon"></i> {{ch.name}}
         </label>
         
-        <button class="btn btn-sm small-btn channel-controls" :disabled="current_image_data.unsure || current_image_data.negative" :class="{'discarded-btn': current_image_data.discarded}" title="discard" @click="toggleDiscard()">Discard</button>
+        <button v-if="current_task_name === 'segmentation'||current_image_data.single_location" class="btn btn-sm small-btn channel-controls" :disabled="current_image_data.unsure" :class="{'discarded-btn': current_image_data.discarded}" title="discard" @click="toggleDiscard()">Discard</button>
         <!--<button class="btn btn-sm small-btn channel-controls" title="annotation mode" v-if="draw_mask_mode && (current_task_name !== 'segmentation')" @click="startRedrawAnnotation()">
           <span v-if="!current_image_data.mask_adjusted"><i class="icon icon-edit"></i>&nbsp;Mask</span>
           <span v-else>Remove</span>
@@ -1403,20 +1426,20 @@ api.export(new ImJoyPlugin())
           <div class="columns">
             <template v-for="group in LIMS_LOCATION_LABELS">
               <template v-for="label in group">
-                <button v-if="LIMS_TO_IF_CSV[label] && current_image_data.location[LIMS_TO_IF_CSV[label]] !== undefined" :disabled="current_image_data.discarded || current_image_data.unsure || current_image_data.negative" @click="toggleLocation(LIMS_TO_IF_CSV[label])" class="column btn location-btn" :class="{'selected-location-btn': current_image_data.location[LIMS_TO_IF_CSV[label]]}">{{label.slice(0,12)+(label.length>12?'.': '')}}</button>
+                <button v-if="LIMS_TO_IF_CSV[label] && current_image_data.location[LIMS_TO_IF_CSV[label]] !== undefined" :disabled="current_image_data.discarded || current_image_data.unsure" @click="toggleLocation(LIMS_TO_IF_CSV[label])" class="column btn location-btn" :class="{'selected-location-btn': current_image_data.location[LIMS_TO_IF_CSV[label]]}">{{label.slice(0,12)+(label.length>12?'.': '')}}</button>
               </template>
               <!-- <div class="break hide-on-mobile"></div> -->
             </template>
             <template v-for="(loc, k) in unsupported_locations">
-              <button  :disabled="current_image_data.discarded || current_image_data.unsure || current_image_data.negative"  @click="toggleLocation(k)" class="column btn location-btn" :class="{'selected-location-btn': loc}">{{k.slice(0,12)+(k.length>12?'.': '')}}</button>
+              <button  :disabled="current_image_data.discarded || current_image_data.unsure"  @click="toggleLocation(k)" class="column btn location-btn" :class="{'selected-location-btn': loc}">{{k.slice(0,12)+(k.length>12?'.': '')}}</button>
             </template>
             
           </div>
-           <br>
+            <br>
           <div class="btn-group">
-            <button :disabled="current_image_data.location_changed || current_image_data.discarded || current_image_data.unsure || current_image_data.negative" class="btn transparent-btn" @click="confirmAnnotation()">&nbsp;Confirm</button>
-            <button :disabled="current_image_data.discarded || current_image_data.unsure" :class="{'highlight-btn': current_image_data.negative}" class="btn transparent-btn" @click="negativeAnnotation()">Negative&nbsp;</button>
-            <button :disabled="current_image_data.discarded || current_image_data.negative" :class="{'highlight-btn': current_image_data.unsure}" class="btn transparent-btn" @click="unsureAnnotation()">Unsure&nbsp;</button>
+            <button :disabled="current_image_data.location_changed || current_image_data.discarded || current_image_data.unsure" class="btn transparent-btn" @click="confirmAnnotation()">&nbsp;Confirm</button>
+            <button :disabled="current_image_data.unsure" :class="{'highlight-btn': current_image_data.discarded}" class="btn transparent-btn" @click="toggleDiscard()">Discard&nbsp;</button>
+            <button :disabled="current_image_data.discarded" :class="{'highlight-btn': current_image_data.unsure}" class="btn transparent-btn" @click="unsureAnnotation()">Unsure&nbsp;</button>
           </div>
           <br>
           <div class="btn-group">
@@ -1646,3 +1669,4 @@ api.export(new ImJoyPlugin())
     }
   }
 </style>
+
