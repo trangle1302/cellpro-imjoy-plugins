@@ -742,6 +742,9 @@ const app = new Vue({
       await this.checkNewMask()
       if(this.current_image_data.location_changed){
         await this.uploadAnnotation();
+        if(this.current_image_data.location_changed){
+          return
+        }
       }
       this.current_image_index = this.cached_image_data.indexOf(this.current_image_data)
       if(this.current_image_index<=0){
@@ -776,8 +779,10 @@ const app = new Vue({
       this.loadMoreIfNeeded();
       await this.checkNewMask()
       if(this.current_image_data.location_changed){
-        api.alert("you should not come here")
         await this.uploadAnnotation();
+        if(this.current_image_data.location_changed){
+          return
+        }
       }
       this.current_image_index++;
       if(this.cached_image_data[this.current_image_index])
@@ -810,7 +815,6 @@ const app = new Vue({
 
     },
     async showImage(imageData){
-      api.alert(JSON.stringify(imageData.discarded))
       if(!imageData){
         api.showStatus('No more image to show.')
         console.error('no image data to show.')
@@ -819,7 +823,6 @@ const app = new Vue({
       if(!this.isMobile) api.showStatus(imageData.cell_id)
       console.log('current image: ', imageData)
       this.current_image_data = imageData;
-      api.alert('Show me discarded value: ' + JSON.stringify(imageData.discarded))
       imageData.start_time = new Date().getTime();
       // annotation viewer
       this.current_panel = 'imageviewer';
@@ -965,23 +968,18 @@ const app = new Vue({
       }
     },
     toggleDiscardButton(){
-      api.alert(JSON.stringify(this.current_image_data.discarded))
       this.current_image_data.location_changed = true;
       if(this.current_image_data.discarded){
         this.current_image_data.discarded = false;
       }else{
-        this.current_image_data.discarded = true; 
+        this.current_image_data.discarded = true;
       }
     },
     async chooseReason(){
       this.current_image_data.location_changed = true;
-      let reason
-      if(this.current_image_data.discarded==='Choose an option'){
-        this.current_image_data.discarded = false;
-      }else if(this.current_image_data.discarded==='Other'){
-          reason = await api.prompt("Specify your reason:")
-          this.current_image_data.discarded = reason
-          api.showMessage('show me the reason')
+      if(this.current_image_data.discarded==='Other'){
+        let reason = await api.prompt("Specify your reason:")
+        this.current_image_data.discarded = reason
       }
       this.$forceUpdate()
       await this.uploadAnnotation();
@@ -1436,24 +1434,32 @@ api.export(new ImJoyPlugin())
       </div>
 
       <!-- channels -->
-      <div v-show="!hide_controls" :style="{bottom: current_image_data.label_display_mode==='multiple'?'-20px': '20px'}" class="form-group floating-channel-btn">
-        <label v-if="current_task_name === 'segmentation'" class="form-checkbox channel-controls">
-          <input v-model="show_segmentation" @change="vector_source.changed()" name="hide segmentation mask" type="checkbox">
-          <i class="form-icon"></i> Segmentation
-        </label>
-        <label v-for="ch in channel_settings" v-show="ch.name!=='merged'" class="form-checkbox channel-controls">
-          <input v-model="ch.show" :name="ch.name" @change="channelSettingsUpdated" type="checkbox">
-          <i class="form-icon"></i> {{ch.name}}
-        </label>
-        
-        <button v-if="current_task_name === 'segmentation'||current_image_data.single_location" class="btn btn-sm small-btn channel-controls" :disabled="current_image_data.unsure" :class="{'discarded-btn': current_image_data.discarded}" title="discard" @click="toggleDiscard()">Discard</button>
-        <!--<button class="btn btn-sm small-btn channel-controls" title="annotation mode" v-if="draw_mask_mode && (current_task_name !== 'segmentation')" @click="startRedrawAnnotation()">
+      <div v-show="!hide_controls" :style="{bottom: current_image_data.label_display_mode==='multiple'?'-20px': '20px'}" class="form-group floating-channel-btn">       
+        <!--<button v-if="current_task_name === 'segmentation'||current_image_data.single_location" class="btn btn-sm small-btn channel-controls" :disabled="current_image_data.unsure" :class="{'discarded-btn': current_image_data.discarded}" title="discard" @click="toggleDiscard()">Discard</button>
+        <button class="btn btn-sm small-btn channel-controls" title="annotation mode" v-if="draw_mask_mode && (current_task_name !== 'segmentation')" @click="startRedrawAnnotation()">
           <span v-if="!current_image_data.mask_adjusted"><i class="icon icon-edit"></i>&nbsp;Mask</span>
           <span v-else>Remove</span>
         </button>
         <button :disabled="loading" v-show="(current_task_name !== 'segmentation')&&current_image_data.mask_adjusted" style="background-color:white" class="btn btn-sm small-btn channel-controls" @click="saveMaskAnnotation()">Save</button>-->
-        <button :disabled="!mask_history||mask_history.length<=0" v-show="current_task_name === 'segmentation'" class="btn btn-sm small-btn channel-controls" @click="undoAnnotation()">Undo</button>
-        <button class="btn btn-sm s-circle channel-controls" style="background-color: transparent;" title="info" @click="info()"><i class="icon icon-message"></i></button>
+        <div>
+          <label v-if="current_task_name === 'segmentation'" class="form-checkbox channel-controls">
+            <input v-model="show_segmentation" @change="vector_source.changed()" name="hide segmentation mask" type="checkbox">
+            <i class="form-icon"></i> Segmentation
+          </label>
+          <label v-for="ch in channel_settings" v-show="ch.name!=='merged'" class="form-checkbox channel-controls">
+            <input v-model="ch.show" :name="ch.name" @change="channelSettingsUpdated" type="checkbox">
+            <i class="form-icon"></i> {{ch.name}}
+          </label>
+          <button :disabled="!mask_history||mask_history.length<=0" v-show="current_task_name === 'segmentation'" class="btn btn-sm small-btn channel-controls" @click="undoAnnotation()">Undo</button>
+          <button class="btn btn-sm s-circle channel-controls" style="background-color: transparent;" title="info" @click="info()"><i class="icon icon-message"></i></button>
+        </div>
+        <div class="form-group">
+          <button v-if="current_task_name === 'segmentation'||current_image_data.single_location" class="btn btn-sm small-btn channel-controls" :disabled="current_image_data.unsure" :class="{'discarded-btn': current_image_data.discarded}" title="discard" @click="toggleDiscardButton()">Discard&nbsp;</button>
+          <select class="form-select" v-show="current_image_data.discarded"  v-model='current_image_data.discarded' @change='chooseReason()' :disabled="current_image_data.unsure">
+            <option>{{current_image_data.discarded}}</option>
+            <option v-for="reason in reasons" :value="reason">{{reason}}</option>
+          </select>
+        </div>
       </div>
       <template v-if="current_image_data.label_display_mode==='multiple'">
         <div v-show="!hide_controls" class="floating-right-btn">
@@ -1487,18 +1493,13 @@ api.export(new ImJoyPlugin())
               </ul>
             </div>
           </div>-->
-          <div>
+          <div class="form-group">
             <button :disabled="current_image_data.unsure" :class="{'highlight-btn': current_image_data.discarded}" class="btn transparent-btn" @click="toggleDiscardButton()">Discard&nbsp;</button>
-          </div>
-
-          <div v-show="current_image_data.discarded" class="form-group">
-            <select class="form-select" v-model='current_image_data.discarded' @change='chooseReason()' :disabled="current_image_data.unsure">
-              <option>{{((typeof(current_image_data.discarded)==='boolean')?'Choose an option':current_image_data.discarded)}}</option>
+            <select class="form-select" v-show="current_image_data.discarded"  v-model='current_image_data.discarded' @change='chooseReason()' :disabled="current_image_data.unsure">
+              <option>{{current_image_data.discarded}}</option>
               <option v-for="reason in reasons" :value="reason">{{reason}}</option>
-              <option>Undiscard</option>
             </select>
           </div>
-          <br>
           <div class="btn-group">
             <button :disabled="current_image_data.discarded || current_image_data.unsure" class="btn transparent-btn" @click="confirmAnnotation()">&nbsp;Confirm</button>
             
