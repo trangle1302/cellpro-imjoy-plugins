@@ -273,13 +273,15 @@ const LIMS_TO_IF_CSV = {
 }
 
 const REASONS = [
+          "Skip reason specifying",
           "Negative",
           "Unspecific",
           "Missing channels",
           "Cell artifacts",
           "Out of focus",
           "Bad segmentation",
-          "Specify other reason",
+          "Incomplet Cell",
+          "Specify other reason"
         ]
 
 const app = new Vue({
@@ -873,7 +875,8 @@ const app = new Vue({
       // Default options are marked with *
       const sendData = {}
       sendData.discarded = this.current_image_data.discarded;
-      if((sendData.discarded===true)||(sendData.discarded==='Specify other reason')){
+      //if((sendData.discarded===true)||(sendData.discarded==='Specify other reason'))
+      if(sendData.discarded==='Specify other reason'){
         api.alert("Please select/specify a reason or cancel the discard option")
         return
       }
