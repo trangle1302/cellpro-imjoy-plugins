@@ -277,8 +277,9 @@ const REASONS = [
           "Unspecific",
           "Missing channels",
           "Cell artifacts",
-          "Out of focus", 
-          "Other",
+          "Out of focus",
+          "Bad segmentation",
+          "Specify other reason",
         ]
 
 const app = new Vue({
@@ -872,8 +873,8 @@ const app = new Vue({
       // Default options are marked with *
       const sendData = {}
       sendData.discarded = this.current_image_data.discarded;
-      if(sendData.discarded===true){
-        api.alert("Please select a reason or cancel the discard option")
+      if((sendData.discarded===true)||(sendData.discarded==='Specify other reason')){
+        api.alert("Please select/specify a reason or cancel the discard option")
         return
       }
       if(this.current_image_data.start_time){
@@ -975,7 +976,7 @@ const app = new Vue({
     },
     async chooseReason(){
       this.current_image_data.location_changed = true;
-      if(this.current_image_data.discarded==='Other'){
+      if(this.current_image_data.discarded==='Specify other reason'){
         let reason = await api.prompt("Specify your reason:")
         this.current_image_data.discarded = reason
       }
