@@ -776,6 +776,7 @@ const app = new Vue({
       this.loadMoreIfNeeded();
       await this.checkNewMask()
       if(this.current_image_data.location_changed){
+        api.alert("you should not come here")
         await this.uploadAnnotation();
       }
       this.current_image_index++;
@@ -809,6 +810,7 @@ const app = new Vue({
 
     },
     async showImage(imageData){
+      api.alert(JSON.stringify(imageData.discarded))
       if(!imageData){
         api.showStatus('No more image to show.')
         console.error('no image data to show.')
@@ -817,6 +819,7 @@ const app = new Vue({
       if(!this.isMobile) api.showStatus(imageData.cell_id)
       console.log('current image: ', imageData)
       this.current_image_data = imageData;
+      api.alert('Show me discarded value: ' + JSON.stringify(imageData.discarded))
       imageData.start_time = new Date().getTime();
       // annotation viewer
       this.current_panel = 'imageviewer';
@@ -866,12 +869,15 @@ const app = new Vue({
       // Default options are marked with *
       const sendData = {}
       sendData.discarded = this.current_image_data.discarded;
+      if(sendData.discarded===true){
+        api.alert("Please select a reason or cancel the discard option")
+        return
+      }
       if(this.current_image_data.start_time){
         this.current_image_data.time_elapsed = new Date().getTime() - this.current_image_data.start_time;
         sendData.start_time = this.current_image_data.start_time;
         sendData.time_elapsed = this.current_image_data.time_elapsed;
       }
-
       if(!sendData.discarded){
         if (this.current_image_data.location_changed){
           if(this.current_image_data.unsure){
@@ -958,19 +964,28 @@ const app = new Vue({
         this.stopMaskAnnotation()
       }
     },
-    async chooseReason(){
+    toggleDiscardButton(){
+      api.alert(JSON.stringify(this.current_image_data.discarded))
       this.current_image_data.location_changed = true;
-      if((this.current_image_data.discarded==='Choose an option')||(this.current_image_data.discarded==='Undiscard')){
+      if(this.current_image_data.discarded){
         this.current_image_data.discarded = false;
       }else{
-        if(this.current_image_data.discarded==='Other'){
-          this.current_image_data.discarded = await api.prompt("Specify your reason:", "")
-        }
-        api.alert(this.current_image_data.discarded)
+        this.current_image_data.discarded = true; 
+      }
+    },
+    async chooseReason(){
+      this.current_image_data.location_changed = true;
+      let reason
+      if(this.current_image_data.discarded==='Choose an option'){
+        this.current_image_data.discarded = false;
+      }else if(this.current_image_data.discarded==='Other'){
+          reason = await api.prompt("Specify your reason:")
+          this.current_image_data.discarded = reason
+          api.showMessage('show me the reason')
       }
       this.$forceUpdate()
       await this.uploadAnnotation();
-      await this.nextImage()
+      //await this.nextImage()
     },
     async toggleDiscard(){
       this.current_image_data.location_changed = true;
@@ -1472,10 +1487,13 @@ api.export(new ImJoyPlugin())
               </ul>
             </div>
           </div>-->
-          <div class="form-group">
-            <label class="form-label" for="discard-reasons">Discard Reason:</label>
+          <div>
+            <button :disabled="current_image_data.unsure" :class="{'highlight-btn': current_image_data.discarded}" class="btn transparent-btn" @click="toggleDiscardButton()">Discard&nbsp;</button>
+          </div>
+
+          <div v-show="current_image_data.discarded" class="form-group">
             <select class="form-select" v-model='current_image_data.discarded' @change='chooseReason()' :disabled="current_image_data.unsure">
-              <option>{{(current_image_data.discarded?current_image_data.discarded:'Choose an option')}}</option>
+              <option>{{((typeof(current_image_data.discarded)==='boolean')?'Choose an option':current_image_data.discarded)}}</option>
               <option v-for="reason in reasons" :value="reason">{{reason}}</option>
               <option>Undiscard</option>
             </select>
@@ -1483,6 +1501,7 @@ api.export(new ImJoyPlugin())
           <br>
           <div class="btn-group">
             <button :disabled="current_image_data.discarded || current_image_data.unsure" class="btn transparent-btn" @click="confirmAnnotation()">&nbsp;Confirm</button>
+            
             <button :disabled="current_image_data.discarded" :class="{'highlight-btn': current_image_data.unsure}" class="btn transparent-btn" @click="unsureAnnotation()">Unsure&nbsp;</button>
           </div>
           <br>
