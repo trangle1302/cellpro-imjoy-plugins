@@ -922,7 +922,6 @@ const app = new Vue({
         };
       }
       // this is the url to send the current annotation
-      /*
       const sub_url = "/annotations/" + this.current_task_name + "/" + this.current_image_data.cell_id;
       const url_post = this.selected_server_url + sub_url;
       const response = await fetch(url_post, {
@@ -936,8 +935,7 @@ const app = new Vue({
           body: JSON.stringify(sendData)
         });
       const res= await response.json();
-      if(res.success)*/
-      if(true){
+      if(res.success){
         this.current_image_data.mask_adjusted = false;
         this.current_image_data.location_changed = false;
         this.current_image_data.saved_location = Object.assign({}, this.current_image_data.location)
@@ -1452,9 +1450,9 @@ api.export(new ImJoyPlugin())
           </label>
           <button :disabled="!mask_history||mask_history.length<=0" v-show="current_task_name === 'segmentation'" class="btn btn-sm small-btn channel-controls" @click="undoAnnotation()">Undo</button>
           <button class="btn btn-sm s-circle channel-controls" style="background-color: transparent;" title="info" @click="info()"><i class="icon icon-message"></i></button>
-        </div>
-        <div class="form-group">
           <button v-if="current_task_name === 'segmentation'||current_image_data.single_location" class="btn btn-sm small-btn channel-controls" :disabled="current_image_data.unsure" :class="{'discarded-btn': current_image_data.discarded}" title="discard" @click="toggleDiscardButton()">Discard&nbsp;</button>
+        </div>
+        <div class="selectbox">
           <select class="form-select" v-show="current_image_data.discarded"  v-model='current_image_data.discarded' @change='chooseReason()' :disabled="current_image_data.unsure">
             <option>{{current_image_data.discarded}}</option>
             <option v-for="reason in reasons" :value="reason">{{reason}}</option>
@@ -1571,7 +1569,16 @@ api.export(new ImJoyPlugin())
     -moz-transform: translate3d(-50%, -50%, 0);
       transform: translate3d(-50%, -50%, 0);
   }
-
+  .selectbox {
+    position: right;
+    display: inline-block;
+    zoom: 1;
+    border: 1px solid #CCC;
+    background: none repeat scroll 0 0 #FFFFFF;
+    min-width: 160px;
+    max-width:220px;
+    width: auto;
+  }
   @media screen and (max-width: 800px) {
     .floating-label{
       top: 90px!important;
