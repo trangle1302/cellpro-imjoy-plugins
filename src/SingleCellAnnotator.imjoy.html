@@ -8,7 +8,7 @@
   "type": "window",
   "tags": [],
   "ui": "",
-  "version": "0.1.55",
+  "version": "0.1.56",
   "api_version": "0.1.7",
   "description": "Annotate images for HPA single-cell image classification",
   "icon": "extension",
@@ -175,6 +175,7 @@ const imageDataTemplate = {
   label_display_mode: null,
   channels: null,
   location: null,
+  discard_reason: null,
   discarded: false,
   mask_adjusted: false,
   location_changed: false,
@@ -272,6 +273,15 @@ const LIMS_TO_IF_CSV = {
     
 }
 
+const REASONS = [
+          "Negative",
+          "Unspecific",
+          "Missing channels",
+          "Cell artifacts",
+          "Out of focus", 
+          "Other",
+        ]
+
 const app = new Vue({
   el: '#app',
   data: {
@@ -293,8 +303,8 @@ const app = new Vue({
     select: null,
     current_panel: 'login',
     user:{
-      username: "",
-      password: "",
+      username: "hao",
+      password: "GshQvF3GPzeoPAWBpalq",
       access_token: null
     },
     mask_history: [],
@@ -319,7 +329,8 @@ const app = new Vue({
     version: null,
     LIMS_LOCATION_LABELS: LIMS_LOCATION_LABELS,
     LIMS_TO_IF_CSV: LIMS_TO_IF_CSV,
-    LIMS_VALUES: Object.values(LIMS_TO_IF_CSV)
+    LIMS_VALUES: Object.values(LIMS_TO_IF_CSV),
+    reasons: REASONS
   },
   mounted(){
     this.$nextTick(async()=>{
@@ -903,6 +914,7 @@ const app = new Vue({
         };
       }
       // this is the url to send the current annotation
+      /*
       const sub_url = "/annotations/" + this.current_task_name + "/" + this.current_image_data.cell_id;
       const url_post = this.selected_server_url + sub_url;
       const response = await fetch(url_post, {
@@ -916,7 +928,8 @@ const app = new Vue({
           body: JSON.stringify(sendData)
         });
       const res= await response.json();
-      if(res.success){
+      if(res.success)*/
+      if(true){
         this.current_image_data.mask_adjusted = false;
         this.current_image_data.location_changed = false;
         this.current_image_data.saved_location = Object.assign({}, this.current_image_data.location)
@@ -946,24 +959,20 @@ const app = new Vue({
         this.stopMaskAnnotation()
       }
     },
+    async chooseReason(){
+      var selectBox = document.getElementById("discard-reasons");
+      var selectedValue = selectBox.options[selectBox.selectedIndex].value;
+      await api.alert(value);
+    },
     async toggleDiscard(){
       this.current_image_data.location_changed = true;
       if(this.current_image_data.discarded){
         this.current_image_data.discarded = false;
       }
       else{
-        
-        const reasons = [
-          "Negative",
-          "Unspecific",
-          "Missing channels",
-          "Cell artifacts",
-          "Out of focus", 
-          "Other",
-        ]
         let question = "Why do you want to discard this cell?\nPlease type the corresponding number bellow:\n"
         let index = 0
-        for(let r of reasons){
+        for(let r of this.reasons){
           index++;
           question = question + index + ': ' + r + '\n'
         }
@@ -971,8 +980,8 @@ const app = new Vue({
         let reason = await api.prompt(question, "")
         index = parseInt(reason);
         if(!isNaN(index)){
-          if(index>0 && index<=reasons.length)
-          reason = reasons[index-1]
+          if(index>0 && index<=this.reasons.length)
+          reason = this.reasons[index-1]
           else{
             await api.alert('Please type a valid number.')
             return
@@ -986,6 +995,7 @@ const app = new Vue({
       }
       this.$forceUpdate()
       await this.uploadAnnotation();
+      await this.nextImage()
     },
     showMaskAnnotation(mask_geojson){
       this.vector_source.clear()
@@ -1433,13 +1443,37 @@ api.export(new ImJoyPlugin())
             </template>
             <template v-for="(loc, k) in unsupported_locations">
               <button  :disabled="current_image_data.discarded || current_image_data.unsure"  @click="toggleLocation(k)" class="column btn location-btn" :class="{'selected-location-btn': loc}">{{k.slice(0,12)+(k.length>12?'.': '')}}</button>
-            </template>
-            
+            </template>            
           </div>
-            <br>
+          <br>
+          <!--<div class="dropdown" :class="{'highlight-btn': current_image_data.discarded}" :disabled="current_image_data.unsure">
+            <div class="btn-group">
+              <a href="#" class="btn btn-link dropdown-toggle" tabindex="0">
+                Discard Reason <i class="icon icon-caret"></i>
+              </a>
+              <ul class="menu">
+                <li class="divider" data-content="Discard-Reason"></li>
+                <li class="menu-item">
+                  <a href='#'><i></i>show</a>
+                </li>
+                <li class="menu-item">
+                  <a href='#'>
+                    <button  :class="{'highlight-btn': current_image_data.discarded}" class="btn transparent-btn" @click="toggleDiscard()"><i></i>Discard&nbsp;</button>
+                  </a>
+                </li>
+              </ul>
+            </div>
+          </div>-->
+          <div class="form-group">
+            <label class="form-label" for="discard-reasons">Discard Reason:</label>
+            <select class="form-select" v-model='current_image_data.discard_reason' @change='chooseReason()'>
+              <option>Choose an option</option>
+              <option v-for="reason in reasons" :value="reason">{{reason}}</option>
+            </select>
+          </div>
+          <br>
           <div class="btn-group">
             <button :disabled="current_image_data.discarded || current_image_data.unsure" class="btn transparent-btn" @click="confirmAnnotation()">&nbsp;Confirm</button>
-            <button :disabled="current_image_data.unsure" :class="{'highlight-btn': current_image_data.discarded}" class="btn transparent-btn" @click="toggleDiscard()">Discard&nbsp;</button>
             <button :disabled="current_image_data.discarded" :class="{'highlight-btn': current_image_data.unsure}" class="btn transparent-btn" @click="unsureAnnotation()">Unsure&nbsp;</button>
           </div>
           <br>
