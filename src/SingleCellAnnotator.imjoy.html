@@ -175,7 +175,6 @@ const imageDataTemplate = {
   label_display_mode: null,
   channels: null,
   location: null,
-  discard_reason: null,
   discarded: false,
   mask_adjusted: false,
   location_changed: false,
@@ -303,7 +302,7 @@ const app = new Vue({
     select: null,
     current_panel: 'login',
     user:{
-      username: "hao",
+      username: "",
       password: "",
       access_token: null
     },
@@ -960,9 +959,18 @@ const app = new Vue({
       }
     },
     async chooseReason(){
-      var selectBox = document.getElementById("discard-reasons");
-      var selectedValue = selectBox.options[selectBox.selectedIndex].value;
-      await api.alert(value);
+      this.current_image_data.location_changed = true;
+      if((this.current_image_data.discarded==='Choose an option')||(this.current_image_data.discarded==='Undiscard')){
+        this.current_image_data.discarded = false;
+      }else{
+        if(this.current_image_data.discarded==='Other'){
+          this.current_image_data.discarded = await api.prompt("Specify your reason:", "")
+        }
+        api.alert(this.current_image_data.discarded)
+      }
+      this.$forceUpdate()
+      await this.uploadAnnotation();
+      await this.nextImage()
     },
     async toggleDiscard(){
       this.current_image_data.location_changed = true;
@@ -1466,9 +1474,10 @@ api.export(new ImJoyPlugin())
           </div>-->
           <div class="form-group">
             <label class="form-label" for="discard-reasons">Discard Reason:</label>
-            <select class="form-select" v-model='current_image_data.discard_reason' @change='chooseReason()'>
-              <option>Choose an option</option>
+            <select class="form-select" v-model='current_image_data.discarded' @change='chooseReason()' :disabled="current_image_data.unsure">
+              <option>{{(current_image_data.discarded?current_image_data.discarded:'Choose an option')}}</option>
               <option v-for="reason in reasons" :value="reason">{{reason}}</option>
+              <option>Undiscard</option>
             </select>
           </div>
           <br>
