@@ -765,7 +765,7 @@ const app = new Vue({
         this.getNewImageBatch(this.current_task_name)
       }
     },
-    async confirmAnnotation(){
+    async saveAnnotation(){
       this.current_image_data.unsure = false;
       this.current_image_data.discarded = false;
       this.current_image_data.location_changed = true;
@@ -1503,8 +1503,7 @@ api.export(new ImJoyPlugin())
             </select>
           </div>
           <div class="btn-group">
-            <button :disabled="current_image_data.discarded || current_image_data.unsure" class="btn transparent-btn" @click="confirmAnnotation()">&nbsp;Confirm</button>
-            
+            <button :disabled="current_image_data.discarded || current_image_data.unsure" class="btn transparent-btn" @click="saveAnnotation()">&nbsp;Save</button>
             <button :disabled="current_image_data.discarded" :class="{'highlight-btn': current_image_data.unsure}" class="btn transparent-btn" @click="unsureAnnotation()">Unsure&nbsp;</button>
           </div>
           <br>
