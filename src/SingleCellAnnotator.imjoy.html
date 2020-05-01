@@ -8,7 +8,7 @@
   "type": "window",
   "tags": [],
   "ui": "",
-  "version": "0.1.55",
+  "version": "0.1.56",
   "api_version": "0.1.7",
   "description": "Annotate images for HPA single-cell image classification",
   "icon": "extension",
@@ -31,7 +31,7 @@
 </config>
 
 <script lang="javascript">
-const servers = {
+const SERVERS = {
   'development': 'https://wet-grasshopper-41.telebit.io',
   'production': 'https://unlucky-shrimp-3.telebit.io',
   'localhost': 'http://127.0.0.1:5000'
@@ -174,10 +174,10 @@ const imageDataTemplate = {
   mask_geojson: null,
   label_display_mode: null,
   channels: null,
-  location: null,
-  discarded: false,
+  label: null,
+  exclusive_label: false,
   mask_adjusted: false,
-  location_changed: false,
+  label_changed: false,
   brightness: 1.0,
 };
 
@@ -289,7 +289,7 @@ const app = new Vue({
     loading: false,
     // develop image parsing
     selected_server_url: null,
-    servers: servers,
+    servers: SERVERS,
     select: null,
     current_panel: 'login',
     user:{
@@ -309,7 +309,6 @@ const app = new Vue({
     tasks: null,
     current_task_name: null,
     cell_per_batch: 10,
-    loaded_image_list: null,
     cached_image_data: [],
     current_image_data: null,
     current_image_index: 0,
@@ -345,12 +344,12 @@ const app = new Vue({
         }
         else if(event.code === 'KeyY'){
           if(this.current_image_data.label_display_mode==='single'){
-            this.selectLocation(true)
+            this.selectLabel(true)
           }
         }
         else if(event.code === 'KeyN'){
           if(this.current_image_data.label_display_mode==='single'){
-            this.selectLocation(false)
+            this.selectLabel(false)
           }
         }
         else if(event.code === 'ArrowRight'){
@@ -360,7 +359,7 @@ const app = new Vue({
           this.previousImage()
         }
         else if(event.code === 'KeyD'){
-          this.toggleDiscard()
+          this.toggleExclusiveLabels()
         }
         else if(event.code === 'KeyR'){
           if(this.current_task_name === 'segmentation'){
@@ -368,7 +367,7 @@ const app = new Vue({
           }
         }
         else if(event.code === 'KeyS'){
-          if(this.current_image_data.location_changed){
+          if(this.current_image_data.labels_changed){
             this.uploadAnnotation();
           }
           if(this.current_image_data.mask_adjusted){
@@ -465,12 +464,12 @@ const app = new Vue({
     });
   },
   computed: {
-    unsupported_locations: function(){
+    unsupported_labels: function(){
       const locs = {}
-      if(this.current_image_data.location){
-        for(let k in this.current_image_data.location){
+      if(this.current_image_data.location_labels){
+        for(let k in this.current_image_data.location_labels){
           if(!this.LIMS_VALUES.includes(k)){
-            locs[k] = this.current_image_data.location[k]
+            locs[k] = this.current_image_data.location_labels[k]
           }
         }
       }
@@ -591,21 +590,24 @@ const app = new Vue({
       imageData.mask_geojson = response.mask;
       //ER, Microtubule, Nuclei, Protein,
       imageData.channels = response.images;
-      if(response.location){
-        locations = Object.keys(response.location);
-        if(locations.length==1){
+      if(!response.available_labels){
+        throw new Error("no available labels.")
+      }
+      imageData.exclusive_labels = response.available_labels.exclusive_labels
+      if(response.available_labels.location_labels){
+        labels = Object.keys(response.available_labels.location_labels);
+        if(labels.length==1){
           imageData.label_display_mode = 'single'
-          imageData.single_location = locations[0];
-          imageData.location = response.location;
+          imageData.single_label = labels[0];
+          imageData.location_labels = response.available_labels.location_labels;
         }
         else
         { 
           imageData.label_display_mode = 'multiple'
-          imageData.location = response.location;
+          imageData.location_labels = response.available_labels.location_labels;
         }
-        imageData.saved_location = Object.assign({}, imageData.location)
-
         
+        imageData.saved_location_label = Object.assign({}, imageData.location_labels)
       }
       else{
         imageData.label_display_mode = 'mask'
@@ -684,17 +686,17 @@ const app = new Vue({
       }
       try{
         this.loading_cache = task_name;
-        let url = "/tasks/" + task_name + "?cell_num=" + this.cell_per_batch
+        let url = "/tasks/" + task_name + "?num=" + this.cell_per_batch
         if(init){
           url = url + '&init=1'
         }
         const response = await this.fetchURLData(url);
-        this.loaded_image_list  =response.cells;
-        if(this.loaded_image_list.length<=0){
+        const tasks = response.tasks;
+        if(tasks.length<=0){
           api.showMessage('No more images in this task.')
           return
         }
-        for(let i=0;i< this.loaded_image_list.length; i++){
+        for(let i=0;i< tasks.length; i++){
           if(task_name !== this.loading_cache){
             console.error('Switching tasks, quit caching')
             break
@@ -703,8 +705,8 @@ const app = new Vue({
             api.showProgress(0)
             return
           }
-          const cell_id = this.loaded_image_list[i];
-          api.showProgress((i+1)/this.loaded_image_list.length)
+          const cell_id = tasks[i];
+          api.showProgress((i+1)/tasks.length)
           const imageData = await this.fetchCellImage(cell_id)
           if(!this.current_image_data && this.current_task_name){
             this.showImage(imageData)
@@ -718,7 +720,7 @@ const app = new Vue({
           console.log('Removing images from the cache.',  this.cached_image_data.length)
         }
         api.showProgress(100)
-        if(!this.isMobile) api.showStatus(`A new batch with ${this.loaded_image_list.length} images loaded`)
+        if(!this.isMobile) api.showStatus(`A new batch with ${tasks.length} images loaded`)
         this.loadMoreIfNeeded();
       }
       catch(e){
@@ -730,7 +732,7 @@ const app = new Vue({
     },
     async previousImage(){
       await this.checkNewMask()
-      if(this.current_image_data.location_changed){
+      if(this.current_image_data.labels_changed){
         await this.uploadAnnotation();
       }
       this.current_image_index = this.cached_image_data.indexOf(this.current_image_data)
@@ -750,22 +752,14 @@ const app = new Vue({
       }
     },
     async saveAnnotation(){
-      this.current_image_data.unsure = false;
-      this.current_image_data.discarded = false;
-      this.current_image_data.location_changed = true;
+      this.current_image_data.exclusive_label = false;
+      this.current_image_data.labels_changed = true;
       await this.nextImage();
-    },
-    async unsureAnnotation(){
-      this.current_image_data.unsure = !this.current_image_data.unsure;
-      this.current_image_data.discarded = false;
-      this.current_image_data.location = Object.assign({}, this.current_image_data.saved_location)
-      this.current_image_data.location_changed = true;
-      await this.uploadAnnotation();
     },
     async nextImage(){
       this.loadMoreIfNeeded();
       await this.checkNewMask()
-      if(this.current_image_data.location_changed){
+      if(this.current_image_data.labels_changed){
         await this.uploadAnnotation();
       }
       this.current_image_index++;
@@ -850,58 +844,57 @@ const app = new Vue({
     },
     async uploadAnnotation(){
       // skip upload annotation if image is annotated and no new change
-      if ((!this.current_image_data.mask_adjusted)&&(!this.current_image_data.location_changed)){
+      if ((!this.current_image_data.mask_adjusted)&&(!this.current_image_data.labels_changed)){
         return
       }
       // Default options are marked with *
       const sendData = {}
-      sendData.discarded = this.current_image_data.discarded;
+      
       if(this.current_image_data.start_time){
         this.current_image_data.time_elapsed = new Date().getTime() - this.current_image_data.start_time;
         sendData.start_time = this.current_image_data.start_time;
         sendData.time_elapsed = this.current_image_data.time_elapsed;
       }
-
-      if(!sendData.discarded){
-        if (this.current_image_data.location_changed){
-          if(this.current_image_data.unsure){
-            sendData.location = 'unsure'
-          }
-          else{
-            sendData.location = this.current_image_data.location;
-          }
-          if(typeof sendData.location === 'object'){
-            let noLocation = true;
-            for (loc in sendData.location){
-              if(sendData.location[loc] === null){
-                sendData.location[loc] = false
-              }
-              else{
-                noLocation = false;
-              }
+      
+      if (this.current_image_data.labels_changed){
+        if(this.current_image_data.exclusive_label){
+          sendData.labels = this.current_image_data.exclusive_label;
+        }
+        else{
+          sendData.labels = this.current_image_data.location_labels;
+        }
+        if(typeof sendData.labels === 'object'){
+          let noLabel = true;
+          for (loc in sendData.labels){
+            if(sendData.labels[loc] === null){
+              sendData.labels[loc] = false
             }
-            if (noLocation && this.current_image_data.label_display_mode==='multiple'){
-              const anwser = await api.confirm("No location label selected, is that correct?")
-              if (!anwser){
-                return
-              }
-            };
+            else{
+              noLabel = false;
+            }
           }
-        };
-        if (this.current_image_data.mask_adjusted){
-          // sendData
-          sendData.extend = this.current_image_data.extend;
-          sendData.bbox = this.current_image_data.bbox;
-          // set the masks
-          const allFeatures = this.vector_source.getFeatures();
-          const format = new ol.format.GeoJSON();
-          const routeFeatures = format.writeFeaturesObject(allFeatures, {decimals: 1});
-          routeFeatures['bbox'] = this.current_image_data.mask_geojson.bbox;
-          this.current_image_data.mask_geojson = routeFeatures;
-          sendData.mask = this.current_image_data.mask_geojson;
-          sendData.mask_diff = this.getMaskDiff(this.current_image_data);
-        };
+          if (noLabel && this.current_image_data.label_display_mode==='multiple'){
+            const anwser = await api.confirm("No label label selected, is that correct?")
+            if (!anwser){
+              return
+            }
+          };
+        }
       }
+      if (this.current_image_data.mask_adjusted){
+        // sendData
+        sendData.extend = this.current_image_data.extend;
+        sendData.bbox = this.current_image_data.bbox;
+        // set the masks
+        const allFeatures = this.vector_source.getFeatures();
+        const format = new ol.format.GeoJSON();
+        const routeFeatures = format.writeFeaturesObject(allFeatures, {decimals: 1});
+        routeFeatures['bbox'] = this.current_image_data.mask_geojson.bbox;
+        this.current_image_data.mask_geojson = routeFeatures;
+        sendData.mask = this.current_image_data.mask_geojson;
+        sendData.mask_diff = this.getMaskDiff(this.current_image_data);
+      };
+    
       // this is the url to send the current annotation
       const sub_url = "/annotations/" + this.current_task_name + "/" + this.current_image_data.cell_id;
       const url_post = this.selected_server_url + sub_url;
@@ -918,8 +911,8 @@ const app = new Vue({
       const res= await response.json();
       if(res.success){
         this.current_image_data.mask_adjusted = false;
-        this.current_image_data.location_changed = false;
-        this.current_image_data.saved_location = Object.assign({}, this.current_image_data.location)
+        this.current_image_data.labels_changed = false;
+        this.current_image_data.saved_location_label = Object.assign({}, this.current_image_data.location_labels)
         this.updateSavedCellIdx(this.current_image_data)
       }
       else{
@@ -946,43 +939,15 @@ const app = new Vue({
         this.stopMaskAnnotation()
       }
     },
-    async toggleDiscard(){
-      this.current_image_data.location_changed = true;
-      if(this.current_image_data.discarded){
-        this.current_image_data.discarded = false;
+    async toggleExclusiveLabels(type){
+      this.current_image_data.labels_changed = true;
+      if(this.current_image_data.exclusive_label === type){
+        this.current_image_data.exclusive_label = false;
+        this.current_image_data.location_labels = Object.assign({}, this.current_image_data.saved_location_label)
       }
       else{
+        this.current_image_data.exclusive_label = type
         
-        const reasons = [
-          "Negative",
-          "Unspecific",
-          "Missing channels",
-          "Cell artifacts",
-          "Out of focus", 
-          "Bad segmentation",
-        ]
-        let question = "Why do you want to discard this cell?\nPlease type the corresponding number bellow:\n"
-        let index = 0
-        for(let r of reasons){
-          index++;
-          question = question + index + ': ' + r + '\n'
-        }
-        question = question + "\nFor other reason, please specify."
-        let reason = await api.prompt(question, "")
-        index = parseInt(reason);
-        if(!isNaN(index)){
-          if(index>0 && index<=reasons.length)
-          reason = reasons[index-1]
-          else{
-            await api.alert('Please type a valid number.')
-            return
-          }
-        }
-        if(!reason){
-          api.showMessage("Not discarded.")
-          return
-        }
-        this.current_image_data.discarded = reason
       }
       this.$forceUpdate()
       await this.uploadAnnotation();
@@ -1032,9 +997,9 @@ const app = new Vue({
       api.alert(JSON.stringify(blob))
     },
     // go to nextImage after select yes/no.
-    async selectLocation(selected){
-      this.current_image_data.location[this.current_image_data.single_location] = selected;
-      this.current_image_data.location_changed = true;
+    async selectLabel(selected){
+      this.current_image_data.location_labels[this.current_image_data.single_label] = selected;
+      this.current_image_data.labels_changed = true;
       await this.nextImage()
     },
     async displayMap(channels, channel_settings, brightness){
@@ -1259,16 +1224,15 @@ const app = new Vue({
       if(this.modifyInteraction)
       this.map.removeInteraction(this.modifyInteraction);
     },
-    toggleLocation(k){
-      if(this.current_image_data.location[k]){
-        this.current_image_data.location[k]=false
+    toggleLabel(k){
+      if(this.current_image_data.location_labels[k]){
+        this.current_image_data.location_labels[k]=false
       }
       else{
-        this.current_image_data.location[k]=true
+        this.current_image_data.location_labels[k]=true
       }
-      this.current_image_data.unsure = false;
-      this.current_image_data.discarded = false;
-      this.current_image_data.location_changed = true;
+      this.current_image_data.exclusive_label = false;
+      this.current_image_data.labels_changed = true;
     },
     home(){
       this.current_panel='task_selection';
@@ -1318,7 +1282,6 @@ api.export(new ImJoyPlugin())
 
 <window>
   <div style="text-align: center;" id="app">
-
     <div class="panel centered-panel" v-if="current_panel=='login'">
       <div class="panel-header">
         <div class="panel-title h2">HPA Image Annotator</div>
@@ -1329,7 +1292,7 @@ api.export(new ImJoyPlugin())
           <label class="form-label" for="server">Server</label>
           <select class="form-select" v-model="selected_server_url">
             <option>Choose an option</option>
-            <option v-for="(url, k) in servers" :value="url">{{k}}</option>
+            <option v-for="(url, k) in servers" :value="url" :key="url">{{k}}</option>
           </select>
         </div>
         <div class="form-group">
@@ -1346,8 +1309,6 @@ api.export(new ImJoyPlugin())
         <!-- buttons or inputs -->
       </div>
     </div>
-
-
     <div class="panel centered-panel" v-if="current_panel=='task_selection'">
       <div class="panel-header">
         <div class="panel-title h2">HPA Image Annotator </div> <span>(v{{version}})</span>
@@ -1356,7 +1317,7 @@ api.export(new ImJoyPlugin())
       </div>
       <div class="panel-body">
         <br>
-        <div v-for="(task, task_name) in tasks">
+        <div v-for="(task, task_name) in tasks" :key="task_name">
           <progress class="progress" style="width: 288px" :value="task.finished" :max="task.total"></progress>
           <br>
           <button class="btn" style="width: 280px" @click="chooseTask(task_name)"><i class="icon icon-edit"></i>&nbsp; {{task_name}}: {{task.finished}}/{{task.total}}</button>&nbsp;&nbsp;
@@ -1372,15 +1333,15 @@ api.export(new ImJoyPlugin())
     <div class="panel" v-if="current_panel=='statistics'&&statistics">
         <button style="right: 52px; top: 10px; position: absolute;" class="btn btn-action s-circle" title="refresh" @click="getStatistics()"><i class="icon icon-refresh"></i></button>&nbsp;&nbsp;
       <button style="right: 10px; top: 10px; position: absolute;" class="btn btn-action s-circle" title="home" @click="home()"><i class="icon icon-cross"></i></button>&nbsp;&nbsp;
-      <div v-for="(s, k) in statistics">
+      <div v-for="(s, k) in statistics" :key="k">
         <div class="card" style="width: 500px;max-width:100%;">
           <div class="card-body">
             <div class="card-header">
               <div class="card-title h5">{{k}}</div>
             </div>  
-            <div v-for="(v, task_name) in s">
+            <div v-for="(v, task_name) in s" :key="task_name">
               <div class="card-subtitle text-gray">{{task_name}}</div>
-              <div v-for="(t, ann_name) in v">
+              <div v-for="(t, ann_name) in v" :key="task_name">
               <span class="chip">{{ann_name}}: {{t}}</span>
               </div>
             </div>
@@ -1408,17 +1369,16 @@ api.export(new ImJoyPlugin())
           <input v-model="show_segmentation" @change="vector_source.changed()" name="hide segmentation mask" type="checkbox">
           <i class="form-icon"></i> Segmentation
         </label>
-        <label v-for="ch in channel_settings" v-show="ch.name!=='merged'" class="form-checkbox channel-controls">
+        <label v-for="ch in channel_settings" :key="ch" v-show="ch.name!=='merged'" class="form-checkbox channel-controls">
           <input v-model="ch.show" :name="ch.name" @change="channelSettingsUpdated" type="checkbox">
           <i class="form-icon"></i> {{ch.name}}
         </label>
-        
-        <button v-if="current_task_name === 'segmentation'||current_image_data.single_location" class="btn btn-sm small-btn channel-controls" :disabled="current_image_data.unsure" :class="{'discarded-btn': current_image_data.discarded}" title="discard" @click="toggleDiscard()">Discard</button>
+         <button :disabled="loading" v-show="current_task_name === 'segmentation'" :class="{'exclusive-label-btn': current_image_data.exclusive_label === 'discarded'}" class="btn btn-sm small-btn channel-controls" @click="toggleExclusiveLabels('discarded')">Discard</button>
         <!--<button class="btn btn-sm small-btn channel-controls" title="annotation mode" v-if="draw_mask_mode && (current_task_name !== 'segmentation')" @click="startRedrawAnnotation()">
           <span v-if="!current_image_data.mask_adjusted"><i class="icon icon-edit"></i>&nbsp;Mask</span>
           <span v-else>Remove</span>
         </button>
-        <button :disabled="loading" v-show="(current_task_name !== 'segmentation')&&current_image_data.mask_adjusted" style="background-color:white" class="btn btn-sm small-btn channel-controls" @click="saveMaskAnnotation()">Save</button>-->
+       -->
         <button :disabled="!mask_history||mask_history.length<=0" v-show="current_task_name === 'segmentation'" class="btn btn-sm small-btn channel-controls" @click="undoAnnotation()">Undo</button>
         <button class="btn btn-sm s-circle channel-controls" style="background-color: transparent;" title="info" @click="info()"><i class="icon icon-message"></i></button>
       </div>
@@ -1427,42 +1387,42 @@ api.export(new ImJoyPlugin())
           <div class="columns">
             <template v-for="group in LIMS_LOCATION_LABELS">
               <template v-for="label in group">
-                <button v-if="LIMS_TO_IF_CSV[label] && current_image_data.location[LIMS_TO_IF_CSV[label]] !== undefined" :disabled="current_image_data.discarded || current_image_data.unsure" @click="toggleLocation(LIMS_TO_IF_CSV[label])" class="column btn location-btn" :class="{'selected-location-btn': current_image_data.location[LIMS_TO_IF_CSV[label]]}">{{label.slice(0,12)+(label.length>12?'.': '')}}</button>
+                <button :key="label" v-if="LIMS_TO_IF_CSV[label] && current_image_data.location_labels[LIMS_TO_IF_CSV[label]] !== undefined" :disabled="current_image_data.exclusive_label" @click="toggleLabel(LIMS_TO_IF_CSV[label])" class="column btn label-btn" :class="{'selected-label-btn': current_image_data.location_labels[LIMS_TO_IF_CSV[label]]}">{{label.slice(0,12)+(label.length>12?'.': '')}}</button>
               </template>
               <!-- <div class="break hide-on-mobile"></div> -->
             </template>
-            <template v-for="(loc, k) in unsupported_locations">
-              <button  :disabled="current_image_data.discarded || current_image_data.unsure"  @click="toggleLocation(k)" class="column btn location-btn" :class="{'selected-location-btn': loc}">{{k.slice(0,12)+(k.length>12?'.': '')}}</button>
+            <template v-for="(loc, k) in unsupported_labels">
+              <button  :key="k" :disabled="current_image_data.exclusive_label"  @click="toggleLabel(k)" class="column btn label-btn" :class="{'selected-label-btn': loc}">{{k.slice(0,12)+(k.length>12?'.': '')}}</button>
             </template>
             
           </div>
             <br>
-          <div class="btn-group">
-            <button :disabled="current_image_data.discarded || current_image_data.unsure" class="btn transparent-btn" @click="saveAnnotation()">&nbsp;Save</button>
-            <button :disabled="current_image_data.unsure" :class="{'highlight-btn': current_image_data.discarded}" class="btn transparent-btn" @click="toggleDiscard()">Discard&nbsp;</button>
-            <button :disabled="current_image_data.discarded" :class="{'highlight-btn': current_image_data.unsure}" class="btn transparent-btn" @click="unsureAnnotation()">Unsure&nbsp;</button>
+          <div class="btn-group" v-if="current_task_name !== 'segmentation'">
+            <button v-for="el in current_image_data.exclusive_labels"  :key="el" class="btn btn-sm median-btn channel-controls" :disabled="current_image_data.exclusive_label&&current_image_data.exclusive_label!==el" :class="{'exclusive-label-btn': current_image_data.exclusive_label ===el}" @click="toggleExclusiveLabels(el)">{{el}}</button>
           </div>
           <br>
+          <br>
           <div class="btn-group">
-            <button :disabled="current_image_index===0  || loading" class="btn transparent-btn" @click="previousImage()"><i class="icon icon-back"></i>&nbsp;Back</button>
+            <button :disabled="current_image_index<=0  || loading" class="btn transparent-btn" @click="previousImage()"><i class="icon icon-back"></i>&nbsp;Back</button>
+            <button :disabled="current_image_data.exclusive_label" class="btn transparent-btn" @click="saveAnnotation()">&nbsp;Save</button>
             <button :disabled="current_image_index>=cached_image_data.length  || loading" class="btn transparent-btn" @click="nextImage()">Next&nbsp;<i class="icon icon-forward"></i></button>
           </div>
         </div>
       </template>
       <template v-if="current_image_data.label_display_mode==='single'">
         <div v-show="!hide_controls" class="btn-group floating-bottom-btn">
-          <button :disabled="current_image_index===0 || loading" class="btn transparent-btn" @click="previousImage()"><i class="icon icon-back"></i>&nbsp;Back</button>
-          <button :disabled="current_image_data.discarded" class="btn transparent-btn" @click="selectLocation(true)" :class="{'selected-location-btn': current_image_data.location[current_image_data.single_location]===true}"><i class="icon icon-check"></i>&nbsp;Yes</button>
-          <button :disabled="current_image_data.discarded" class="btn transparent-btn" @click="selectLocation(false)" :class="{'selected-location-btn': current_image_data.location[current_image_data.single_location]===false}"><i class="icon icon-cross"></i>&nbsp;No</button>
+          <button :disabled="current_image_index<=0 || loading" class="btn transparent-btn" @click="previousImage()"><i class="icon icon-back"></i>&nbsp;Back</button>
+          <button :disabled="current_image_data.exclusive_label" class="btn transparent-btn" @click="selectLabel(true)" :class="{'selected-label-btn': current_image_data.location_labels[current_image_data.single_label]===true}"><i class="icon icon-check"></i>&nbsp;Yes</button>
+          <button :disabled="current_image_data.exclusive_label" class="btn transparent-btn" @click="selectLabel(false)" :class="{'selected-label-btn': current_image_data.location_labels[current_image_data.single_label]===false}"><i class="icon icon-cross"></i>&nbsp;No</button>
           <button :disabled="current_image_index>=cached_image_data.length || loading" class="btn transparent-btn" @click="nextImage()">Next&nbsp;<i class="icon icon-forward"></i></button>
         </div>
-        <span v-show="!hide_controls" class="h3 floating-label">{{current_image_data.single_location}}</span>
+        <span v-show="!hide_controls" class="h3 floating-label">{{current_image_data.single_label}}</span>
       </template>
       <template v-if="current_task_name === 'segmentation'">
         <div v-show="!hide_controls" class="btn-group floating-bottom-btn">
           <button :disabled="current_image_index===0 || loading" class="btn transparent-btn" @click="previousImage()"><i class="icon icon-back"></i>&nbsp;Back</button>
-          <button :disabled="current_image_data.discarded || !selected_feature" class="btn transparent-btn" @click="deleteAnnotation()" ><i class="icon icon-cross"></i>Remove&nbsp;</button>
-          <button :disabled="current_image_data.discarded || loading" class="btn transparent-btn"  @click="saveMaskAnnotation()"><i class="icon icon-check"></i>
+          <button :disabled="current_image_data.exclusive_label || !selected_feature" class="btn transparent-btn" @click="deleteAnnotation()" ><i class="icon icon-cross"></i>Remove&nbsp;</button>
+          <button :disabled="current_image_data.exclusive_label || loading" class="btn transparent-btn"  @click="saveMaskAnnotation()"><i class="icon icon-check"></i>
             Save
           </button>
           <button :disabled="current_image_index>=cached_image_data.length || loading" class="btn transparent-btn" @click="nextImage()">Next&nbsp;<i class="icon icon-forward"></i></button>
@@ -1472,9 +1432,7 @@ api.export(new ImJoyPlugin())
       <div v-if="loading" class="loading loading-lg floating"></div>
       <div id="map" ref="map" v-show="current_panel=='imageviewer'" :style="{height: innerHeight}"></div>
     </div>
-    </div>
   </div>
-
 </window>
 <style lang="css">
   body{
@@ -1586,7 +1544,7 @@ api.export(new ImJoyPlugin())
     width: 330px;
     z-index: 999;
   }
-  .location-btn {
+  .label-btn {
     padding-top: 0px;
     font-size: small;
     margin-left: 0px;
@@ -1595,16 +1553,16 @@ api.export(new ImJoyPlugin())
     width: 110px;
     background-color:#fff3;
   }
-  .discarded-btn{
+  .exclusive-label-btn{
     background-color: rgb(248, 27, 2)!important;
   }
   .highlight-btn{
     background-color: white!important;
   }
-  .location-btn:hover, .location-btn:focus{
+  .label-btn:hover, .label-btn:focus{
     background-color:rgba(255, 255, 255, 0.42);
   }
-  .selected-location-btn{
+  .selected-label-btn{
     background-color: #3580ff7d!important;
     color: white!important;
   }
@@ -1621,6 +1579,14 @@ api.export(new ImJoyPlugin())
   }
   .small-btn{
     width: 60px;
+    background: transparent;
+    border: none;
+    background-color:#fff3;
+    margin-bottom: 3px;
+  }
+  
+  .median-btn{
+    width: 80px;
     background: transparent;
     border: none;
     background-color:#fff3;
