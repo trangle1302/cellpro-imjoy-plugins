@@ -8,7 +8,7 @@
   "type": "window",
   "tags": [],
   "ui": "",
-  "version": "0.1.58",
+  "version": "0.1.59",
   "api_version": "0.1.7",
   "description": "Annotate images for HPA single-cell image classification",
   "icon": "extension",
@@ -598,7 +598,7 @@ const app = new Vue({
       }
       imageData.exclusive_labels = response.available_labels.exclusive_labels
       if(response.available_labels.location_labels){
-        labels = Object.keys(response.available_labels.location_labels);
+        const labels = Object.keys(response.available_labels.location_labels);
         if(labels.length==1){
           imageData.label_display_mode = 'single'
           imageData.single_label = labels[0];
@@ -868,7 +868,7 @@ const app = new Vue({
         }
         if(typeof sendData.labels === 'object'){
           let noLabel = true;
-          for (loc in sendData.labels){
+          for (let loc in sendData.labels){
             if(sendData.labels[loc] === null){
               sendData.labels[loc] = false
             }
@@ -957,7 +957,7 @@ const app = new Vue({
     },
     showMaskAnnotation(mask_geojson){
       this.vector_source.clear()
-      features = (new GeoJSON()).readFeatures(mask_geojson)
+      const features = (new GeoJSON()).readFeatures(mask_geojson)
       this.vector_source.addFeatures(features)
       this.current_image_data.mask_adjusted = false;
       this.mask_history = []
