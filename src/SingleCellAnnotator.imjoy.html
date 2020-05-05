@@ -1139,6 +1139,18 @@ const app = new Vue({
               this.selected_feature = null
           }
       })
+
+      const modify = new Modify({
+          source: this.vector_source,
+          features: select.getFeatures(),
+          deleteCondition: function (event) {
+              return ol.events.condition.shiftKeyOnly(event) &&
+                  ol.events.condition.singleClick(event);
+          }
+      });
+      modify.createVertices = true;
+      this.map.addInteraction(modify);
+
       if(this.current_task_name === 'segmentation' && !this.isMobile){
         this.startMaskAnnotation(this.vector_source, this.freehand_mode)
       }
@@ -1151,9 +1163,9 @@ const app = new Vue({
         if(this.freehand_mode)
         this.startMaskAnnotation(this.vector_source, this.freehand_mode)
         else{
-          if(this.isMobile){
+          // if(this.isMobile){
             this.stopMaskAnnotation()
-          }
+          // }
         }
     },
     async undoAnnotation() {
