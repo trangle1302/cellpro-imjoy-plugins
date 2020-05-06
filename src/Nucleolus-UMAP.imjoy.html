@@ -20,7 +20,7 @@ a localization pattern.
     "type": "window",
     "tags": [],
     "ui": "Explore protein localization patterns in HPA images.",
-    "version": "0.9.3",
+    "version": "0.9.6",
     "api_version": "0.1.2",
     "description": "Explore protein localization patterns in HPA images.",
     "icon": "photo",
@@ -106,6 +106,7 @@ class ImJoyPlugin {
                 api.utils.openUrl(url)
             },
             openHPA(meta){
+                debugger
                 const url = 'https://www.proteinatlas.org/'+meta.gene_ensembl_id+'-'+meta.gene+'/cell/' 
                 api.utils.openUrl(url)
             },
@@ -239,29 +240,6 @@ class ImJoyPlugin {
     });
     }
 
-    async generateFakeData(){
-    const Xs = [], Ys = [], Meta=[], n = 100000;
-
-    for (let i = 0; i < n; i += 1) {
-        Xs.push(gaussianRand());
-        Ys.push(gaussianRand());
-        Meta.push('index: '+i)
-    }
-
-    const data = [{
-        type: "scattergl",
-        mode: "markers",
-        marker: {
-            line: {
-                width: 1,
-                color: '#404040'}
-        },
-        x: Xs,
-        y: Ys,
-        customdata: Meta
-    }]
-    return data
-    }
     async updateUmap(table, filter){
     filter = (filter || '') && filter.trim()
     const filters = filter.split(' ')
@@ -322,11 +300,12 @@ class ImJoyPlugin {
                 else if(typeof index === 'string'){
                     const locs = index.split(' ')
                     // Single loc nucleoli rim proteins (from the list I attached above) - #4DAF4A
-                    if(locs.includes("99")){
+                    // nucleoli rim from the green_rim_genes list
+                    if(locs.includes("green")){
                         return '#4DAF4A' + alpha
                     }
-                    // Multiloc nucleoli or nucleoli fibrillar center proteins 
-                    else if(locs.includes("2") || locs.includes("3")){
+                    // Multiloc nucleoli, nucleoli fibrillar center proteins or nucleoli rim from the yellow_rim_genes list
+                    else if(locs.includes("2") || locs.includes("3") || locs.includes("yellow")){
                         return '#FFFF33' + alpha
                     }
                     else{
@@ -340,6 +319,7 @@ class ImJoyPlugin {
             })
             //colorscale: 'Viridis'
         },
+        text: dataObj.info,
         x: dataObj.x,
         y: dataObj.y,
         customdata: table
@@ -347,12 +327,17 @@ class ImJoyPlugin {
     this.plot(data)
     }
     async run(my) {
-    let rim_proteins = await api.getAttachment('rim_proteins')
-    rim_proteins = rim_proteins.split('\n').filter((gene)=>{
+    let green_rim_genes = await api.getAttachment('green_rim_genes')
+    green_rim_genes = green_rim_genes.split('\n').filter((gene)=>{
         return gene.startsWith('ENSG')
     })
-    api.showMessage(`nucleoli rim list with ${rim_proteins.length} items loaded.`)
-    console.log('rim protein======>', rim_proteins)
+    let yellow_rim_genes = await api.getAttachment('yellow_rim_genes')
+    yellow_rim_genes = yellow_rim_genes.split('\n').filter((gene)=>{
+        return gene.startsWith('ENSG')
+    })
+
+    api.showMessage(`nucleoli rim list with ${green_rim_genes.length + yellow_rim_genes.length} items loaded, green: ${green_rim_genes.length}, yellow: ${yellow_rim_genes.length}.`)
+    console.log('rim protein======>', green_rim_genes, yellow_rim_genes)
     const url = "https://dl.dropbox.com/s/k9ekd4ff3fyjbfk/umap_results_fit_all_transform_all_sorted_20190422.csv"
     Papa.parse(url, {
         download: true,
@@ -371,11 +356,17 @@ class ImJoyPlugin {
             
             const rim_locs = []
             for(let loc of results.data){
-                if(rim_proteins.includes(loc.gene_ensembl_id)){
-                    loc.location = loc.location+','+ 'Nucleoli rim'
-                    loc.location_code = loc.location_code + ' 99'
+                if(yellow_rim_genes.includes(loc.gene_ensembl_id)){
+                    loc.location = loc.location+','+ 'Nucleoli rim(Y)'
+                    loc.location_code = loc.location_code + ' yellow'
                     rim_locs.push(loc)
                 }
+                if(green_rim_genes.includes(loc.gene_ensembl_id)){
+                    loc.location = loc.location+','+ 'Nucleoli rim(G)'
+                    loc.location_code = loc.location_code + ' green'
+                    rim_locs.push(loc)
+                }
+                loc.info = loc.gene + '(' + loc.cell_line + ')' + ': ' + loc.location
             }
             console.log('===============>', results)
             api.showMessage(`${rim_locs.length} Necleoli rim proteins(antibodies) detected: `, rim_locs)
@@ -448,7 +439,36 @@ api.export(new ImJoyPlugin())
     </div>
 
 </window>
-<attachment name="rim_proteins">
+<attachment name="green_rim_genes">
+ENSG00000122557
+ENSG00000188649
+ENSG00000135953
+ENSG00000145391
+ENSG00000108592
+ENSG00000085721
+ENSG00000077080
+ENSG00000067334
+ENSG00000188976
+ENSG00000171490
+ENSG00000175182
+ENSG00000180257
+ENSG00000149262
+ENSG00000088205
+ENSG00000164091
+ENSG00000010626
+ENSG00000124383
+ENSG00000134697
+ENSG00000117395
+ENSG00000021826
+ENSG00000253313
+ENSG00000128596
+ENSG00000135638
+ENSG00000175832
+ENSG00000170468
+ENSG00000109189
+ENSG00000155438
+</attachment>
+<attachment name="yellow_rim_genes">
 ENSG00000051180
 ENSG00000125872
 ENSG00000128245
@@ -462,10 +482,8 @@ ENSG00000198874
 ENSG00000225528
 ENSG00000230453
 ENSG00000232112
-ENSG00000122557
 ENSG00000067365
 ENSG00000163563
-ENSG00000188649
 ENSG00000123983
 ENSG00000188368
 ENSG00000174485
@@ -473,23 +491,19 @@ ENSG00000173145
 ENSG00000139289
 ENSG00000197385
 ENSG00000137876
-ENSG00000135953
 ENSG00000166261
 ENSG00000133114
 ENSG00000097096
 ENSG00000205476
-ENSG00000145391
 ENSG00000178691
 ENSG00000125089
 ENSG00000214274
-ENSG00000108592
 ENSG00000162650
 ENSG00000122406
 ENSG00000036549
 ENSG00000178685
 ENSG00000011260
 ENSG00000170270
-ENSG00000085721
 ENSG00000100722
 ENSG00000138801
 ENSG00000087502
@@ -499,32 +513,23 @@ ENSG00000264668
 ENSG00000175573
 ENSG00000101457
 ENSG00000203805
-ENSG00000077080
 ENSG00000132823
-ENSG00000067334
 ENSG00000198945
 ENSG00000148291
-ENSG00000188976
-ENSG00000171490
 ENSG00000111615
 ENSG00000008382
 ENSG00000169592
 ENSG00000167394
 ENSG00000134146
 ENSG00000086189
-ENSG00000175182
 ENSG00000151304
 ENSG00000105447
 ENSG00000153237
-ENSG00000180257
-ENSG00000149262
 ENSG00000104047
 ENSG00000221944
 ENSG00000189091
 ENSG00000110104
 ENSG00000103550
-ENSG00000088205
-ENSG00000164091
 ENSG00000175216
 ENSG00000100029
 ENSG00000107937
@@ -536,7 +541,6 @@ ENSG00000136045
 ENSG00000133773
 ENSG00000159335
 ENSG00000144711
-ENSG00000010626
 ENSG00000138138
 ENSG00000165732
 ENSG00000153044
@@ -546,7 +550,6 @@ ENSG00000197498
 ENSG00000119950
 ENSG00000071889
 ENSG00000158552
-ENSG00000124383
 ENSG00000162755
 ENSG00000176222
 ENSG00000131558
@@ -561,14 +564,11 @@ ENSG00000180758
 ENSG00000171824
 ENSG00000198265
 ENSG00000140538
-ENSG00000134697
 ENSG00000170027
-ENSG00000117395
 ENSG00000067533
 ENSG00000145555
 ENSG00000148296
 ENSG00000048405
-ENSG00000021826
 ENSG00000161036
 ENSG00000103479
 ENSG00000171497
@@ -576,28 +576,21 @@ ENSG00000178662
 ENSG00000160208
 ENSG00000277149
 ENSG00000174718
-ENSG00000253313
 ENSG00000055483
 ENSG00000181163
 ENSG00000166913
 ENSG00000175793
 ENSG00000197724
-ENSG00000128596
 ENSG00000108953
 ENSG00000123485
 ENSG00000156711
-ENSG00000135638
 ENSG00000100503
-ENSG00000175832
-ENSG00000170468
-ENSG00000109189
 ENSG00000185000
 ENSG00000148843
 ENSG00000163938
 ENSG00000121570
 ENSG00000111206
 ENSG00000149948
-ENSG00000155438
 ENSG00000163064
 ENSG00000184897
 ENSG00000187837
