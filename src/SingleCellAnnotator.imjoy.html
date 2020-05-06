@@ -8,7 +8,7 @@
   "type": "window",
   "tags": [],
   "ui": "",
-  "version": "0.1.59",
+  "version": "0.1.60",
   "api_version": "0.1.7",
   "description": "Annotate images for HPA single-cell image classification",
   "icon": "extension",
@@ -279,7 +279,7 @@ const app = new Vue({
     renderWindow: null,
     interactor: null,
     renderer: null,
-    modifyInteraction: null,
+    //modifyInteraction: null,
     drawInteraction: null,
     itkInteraction: null,
     draw_mask_mode: true,
@@ -1148,12 +1148,10 @@ const app = new Vue({
     },
     freehandChanged(){
         if (this.current_task_name !== 'segmentation') return
-        if(this.freehand_mode)
+        
         this.startMaskAnnotation(this.vector_source, this.freehand_mode)
-        else{
-          if(this.isMobile){
+        if(!this.freehand_mode && this.isMobile){
             this.stopMaskAnnotation()
-          }
         }
     },
     async undoAnnotation() {
@@ -1189,11 +1187,6 @@ const app = new Vue({
       if(!source){
         console.error("Please specify an annotation layer source")
       }
-      if (this.modifyInteraction) {
-        this.map.removeInteraction(this.modifyInteraction)
-      }
-      this.modifyInteraction = new Modify({source: source});
-      this.map.addInteraction(this.modifyInteraction);
       if (this.drawInteraction) {
         this.map.removeInteraction(this.drawInteraction)
       }
@@ -1202,9 +1195,9 @@ const app = new Vue({
         type: 'Polygon',
         freehand: freehand
       });
-        this.drawInteraction.on('drawend', async (evt) => {
-            
-        });
+      // this.drawInteraction.on('drawend', async (evt) => {
+          
+      // });
       this.map.addInteraction(this.drawInteraction);
       if(this.current_task_name !== 'segmentation'){
         if(this.channel_settings['Mask'])
@@ -1219,8 +1212,6 @@ const app = new Vue({
       if(!this.map) return;
       if(this.drawInteraction)
       this.map.removeInteraction(this.drawInteraction);
-      if(this.modifyInteraction)
-      this.map.removeInteraction(this.modifyInteraction);
     },
     toggleLabel(k){
       if(this.current_image_data.location_labels[k]){
