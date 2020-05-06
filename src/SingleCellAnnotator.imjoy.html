@@ -1187,11 +1187,6 @@ const app = new Vue({
       if(!source){
         console.error("Please specify an annotation layer source")
       }
-      //if (this.modifyInteraction) {
-      //  this.map.removeInteraction(this.modifyInteraction)
-      //}
-      //this.modifyInteraction = new Modify({source: source});
-      //this.map.addInteraction(this.modifyInteraction);
       if (this.drawInteraction) {
         this.map.removeInteraction(this.drawInteraction)
       }
@@ -1200,9 +1195,9 @@ const app = new Vue({
         type: 'Polygon',
         freehand: freehand
       });
-        this.drawInteraction.on('drawend', async (evt) => {
-            
-        });
+      // this.drawInteraction.on('drawend', async (evt) => {
+          
+      // });
       this.map.addInteraction(this.drawInteraction);
       if(this.current_task_name !== 'segmentation'){
         if(this.channel_settings['Mask'])
@@ -1217,8 +1212,6 @@ const app = new Vue({
       if(!this.map) return;
       if(this.drawInteraction)
       this.map.removeInteraction(this.drawInteraction);
-      //if(this.modifyInteraction)
-      //this.map.removeInteraction(this.modifyInteraction);
     },
     toggleLabel(k){
       if(this.current_image_data.location_labels[k]){
