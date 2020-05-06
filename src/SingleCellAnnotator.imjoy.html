@@ -1,1632 +1,634 @@
 <docs lang="markdown">
-[TODO: write documentation for this plugin.]
+
+This plugin allows to visualize results of a classification of protein 
+localization patterns from microscope images of the entire HPA cell atlas(v18, 63955 images).  
+
+Classification is performed with the winning approach of a 2018 Kaggle challenge 
+(https://www.kaggle.com/c/human-protein-atlas-image-classification). 
+
+Plots shows a UMAP projection (Uniform Manifold Approximation and Projection) calculated from the
+last layer of the network (densenet121, dimensions: 1024). Each dot is an image and when clicking on a 
+dot, the corresponding image is displayed together with information about the cell line, the 
+protein, and a link to the HPA website. The plugin also allows to search for a gene, cell line, or 
+a localization pattern.  
+
 </docs>
 
 <config lang="json">
 {
-  "name": "SingleCellAnnotator",
-  "type": "window",
-  "tags": [],
-  "ui": "",
-  "version": "0.1.59",
-  "api_version": "0.1.7",
-  "description": "Annotate images for HPA single-cell image classification",
-  "icon": "extension",
-  "inputs": null,
-  "outputs": null,
-  "env": "",
-  "permissions": [],
-  "requirements": [
-      "https://cdn.jsdelivr.net/npm/vue@2.6.10/dist/vue.min.js",
-      "https://static.imjoy.io/spectre.css/spectre.min.css",
-      "https://static.imjoy.io/spectre.css/spectre-exp.min.css",
-      "https://static.imjoy.io/spectre.css/spectre-icons.min.css",
-      "https://cdn.jsdelivr.net/gh/openlayers/openlayers.github.io@master/en/v6.1.1/css/ol.css",
-      "https://cdn.jsdelivr.net/gh/openlayers/openlayers.github.io@master/en/v6.1.1/build/ol.js"
-  ],
-  "dependencies": [],
-  "defaults": {"fullscreen": true},
-  "runnable": true
+    "name": "Nucleolus-UMAP",
+    "type": "window",
+    "tags": [],
+    "ui": "Explore protein localization patterns in HPA images.",
+    "version": "0.9.4",
+    "api_version": "0.1.2",
+    "description": "Explore protein localization patterns in HPA images.",
+    "icon": "photo",
+    "inputs": null,
+    "outputs": null,
+    "requirements": [
+    "https://cdn.plot.ly/plotly-latest.min.js",
+    "https://unpkg.com/papaparse@latest/papaparse.min.js",
+    "https://cdn.jsdelivr.net/npm/vue@2.6.10/dist/vue.min.js",
+    "https://unpkg.com/spectre.css/dist/spectre.min.css",
+    "https://unpkg.com/spectre.css/dist/spectre-exp.min.css",
+    "https://unpkg.com/spectre.css/dist/spectre-icons.min.css"],
+    "dependencies": [],
+    "defaults": {"w": 50, "h":20, "fullscreen": true},
+    "cover": "https://imjoy-team.github.io/imjoy-plugins/hpa-umap/hpa-umap-cover.gif"
 }
 </config>
 
 <script lang="javascript">
-const SERVERS = {
-  'development': 'https://wet-grasshopper-41.telebit.io',
-  'production': 'https://unlucky-shrimp-3.telebit.io',
-  'localhost': 'http://127.0.0.1:5000'
+function gaussianRand() {
+    var rand = 0;
+    for (var i = 0; i < 6; i += 1) {
+        rand += Math.random();
+    }
+    return (rand / 6)-0.5;
 }
 
-const Map = ol.Map;
-const View = ol.View;
-const Draw = ol.interaction.Draw;
-const Modify = ol.interaction.Modify;
-const Select = ol.interaction.Select;
-const defaultInteractions = ol.interaction.defaults;
-const TileLayer = ol.layer.Tile;
-const Style = ol.style.Style;
-const Fill = ol.style.Fill;
-const Stroke = ol.style.Stroke;
-const Text = ol.style.Text;
-const VectorLayer = ol.layer.Vector;
-const OSM = ol.source.OSM;
-const VectorSource = ol.source.Vector;
-const MousePosition = ol.control.MousePosition;
-const LayerSwitcher = ol.control.LayerSwitcher;
-const Zoomify = ol.source.Zoomify;
-const Static = ol.source.ImageStatic;
-const ImageLayer = ol.layer.Image;
-const Projection = ol.proj.Projection;
-const createStringXY = ol.coordinate.createStringXY;
-const DragAndDrop = ol.interaction.DragAndDrop;
-const GeoJSON = ol.format.GeoJSON;
-const RasterSource = ol.source.Raster;
-const getWidth = ol.extent.getWidth;
-const getCenter = ol.extent.getCenter;
-const Layer = ol.layer.Layer;
-const fromLonLat = ol.proj.fromLonLat;
-const toLonLat = ol.proj.toLonLat;
-const CircleStyle = ol.style.Circle;
-const defaultControls = ol.control.defaults;
+function transpose(data) {
+    let result = {};
+    for (let row of data) {
+    for (let [key, value] of Object.entries(row)) {
+        result[key] = result[key] || [];
+        result[key].push(value); 
+    }
+    }
+    return result;
+}
 
-function mobileAndTabletcheck() {
-  var check = false;
-  (function(a){if(/(android|bb\d+|meego).+mobile|avantgo|bada\/|blackberry|blazer|compal|elaine|fennec|hiptop|iemobile|ip(hone|od)|iris|kindle|lge |maemo|midp|mmp|mobile.+firefox|netfront|opera m(ob|in)i|palm( os)?|phone|p(ixi|re)\/|plucker|pocket|psp|series(4|6)0|symbian|treo|up\.(browser|link)|vodafone|wap|windows ce|xda|xiino|android|ipad|playbook|silk/i.test(a)||/1207|6310|6590|3gso|4thp|50[1-6]i|770s|802s|a wa|abac|ac(er|oo|s\-)|ai(ko|rn)|al(av|ca|co)|amoi|an(ex|ny|yw)|aptu|ar(ch|go)|as(te|us)|attw|au(di|\-m|r |s )|avan|be(ck|ll|nq)|bi(lb|rd)|bl(ac|az)|br(e|v)w|bumb|bw\-(n|u)|c55\/|capi|ccwa|cdm\-|cell|chtm|cldc|cmd\-|co(mp|nd)|craw|da(it|ll|ng)|dbte|dc\-s|devi|dica|dmob|do(c|p)o|ds(12|\-d)|el(49|ai)|em(l2|ul)|er(ic|k0)|esl8|ez([4-7]0|os|wa|ze)|fetc|fly(\-|_)|g1 u|g560|gene|gf\-5|g\-mo|go(\.w|od)|gr(ad|un)|haie|hcit|hd\-(m|p|t)|hei\-|hi(pt|ta)|hp( i|ip)|hs\-c|ht(c(\-| |_|a|g|p|s|t)|tp)|hu(aw|tc)|i\-(20|go|ma)|i230|iac( |\-|\/)|ibro|idea|ig01|ikom|im1k|inno|ipaq|iris|ja(t|v)a|jbro|jemu|jigs|kddi|keji|kgt( |\/)|klon|kpt |kwc\-|kyo(c|k)|le(no|xi)|lg( g|\/(k|l|u)|50|54|\-[a-w])|libw|lynx|m1\-w|m3ga|m50\/|ma(te|ui|xo)|mc(01|21|ca)|m\-cr|me(rc|ri)|mi(o8|oa|ts)|mmef|mo(01|02|bi|de|do|t(\-| |o|v)|zz)|mt(50|p1|v )|mwbp|mywa|n10[0-2]|n20[2-3]|n30(0|2)|n50(0|2|5)|n7(0(0|1)|10)|ne((c|m)\-|on|tf|wf|wg|wt)|nok(6|i)|nzph|o2im|op(ti|wv)|oran|owg1|p800|pan(a|d|t)|pdxg|pg(13|\-([1-8]|c))|phil|pire|pl(ay|uc)|pn\-2|po(ck|rt|se)|prox|psio|pt\-g|qa\-a|qc(07|12|21|32|60|\-[2-7]|i\-)|qtek|r380|r600|raks|rim9|ro(ve|zo)|s55\/|sa(ge|ma|mm|ms|ny|va)|sc(01|h\-|oo|p\-)|sdk\/|se(c(\-|0|1)|47|mc|nd|ri)|sgh\-|shar|sie(\-|m)|sk\-0|sl(45|id)|sm(al|ar|b3|it|t5)|so(ft|ny)|sp(01|h\-|v\-|v )|sy(01|mb)|t2(18|50)|t6(00|10|18)|ta(gt|lk)|tcl\-|tdg\-|tel(i|m)|tim\-|t\-mo|to(pl|sh)|ts(70|m\-|m3|m5)|tx\-9|up(\.b|g1|si)|utst|v400|v750|veri|vi(rg|te)|vk(40|5[0-3]|\-v)|vm40|voda|vulc|vx(52|53|60|61|70|80|81|83|85|98)|w3c(\-| )|webc|whit|wi(g |nc|nw)|wmlb|wonu|x700|yas\-|your|zeto|zte\-/i.test(a.substr(0,4))) check = true;})(navigator.userAgent||navigator.vendor||window.opera);
-  return check;
+const convertBase64ToFile = function (image) {
+    let mime = image.match(/data:([a-zA-Z0-9]+\/[a-zA-Z0-9-.+]+).*,.*/);  
+    if (mime && mime.length) {
+    mime = mime[1];
+    }
+
+    let ab
+    if(mime === 'image/svg+xml'){
+        const byteString = image.split(',')[1];
+        ab = decodeURIComponent(byteString)
+    }
+    else{
+        const byteString = atob(image.split(',')[1]);
+    ab = new ArrayBuffer(byteString.length);
+    const ia = new Uint8Array(ab);
+    for (let i = 0; i < byteString.length; i += 1) {
+        ia[i] = byteString.charCodeAt(i);
+    }
+    }
+    const newBlob = new Blob([ab], {
+    type: mime,
+    });
+
+    return newBlob;
 };
 
-async function getMeta(url) {
-    return new Promise((resolve, reject) => {
-        let img = new Image();
-        img.onload = () => resolve(img);
-        img.onerror = reject;
-        img.src = url;
-    });
-}
-
-async function getImageData(url) {
-  return new Promise((resolve, reject) => {
-      const img = new Image();
-      img.onload = () => {
-        const canvas = document.createElement('canvas')
-        canvas.width = img.width
-        canvas.height = img.height
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(img, 0,0);
-        const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height).data
-        const data = new Uint8Array(new ArrayBuffer(canvas.width * canvas.height))
-        for(let i=0;i<canvas.width*canvas.height;i++){
-          data[i] = imgData[i*4];
-        }
-        resolve({data: data, width: canvas.width, height: canvas.height})
-      };
-      img.onerror = reject;
-      img.crossOrigin = "Anonymous";
-      img.src = url;
-  });
-};
-
-const colormap = {'Microtubule': 0, 'Protein': 1, 'ER': 0, 'Nuclei': 2, 'Mask': 3}
-
-async function composeChannels(channels, channel_settings, alpha, brightness){
-  if(alpha<0) alpha = 0;
-  if(alpha>1) alpha = 1;
-  brightness = brightness || 1.0;
-  const rgb_channels = []
-  const canvas = document.createElement('canvas') 
-  for(let k in channel_settings){
-    if(channels[k] && colormap.hasOwnProperty(k)){
-      if(channel_settings[k].show){
-        const imgData = await getImageData(channels[k]);
-        rgb_channels[colormap[k]] = imgData;
-        canvas.width = imgData.width
-        canvas.height = imgData.height
-      }
-    }
-    if(!colormap.hasOwnProperty(k)){
-      console.warn('No color map defined for ' + k)
-    }
-  }
-  const ctx = canvas.getContext('2d');
-  const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height)
-  const channel_offset = canvas.width * canvas.height * 4
-  let i, j, v;
-  const data = imgData.data
-  // set color channels
-  for(j=0;j<3;j++){
-    if(rgb_channels[j]){
-      const src = rgb_channels[j].data;
-      for(i=0;i<channel_offset;i++){
-        if(brightness===1){
-          data[i*4+j] = src[i]
-        }
-        else{
-          v = src[i]*brightness;
-          data[i*4+j] = v>255?255:parseInt(v);
-        }
-      }
-    }
-  }
-  // set alpha channel
-  if(rgb_channels[3]){
-    const src = rgb_channels[3].data;
-    for(i=0;i<channel_offset;i++){
-      if(src[i]>0){
-        data[i*4+3] = parseInt(alpha*255);
-      }
-      else{
-        data[i*4+3] = 255;
-      }
-    }
-  }
-  else{
-    for(i=0;i<channel_offset;i++){
-      data[i*4+3] = 255; 
-    }
-  }
-  ctx.putImageData(imgData, 0, 0);
-  return {url: canvas.toDataURL(), width: canvas.width, height: canvas.height}
-}
-
-const imageDataTemplate = {
-  extend: null,
-  cell_id: null,
-  mask_geojson: null,
-  label_display_mode: null,
-  channels: null,
-  label: null,
-  exclusive_label: false,
-  mask_adjusted: false,
-  label_changed: false,
-  brightness: 1.0,
-};
-
-const LIMS_LOCATION_LABELS = {
-    "Nuclear localizations":
-    [
-        "Nucleoplasm",
-        "Nuc membrane",
-        "Nucleoli",
-        "Nucleoli Fibrillar center",
-        "Nucl speckles",
-        "Nuclear bodies",
-        "Kinetochore",
-        "Mitotic chromosome",
-    ],
-  "Secretory":
-    [
-        "ER",
-        "Golgi",
-        "Vesicles",
-        "Peroxisomes",
-        "Endosomes",
-        "Lysosomes",
-    ],
-  "Cytoskeletal localizations":
-    [
-        "Csk(Int Fil)",
-        "Csk(actin)",
-        "Focal Adhesions",
-        "Csk(mt)",
-        "Csk(mt end)",
-        "Csk(cyt bridge)",
-        "Midbody",
-        "Midbody ring",
-        "Cleavage furrow",
-        "Mitotic spindle",
-        "Primary cilia",
-        "Centriolar satelite",
-        "Centrosome",
-    ],
-  "Others":
-    [
-        "Lipid droplets",
-        "Plasma membrane",
-        "Cell Junctions",
-        "Mitochondria",
-        "Aggresome",
-        "Cytosol",
-        "Cytoplasmic bodies",
-        "Rods & Rings",
-  ],
-}
-
-const LIMS_TO_IF_CSV = {
-  "Nucleoplasm": "Nucleoplasm",
-  "Nuc membrane": "Nuclear membrane",
-  "Nucleoli": "Nucleoli",
-  "Nucleoli Fibrillar center": "Nucleoli fibrillar center",
-  "Nucl speckles": "Nuclear speckles",
-  "Nuclear bodies": "Nuclear bodies",
-  "Kinetochore": null,
-  "Mitotic chromosome": "Mitotic chromosome",
-
-  "ER": "Endoplasmic reticulum",
-  "Golgi": "Golgi apparatus",
-  "Vesicles": "Vesicles",
-  "Peroxisomes": "Peroxisomes",
-  "Endosomes": "Endosomes",
-  "Lysosomes": "Lysosomes",
-
-  "Csk(Int Fil)": "Intermediate filaments",
-  "Csk(actin)": "Actin filaments",
-  "Focal Adhesions": "Focal adhesion sites",
-  "Csk(mt)": "Microtubules",
-  "Csk(mt end)": "Microtubule ends",
-  "Csk(cyt bridge)": "Cytokinetic bridge",
-  "Midbody": "Midbody",
-  "Midbody ring": "Midbody ring",
-  "Cleavage furrow": "Cleavage furrow",
-  "Mitotic spindle": "Mitotic spindle",
-  "Primary cilia": null,
-  "Centriolar satalite": "Centriolar satellite",
-  "Centrosome": "Centrosome",
-  "Lipid droplets": "Lipid droplets",
-  "Plasma membrane": "Plasma membrane",
-  "Cell Junctions": "Cell Junctions",
-  "Mitochondria": "Mitochondria",
-  "Aggresome": "Aggresome",
-  "Cytosol": "Cytosol",
-  "Cytoplasmic bodies": "Cytoplasmic bodies",
-  "Rods & Rings": "Rods & Rings",
-    
-}
-
-const app = new Vue({
-  el: '#app',
-  data: {
-    viewProxy: null,
-    renderWindow: null,
-    interactor: null,
-    renderer: null,
-    modifyInteraction: null,
-    drawInteraction: null,
-    itkInteraction: null,
-    draw_mask_mode: true,
-    freehand_mode: true,
-    vector_source: null,
-    selected_feature: null,
-    loading: false,
-    // develop image parsing
-    selected_server_url: null,
-    servers: SERVERS,
-    select: null,
-    current_panel: 'login',
-    user:{
-      username: "",
-      password: "",
-      access_token: null
-    },
-    mask_history: [],
-    channel_settings: {},
-    alpha: 0.2,
-    hide_controls: false,
-    show_segmentation: true,
-    default_extend_value: 50,
-    current_extend_value: 50,
-    statistics: {},
-    // from here this is communication to backend, to develop/activate
-    tasks: null,
-    current_task_name: null,
-    cell_per_batch: 10,
-    cached_image_data: [],
-    current_image_data: null,
-    current_image_index: 0,
-    loading_cache: false,
-    innerHeight: '100vh',
-    isMobile: false,
-    version: null,
-    LIMS_LOCATION_LABELS: LIMS_LOCATION_LABELS,
-    LIMS_TO_IF_CSV: LIMS_TO_IF_CSV,
-    LIMS_VALUES: Object.values(LIMS_TO_IF_CSV)
-  },
-  mounted(){
-    this.$nextTick(async()=>{
-      this.version = await api.getConfig('_version');
-    })
-    this.isMobile = mobileAndTabletcheck()
-    window.onresize = ()=>{
-      document.body.height = window.innerHeight;
-      this.innerHTML = window.innerHeight + 'px';
-      this.$forceUpdate()
-    }
-    window.onresize();
-    this.selected_server_url = this.servers['production']
-    document.addEventListener('keydown', async (event)=>{
-      if(this.current_panel==='imageviewer'){
-        if(event.shiftKey && event.code ==='Equal' || ['+', 'Plus', 'NumpadAdd'].includes(event.code)){
-          this.current_image_data.brightness = this.current_image_data.brightness * 1.3
-          this.displayMap(this.current_image_data.channels, this.channel_settings, this.current_image_data.brightness);
-        }
-        else if(['-', 'Minus', 'NumpadSubtract'].includes(event.code)){
-          this.current_image_data.brightness = this.current_image_data.brightness / 1.3
-          this.displayMap(this.current_image_data.channels, this.channel_settings, this.current_image_data.brightness);
-        }
-        else if(event.code === 'KeyT'){
-          if(this.current_image_data.label_display_mode==='single'){
-            this.selectLabel(true)
-          }
-        }
-        else if(event.code === 'KeyF'){
-          if(this.current_image_data.label_display_mode==='single'){
-            this.selectLabel(false)
-          }
-        }
-        else if(event.code === 'ArrowRight'){
-          this.nextImage()
-        }
-        else if(event.code === 'ArrowLeft'){
-          this.previousImage()
-        }
-        else if(event.code === 'KeyD'){
-          
-          this.toggleExclusiveLabels('Discarded')
-        }
-        else if(event.code === 'KeyS'){
-          if(this.current_image_data.labels_changed){
-            this.uploadAnnotation();
-          }
-          if(this.current_image_data.mask_adjusted){
-            this.saveMaskAnnotation()
-          }
-        }
-        else if(event.code === 'Escape'){
-          this.home()
-        }
-        else if(event.code === 'KeyE'){
-          this.current_extend_value = parseInt(await api.prompt("Please enter a pixel number for extending the image area surrounding the cell:", "300"))
-          if( !this.current_extend_value || this.current_extend_value<=0){
-            this.current_extend_value = this.default_extend_value
-          }
-          else if(this.current_extend_value>2048){
-            this.current_extend_value = this.default_extend_value
-          }
-          this.reloadImage()
-        }
-        // alpha channel mask
-        else if(event.code === 'KeyA'){
-          if(this.channel_settings['Mask'].show)
-            this.channel_settings['Mask'].show = false;
-          else
-            this.channel_settings['Mask'].show = true;
-          this.displayMap(this.current_image_data.channels, this.channel_settings);
-        }
-        // ER
-        else if(event.code === 'KeyY'){
-          if(this.channel_settings['ER'].show)
-            this.channel_settings['ER'].show = false;
-          else
-            this.channel_settings['ER'].show = true;
-          this.displayMap(this.current_image_data.channels, this.channel_settings);
-        }
-        // Microtubule
-        else if(event.code === 'KeyR'){
-          if(this.channel_settings['Microtubule'].show)
-            this.channel_settings['Microtubule'].show = false;
-          else
-            this.channel_settings['Microtubule'].show = true;
-          this.displayMap(this.current_image_data.channels, this.channel_settings);
-        }
-        // Nuclei
-        else if(event.code === 'KeyB'){
-          if(this.channel_settings['Nuclei'].show)
-            this.channel_settings['Nuclei'].show = false;
-          else
-            this.channel_settings['Nuclei'].show = true;
-          this.displayMap(this.current_image_data.channels, this.channel_settings);
-        }
-        // Protein
-        else if(event.code === 'KeyG'){
-          if(this.channel_settings['Protein'].show)
-            this.channel_settings['Protein'].show = false;
-          else
-            this.channel_settings['Protein'].show = true;
-          this.displayMap(this.current_image_data.channels, this.channel_settings);
-        }
-        else if(event.code === 'KeyH'){
-          if(this.hide_controls){
-            this.hide_controls = false
-          } 
-          else{
-            this.hide_controls = true
-          }
-        }
-        else if(event.code ==='Backspace' || event.code ==='Delete'){
-          if(this.current_task_name==='segmentation'){
-            this.deleteAnnotation()
-          }
-        }
-        else if(event.code ==='KeyZ' && (event.metaKey || event.ctrlKey)){
-          if(this.current_task_name==='segmentation'){
-            this.undoAnnotation()
-          }
-        }
-        else if(event.code ==='KeyM'){
-          if(this.current_task_name==='segmentation'){
-            if(this.show_segmentation) this.show_segmentation = false
-            else this.show_segmentation = true
-            this.vector_source.changed()
-          }
-        }
-        this.$forceUpdate()
-      }
-    })
-    // make sure the key binding works
-    document.addEventListener('mouseenter', e => {
-      window.focus();
-    });
-    document.addEventListener('click', e => {
-      window.focus();
-    });
-  },
-  computed: {
-    unsupported_labels: function(){
-      const locs = {}
-      if(this.current_image_data.location_labels){
-        for(let k in this.current_image_data.location_labels){
-          if(!this.LIMS_VALUES.includes(k)){
-            locs[k] = this.current_image_data.location_labels[k]
-          }
-        }
-      }
-      return locs      
-    }
-  },
-  methods: {
-    info(){
-      api.alert(`====== Hot keys ======
-      ======Navigation=====
-      ➕: Increase brightness
-      ➖: Decrease brightness
-      ➡️: Next image
-      ⬅️: Back
-      ======Annotation=====
-      T: True
-      F: False
-      D: Discard (toggle)
-      ======Mask=====
-      S: Save mask
-      Delete: delete selected mask
-      Ctrl+Z: Undo
-      R: Redraw mask
-      B: Extend image region
-      M: Show/hide segmentation mask
-      ======Channels=====
-      A: Alpha mask channel (toggle)
-      R: Microtubule channel (toggle)
-      G: Protein channel (toggle)
-      B: Nuclei channel (toggle)
-      Y: ER channel (toggle)
-      ======Others=====
-      H: Hide all controls (toggle)
-      Esc: Quit annotation
-      `)
-    },
-    async login(){
-      const formData = new FormData();
-      formData.append('username', this.user.username);
-      formData.append('password', this.user.password);
-      try{
-          const response = await fetch(this.selected_server_url + "/login", {
-          method: 'POST',
-          mode: 'cors',
-          body: formData
-        })
-        if(response.status === 200){
-          const res = await response.json()
-          if(res.success){
-            if(!res.access_token){
-              api.alert('JWT access token required, please make sure you are using the latest backend.');
-              return
-            }
-            this.user.role = res.role
-            this.user.access_token = res.access_token
-            this.current_panel = 'task_selection';
-            await this.getTaskList()
-          }else{
-            api.alert('Failed to login, error: ' + res.error);
-          }
-        }else{
-          api.alert('Response Status' + response.status)
-        }
-      }
-      catch(e){
-        api.alert("Cannot login to the server, error: " + e)
-      }
-    },
-    async getStatistics(){
-      const response2 = await fetch(this.selected_server_url + "/statistics", {
-        method: 'GET',
-        headers: {'Authorization': `Bearer ${this.user.access_token}`},
-      })
-      const res2 = await response2.json()
-      this.statistics = res2.statistics
-      console.log( this.statistics )
-    },
-    async getTaskList(){
-      const response2 = await fetch(this.selected_server_url + "/tasks", {
-        method: 'GET',
-        headers: {'Authorization': `Bearer ${this.user.access_token}`},
-      })
-      const res2 = await response2.json()
-      this.tasks = res2.tasks
-    },
-    async fetchURLData (sub_url){
-      const response = await fetch(this.selected_server_url + sub_url, {
-        method: 'GET',
-        headers: {'Authorization': `Bearer ${this.user.access_token}`},
-      })
-      if(response.status === 200){
-        const res = await response.json()
-        if (res.success){
-          return res
-        }else{
-          api.showMessage('Internal server error: ' + res.error)
-          throw 'Internal server error: ' + res.error
-        }
-      }else{
-        api.showMessage('Response Status:' + response.status)
-        throw 'Response Status:' + response.status
-      }
-    },
-    async chooseTask (task_name){
-      this.current_task_name = task_name;
-      this.cached_image_data = [];
-      if(this.current_task_name==='segmentation' && !this.isMobile){
-        this.freehand_mode = true
-      }
-      else{
-        this.freehand_mode = false
-      }
-      this.loading = true;
-      this.channel_settings = {};
-      this.getNewImageBatch(this.current_task_name, true);
-    },
-    async fetchCellImage(cell_id){
-      const imageData = JSON.parse(JSON.stringify(imageDataTemplate));
-      imageData.cell_id = cell_id;
-      let image_url = "/images/" + this.current_task_name + "/" + imageData.cell_id;
-      imageData.extend = this.current_extend_value;
-      image_url += "?extend="+imageData.extend+"&maskout=1";
-      const response = await this.fetchURLData(image_url)
-      imageData.bbox = response.bbox;
-      imageData.mask_geojson = response.mask;
-      //ER, Microtubule, Nuclei, Protein,
-      imageData.channels = response.images;
-      if(!response.available_labels){
-        throw new Error("no available labels.")
-      }
-      imageData.exclusive_labels = response.available_labels.exclusive_labels
-      if(response.available_labels.location_labels){
-        const labels = Object.keys(response.available_labels.location_labels);
-        if(labels.length==1){
-          imageData.label_display_mode = 'single'
-          imageData.single_label = labels[0];
-          imageData.location_labels = response.available_labels.location_labels;
-        }
-        else
-        { 
-          imageData.label_display_mode = 'multiple'
-          imageData.location_labels = response.available_labels.location_labels;
-        }
-        
-        imageData.saved_location_label = Object.assign({}, imageData.location_labels)
-      }
-      else{
-        imageData.label_display_mode = 'mask'
-      }
-      // record the current cell indice list
-      this.updateSavedCellIdx(imageData)
-
-      return imageData
-    },
-    updateSavedCellIdx(imageData){
-      imageData.saved_cell_idx_list = []
-      
-      const features = imageData.mask_geojson.features;
-      imageData.max_cell_id = -1
-      for (let i = 0; i < features.length; i++){
-        if(features[i].properties && typeof features[i].properties.cell_idx === 'number'){
-          if(imageData.max_cell_id< features[i].properties.cell_idx){
-            imageData.max_cell_id = features[i].properties.cell_idx
-          }
-        }
-      }
-
-      for (let i = 0; i < features.length; i++){
-        features[i].properties = features[i].properties || {type: 'cell'}
-        // make sure one cell has one id
-        if(typeof features[i].properties.cell_idx !== 'number'){
-          imageData.max_cell_id++;
-          features[i].properties.cell_idx = imageData.max_cell_id;
-        }
-        imageData.saved_cell_idx_list.push(features[i].properties.cell_idx)
-      }
-    },
-    getMaskDiff(imageData){
-      const cell_idx_max = Math.max(...imageData.saved_cell_idx_list);
-      const features = this.current_image_data.mask_geojson.features;
-      let new_cell_idx = 0;
-      for (let k = 0; k < features.length; k++){
-        if(features[k].properties && typeof features[k].properties.cell_idx === 'number'&& features[k].properties.cell_idx > new_cell_idx){
-          new_cell_idx = features[k].properties.cell_idx
-        }
-      };
-      const new_cell_idx_list = [];
-      for (let i = 0; i < features.length; i++){
-        features[i].properties = features[i].properties || {}
-        if(!features[i].properties.label){
-          new_cell_idx += 1
-          features[i].properties.cell_idx = new_cell_idx;   
-          features[i].properties.label = 'cell'
-        };
-        new_cell_idx_list.push(features[i].properties.cell_idx)            
-      };
-      const removed = [];
-      const added = [];
-      for (let i=0; i < imageData.saved_cell_idx_list.length; i++){
-        if(!(new_cell_idx_list.includes(imageData.saved_cell_idx_list[i]))){
-          removed.push(imageData.saved_cell_idx_list[i])
-        }
-      };
-      for (let j = 0; j < new_cell_idx_list.length; j++){
-        if (!(imageData.saved_cell_idx_list.includes(new_cell_idx_list[j]))){
-          added.push(new_cell_idx_list[j])
-        }
-      };
-      return {added, removed}
-    },
-    async getNewImageBatch(task_name, init){
-      if(!this.isMobile) api.showStatus('Loading a new batch...')
-      if(this.loading_cache){
-        if(task_name === this.loading_cache){
-          return
-        }
-        else{
-          // switch tasks
-          this.cached_image_data = []
-        }
-      }
-      try{
-        this.loading_cache = task_name;
-        let url = "/tasks/" + task_name + "?num=" + this.cell_per_batch
-        if(init){
-          url = url + '&init=1'
-        }
-        const response = await this.fetchURLData(url);
-        const tasks = response.tasks;
-        if(tasks.length<=0){
-          api.showMessage('No more images in this task.')
-          return
-        }
-        for(let i=0;i< tasks.length; i++){
-          if(task_name !== this.loading_cache){
-            console.error('Switching tasks, quit caching')
-            break
-          }
-          if(!this.current_task_name){
-            api.showProgress(0)
-            return
-          }
-          const cell_id = tasks[i];
-          api.showProgress((i+1)/tasks.length)
-          const imageData = await this.fetchCellImage(cell_id)
-          if(!this.current_image_data && this.current_task_name){
-            this.showImage(imageData)
-            this.$forceUpdate();
-          }
-          this.cached_image_data.push(imageData)
-        }
-        // remove older images
-        if(this.cached_image_data.length>this.cell_per_batch*3){
-          this.cached_image_data = this.cached_image_data.slice(this.cell_per_batch)
-          console.log('Removing images from the cache.',  this.cached_image_data.length)
-        }
-        api.showProgress(100)
-        if(!this.isMobile) api.showStatus(`A new batch with ${tasks.length} images loaded`)
-        this.loadMoreIfNeeded();
-      }
-      catch(e){
-        console.error(e)
-      }
-      finally{
-        this.loading_cache = false;
-      }
-    },
-    async previousImage(){
-      await this.checkNewMask()
-      if(this.current_image_data.labels_changed){
-        await this.uploadAnnotation();
-      }
-      this.current_image_index = this.cached_image_data.indexOf(this.current_image_data)
-      if(this.current_image_index<=0){
-        this.current_image_index = 0;
-      }
-      else{
-        this.current_image_index--;
-      }
-      await this.showImage(this.cached_image_data[this.current_image_index]);
-    },
-    loadMoreIfNeeded(){
-      this.current_image_index = this.cached_image_data.indexOf(this.current_image_data)
-      // when we reach 70% of the the cached images
-      if(this.current_image_index>this.cached_image_data.length*0.7){
-        this.getNewImageBatch(this.current_task_name)
-      }
-    },
-    async saveAnnotation(){
-      this.current_image_data.exclusive_label = false;
-      this.current_image_data.labels_changed = true;
-      await this.nextImage();
-    },
-    async nextImage(){
-      this.loadMoreIfNeeded();
-      await this.checkNewMask()
-      if(this.current_image_data.labels_changed){
-        await this.uploadAnnotation();
-      }
-      this.current_image_index++;
-      if(this.cached_image_data[this.current_image_index])
-      await this.showImage(this.cached_image_data[this.current_image_index]);
-    },
-    async checkNewMask(){
-      if(!this.current_image_data.mask_adjusted){
-        return 
-      }
-      if(this.current_task_name === 'segmentation'){
-          await this.uploadAnnotation();
-      }
-      else{
-        if(this.vector_source && this.vector_source.getFeatures().length>0){
-          const anwser = await api.confirm("Would you like to save the mask annotation?")
-          if(anwser){
-            if(!await this.saveMaskAnnotation()){
-              return
-            }
-          }
-          else{
-            this.stopMaskAnnotation()
-            this.current_image_data.mask_adjusted = false;
-          }
-        }
-        else{
-          this.stopMaskAnnotation()
-        }
-      }
-
-    },
-    async showImage(imageData){
-      if(!imageData){
-        api.showStatus('No more image to show.')
-        console.error('no image data to show.')
-        return
-      }
-      if(!this.isMobile) api.showStatus(imageData.cell_id)
-      console.log('current image: ', imageData)
-      this.current_image_data = imageData;
-      imageData.start_time = new Date().getTime();
-      // annotation viewer
-      this.current_panel = 'imageviewer';
-      if(!this.draw_mask_mode){
-        this.stopMaskAnnotation()
-      }
-      if(this.draw_mask_mode && imageData.extend != this.current_extend_value){
-        this.reloadImage()
-      }
-      else{
-        this.$nextTick(async ()=>{
-          this.loading = true;
-          window.onresize();
-          try{
-              await this.displayMap(imageData.channels, this.channel_settings);
-              this.showMaskAnnotation(imageData.mask_geojson);
-          }
-          catch(e){
-            console.error(e)
-          }
-          finally{
-            this.loading = false;
-          }
-        })
-      };
-    },
-    // extend Image
-    async reloadImage(){
-      this.loading = true;
-      this.current_image_index = this.cached_image_data.indexOf(this.current_image_data);
-      const imageDataOld = this.current_image_data;
-      const imageData = await this.fetchCellImage(imageDataOld.cell_id)
-      imageDataOld.mask_geojson = imageData.mask_geojson;
-      imageDataOld.channels = imageData.channels;
-      imageDataOld.extend = imageData.extend;
-      imageDataOld.mask_adjusted = imageData.mask_adjusted;
-      if(this.current_image_data.cell_id === imageDataOld.cell_id){
-        await this.showImage(imageDataOld)
-      }
-      this.loading = false;
-    },
-    async uploadAnnotation(){
-      // skip upload annotation if image is annotated and no new change
-      if ((!this.current_image_data.mask_adjusted)&&(!this.current_image_data.labels_changed)){
-        return
-      }
-      // Default options are marked with *
-      const sendData = {}
-      
-      if(this.current_image_data.start_time){
-        this.current_image_data.time_elapsed = new Date().getTime() - this.current_image_data.start_time;
-        sendData.start_time = this.current_image_data.start_time;
-        sendData.time_elapsed = this.current_image_data.time_elapsed;
-      }
-      
-      if (this.current_image_data.labels_changed){
-        if(this.current_image_data.exclusive_label){
-          sendData.labels = this.current_image_data.exclusive_label;
-        }
-        else{
-          sendData.labels = this.current_image_data.location_labels;
-        }
-        if(typeof sendData.labels === 'object'){
-          let noLabel = true;
-          for (let loc in sendData.labels){
-            if(sendData.labels[loc] === null){
-              sendData.labels[loc] = false
-            }
-            else{
-              noLabel = false;
-            }
-          }
-          if (noLabel && this.current_image_data.label_display_mode==='multiple'){
-            const anwser = await api.confirm("No label label selected, is that correct?")
-            if (!anwser){
-              return
-            }
-          };
-        }
-      }
-      if (this.current_image_data.mask_adjusted){
-        // sendData
-        sendData.extend = this.current_image_data.extend;
-        sendData.bbox = this.current_image_data.bbox;
-        // set the masks
-        const allFeatures = this.vector_source.getFeatures();
-        const format = new ol.format.GeoJSON();
-        const routeFeatures = format.writeFeaturesObject(allFeatures, {decimals: 1});
-        routeFeatures['bbox'] = this.current_image_data.mask_geojson.bbox;
-        this.current_image_data.mask_geojson = routeFeatures;
-        sendData.mask = this.current_image_data.mask_geojson;
-        sendData.mask_diff = this.getMaskDiff(this.current_image_data);
-      };
-    
-      // this is the url to send the current annotation
-      const sub_url = "/annotations/" + this.current_task_name + "/" + this.current_image_data.cell_id;
-      const url_post = this.selected_server_url + sub_url;
-      const response = await fetch(url_post, {
-          method: 'POST',
-          mode: 'cors',
-          cache: 'no-cache',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${this.user.access_token}`,
-          },
-          body: JSON.stringify(sendData)
-        });
-      const res= await response.json();
-      if(res.success){
-        this.current_image_data.mask_adjusted = false;
-        this.current_image_data.labels_changed = false;
-        this.current_image_data.saved_location_label = Object.assign({}, this.current_image_data.location_labels)
-        this.updateSavedCellIdx(this.current_image_data)
-      }
-      else{
-        alert('Failed to upload the annotaiton, error: ' + res.error);
-        throw new Error('Failed to upload the annotaiton.')
-      };
-    },
-    async drawMaskModeChanged(){
-      if(this.draw_mask_mode){
-        this.loading = true;
-        try{
-          this.current_image_data.mask_adjusted=false;
-          await this.reloadImage();
-        }
-        catch(e){
-          console.error(e)
-        }
-        finally{
-          this.loading = false;
-        }
-      }
-      else{
-        this.checkNewMask()
-        this.stopMaskAnnotation()
-      }
-    },
-    async toggleExclusiveLabels(type){
-      this.current_image_data.labels_changed = true;
-      if(this.current_image_data.exclusive_label === type){
-        this.current_image_data.exclusive_label = false;
-        this.current_image_data.location_labels = Object.assign({}, this.current_image_data.saved_location_label)
-      }
-      else{
-        this.current_image_data.exclusive_label = type
-        
-      }
-      this.$forceUpdate()
-      await this.uploadAnnotation();
-    },
-    showMaskAnnotation(mask_geojson){
-      this.vector_source.clear()
-      const features = (new GeoJSON()).readFeatures(mask_geojson)
-      this.vector_source.addFeatures(features)
-      this.current_image_data.mask_adjusted = false;
-      this.mask_history = []
-    },
-    async saveMaskAnnotation(){
-      const allFeatures = this.vector_source.getFeatures();
-      const format = new ol.format.GeoJSON();
-      const routeFeatures = format.writeFeaturesObject(allFeatures, {decimals: 1});
-      if(this.current_task_name !== 'segmentation'){
-        if (!routeFeatures.features.length){
-          api.alert('Please draw a cell mask before saving!');
-          return false
-        }
-        if(routeFeatures.features.length>1){
-          api.alert('Only one cell mask is allowed!');
-          return false
-        }
-      }
-
-      routeFeatures['bbox'] = this.current_image_data.mask_geojson.bbox;
-      this.current_image_data.mask_geojson = routeFeatures;
-      this.current_image_data.mask_adjusted = true;
-      await this.uploadAnnotation()
-      if (this.current_task_name !== 'segmentation'){
-        this.stopMaskAnnotation()
-      }
-      await this.reloadImage()
-      return true
-    },
-    async exportAnnotation() {
-      const allFeatures = this.vector_source.getFeatures();
-
-      const format = new ol.format.GeoJSON();
-      const routeFeatures = format.writeFeaturesObject(allFeatures, {decimals: 1});
-      routeFeatures['bbox'] = this.current_image_data.mask_geojson.bbox;
-      const blob = new Blob([JSON.stringify(routeFeatures)], {
-          type: "text/plain;charset=utf-8"
-      });
-      api.alert(JSON.stringify(blob))
-    },
-    // go to nextImage after select True/False.
-    async selectLabel(selected){
-      this.current_image_data.location_labels[this.current_image_data.single_label] = selected;
-      this.current_image_data.labels_changed = true;
-      await this.nextImage()
-    },
-    async displayMap(channels, channel_settings, brightness){
-      for(let k of Object.keys(channels)){
-        if(!channel_settings[k]){
-          channel_settings[k] = {name: k, show: true}
-          // don't show ER by default
-          if(k==='ER'){
-            channel_settings[k].show = false;
-          }
-        }
-      }
-      let url, extent;
-      if(channels.merged){
-        url = channels.merged
-        const imgObj = await getMeta(url)
-        extent = [0, 0, imgObj.width, imgObj.height];
-      }
-      else{
-        const image = await composeChannels(channels, channel_settings, this.alpha, brightness)
-        extent = [0, 0, image.width, image.height];
-        url = image.url;
-      }
-
-      const projection = new Projection({
-          code: 'image',
-          units: 'pixels',
-          extent: extent,
-      });
-
-      const image_source = new Static({
-        attributions: '©Human Protein Atlas',
-        url: url,
-        projection: projection,
-        imageExtent: extent
-      })
-
-      if(this.image_layer && this.map){
-        this.map.setView( new View({
-          projection: projection,
-          center: getCenter(extent),
-          zoom: 1,
-          minZoom: -10
-        }))
-        this.image_layer.setSource(image_source)
-        return
-      }
-
-      this.image_layer = new ImageLayer({
-        source: image_source,
-      })
-
-      this.vector_source = new VectorSource();
-      this.mask_history = []
-      this.vector_source.on('addfeature', (event)=>{
-        if(event.feature._undoing){
-          delete event.feature._undoing
-        }
-        else{
-          this.mask_history.push({'add': event.feature})
-          if(!event.feature.get('cell_idx') && event.feature.get('cell_idx') !== 0){
-            this.current_image_data.max_cell_id++      
-            event.feature.set('cell_idx', this.current_image_data.max_cell_id)
-            event.feature.set('label', 'cell')
-          }
-        }
-        this.current_image_data.mask_adjusted = true
-      });
-      this.vector_source.on('removefeature', (event)=>{
-        if(event.feature._undoing){
-          delete event.feature._undoing
-        }
-        else{
-          this.mask_history.push({'remove': event.feature})
-        }
-        // this.current_image_data.mask_changed.removed.push(event.feature.values_.cell_idx)
-        this.current_image_data.mask_adjusted = true
-      });
-      var vector_layer = new VectorLayer({
-        source: this.vector_source
-      });
-
-      vector_layer.setStyle((feature) => {
-        let color_style = new Style({
-            fill: new Fill({
-              color: 'rgba(255, 255, 255, 0)'
-            }),
-            stroke: new Stroke({
-                color: this.current_task_name ==='segmentation'? (this.show_segmentation? '#f5d80b91': '#00000000'): '#448aff53',
-                width: 2
-            }),
-            text: new Text({
-                text: this.current_task_name ==='segmentation'? String(feature.get('cell_idx')): '',
-                font: '14px Calibri,sans-serif',
-                fill: new Fill({
-                    color: '#03346f'
-                }),
-                stroke: new Stroke({
-                    color: '#d6d37ea6',
-                    width: 4
-                })
-            })
-        });
-        return color_style;      
-      })
-      const select = new Select({
-          wrapX: false
-      });
-      // clear map
-      this.$refs.map.innerHTML = ""
-      this.map = new Map({
-        interactions: ol.interaction.defaults({altShiftDragRotate:false, pinchRotate:false}),
-        controls: [],
-        layers: [
-          this.image_layer,
-          vector_layer,
-        ],
-        target: 'map',
-        view: new View({
-          projection: projection,
-          center: getCenter(extent),
-          zoom: 1,
-          minZoom: -10
-        })
-      });
-      this.map.addControl(new MousePosition({
-          coordinateFormat: createStringXY(0)
-      }));
-      this.map.addInteraction(select);
-      this.select = select
-      select.on('select', (e)=>{
-        if(e.selected && e.selected.length>0)
-            this.selected_feature = e.selected
-          else{
-              this.selected_feature = null
-          }
-      })
-      if(this.current_task_name === 'segmentation' && !this.isMobile){
-        this.startMaskAnnotation(this.vector_source, this.freehand_mode)
-      }
-      else{
-        this.freehand_mode = false;
-      }
-    },
-    freehandChanged(){
-        if (this.current_task_name !== 'segmentation') return
-        if(this.freehand_mode)
-        this.startMaskAnnotation(this.vector_source, this.freehand_mode)
-        else{
-          if(this.isMobile){
-            this.stopMaskAnnotation()
-          }
-        }
-    },
-    async undoAnnotation() {
-      if(this.mask_history.length>0){
-        const action = this.mask_history.pop()
-        if(action.add){
-            const allFeatures = this.vector_source.getFeatures();
-          allFeatures.forEach((feature)=>{
-            if(action.add === feature){
-              feature._undoing = true
-              this.vector_source.removeFeature(feature);
-              this.select.getFeatures().remove(feature);
-            }
-          });
-        }
-        else if(action.remove){
-          action.remove._undoing = true
-          this.vector_source.addFeature(action.remove)
-        }
-      }
-    },
-    // to remove selected annotation
-    async deleteAnnotation() {
-      if (this.vector_source) {
-        const features = this.select.getFeatures()
-        features.forEach((feature)=>{
-            this.vector_source.removeFeature(feature);
-            this.select.getFeatures().remove(feature);
-        });
-      }
-    },
-    startMaskAnnotation(source, freehand){
-      if(!source){
-        console.error("Please specify an annotation layer source")
-      }
-      if (this.modifyInteraction) {
-        this.map.removeInteraction(this.modifyInteraction)
-      }
-      this.modifyInteraction = new Modify({source: source});
-      this.map.addInteraction(this.modifyInteraction);
-      if (this.drawInteraction) {
-        this.map.removeInteraction(this.drawInteraction)
-      }
-      this.drawInteraction = new Draw({
-        source: source,
-        type: 'Polygon',
-        freehand: freehand
-      });
-        this.drawInteraction.on('drawend', async (evt) => {
-            
-        });
-      this.map.addInteraction(this.drawInteraction);
-      if(this.current_task_name !== 'segmentation'){
-        if(this.channel_settings['Mask'])
-          this.channel_settings['Mask'].show = false
-        this.displayMap(this.current_image_data.channels, this.channel_settings);
-      }
-    },
-    stopMaskAnnotation(){
-      if(this.channel_settings['Mask'])
-      this.channel_settings['Mask'].show = true
-      this.displayMap(this.current_image_data.channels, this.channel_settings);
-      if(!this.map) return;
-      if(this.drawInteraction)
-      this.map.removeInteraction(this.drawInteraction);
-      if(this.modifyInteraction)
-      this.map.removeInteraction(this.modifyInteraction);
-    },
-    toggleLabel(k){
-      if(this.current_image_data.location_labels[k]){
-        this.current_image_data.location_labels[k]=false
-      }
-      else{
-        this.current_image_data.location_labels[k]=true
-      }
-      this.current_image_data.exclusive_label = false;
-      this.current_image_data.labels_changed = true;
-    },
-    home(){
-      this.current_panel='task_selection';
-      this.current_task_name = null;
-      this.current_image_index = 0;
-      this.cached_image_data = [];
-      this.current_image_data = null
-      this.getTaskList();
-      // destroy the map
-      this.$refs.map.innerHTML = "";
-      this.map = null;
-      this.$forceUpdate();
-    },
-    channelSettingsUpdated(event){
-      // make sure ER and Microtubule are not turned on at the same time
-      if(event.target.name === 'ER' && event.target.value === 'on'){
-        if(this.channel_settings['Microtubule']){
-          this.channel_settings['Microtubule'].show = false
-        }
-      }
-      else if(event.target.name === 'Microtubule' && event.target.value === 'on'){
-        if(this.channel_settings['ER']){
-          this.channel_settings['ER'].show = false
-        }
-      }
-      this.$forceUpdate()
-      this.displayMap(this.current_image_data.channels, this.channel_settings);
-    },
-    async showStatistics(){
-      await this.getStatistics()
-      this.current_panel = 'statistics'
-    }
-  }
-})
+const COLORS = [
+    '#f44336', '#e91e63', '#9c27b0', '#673ab7', '#3f51b5',
+    '#2196f3', '#03a9f4', '#00bcd4', '#009688', '#4caf50',
+    '#8bc34a', '#cddc39', '#ffeb3b', '#ffc107', '#ff9800',
+    '#ff5722', '#795548', '#009e9e', '#607d8b', '#d500f9',
+    '#212121', '#ff9e80', '#ff6d00', '#ffff00', '#76ff03',
+    '#00e676', '#64ffda', '#18ffff',
+]
 
 class ImJoyPlugin {
-  async setup() {
-  }
+    async setup() {
+        const self = this
+        this.store = {images: [], current_index: 0, loading: true, thumbnail: null, search_text: ''}
+        this.app = new Vue({
+        el: '#app',
+        data: this.store,
+        methods: {
+            openImage(url){
+                api.utils.openUrl(url)
+            },
+            openHPA(meta){
+                debugger
+                const url = 'https://www.proteinatlas.org/'+meta.gene_ensembl_id+'-'+meta.gene+'/cell/' 
+                api.utils.openUrl(url)
+            },
+            showImage(obj){
+                this.images.push(obj)
+                if(this.images.length>5){
+                    this.images.shift()
+                }
+                this.current_index = this.images.length -1
+            },
+            showThumbnail(obj){
+                this.thumbnail = obj
+            },
+            search(text){
+                self.updateUmap(self.umap_data, text)
+            },
+            async export_image(){
+                await api.showStatus('exporting as image...')
+                let url = await Plotly.toImage(self.umap_chart, {format:'png', height:2048, width:2048})
+                await api.exportFile(convertBase64ToFile(url), 'HPA_V18_UMAP_densenet121.png')
 
-  async run(ctx) {
+                url = await Plotly.toImage(self.umap_chart, {format:'svg', height:1024, width: 1024})
+                await api.exportFile(convertBase64ToFile(url), 'HPA_V18_UMAP_densenet121.svg')
+                await api.showStatus('done')
+            }
+        }
+    })
+    }
 
-  }
+    async plot(data){
+    document.getElementById('chart').innerHTML = ''
+    const updatemenus =[
+            {
+        buttons: [
+            {
+                args: [{'marker.size': 16}],
+                label:'marker size: 16',
+                method:'restyle'
+            },
+            {
+                args: [{'marker.size': 8}],
+                label:'marker size: 8',
+                method:'restyle'
+            },
+            {
+                args: [{'marker.size': 4}],
+                label:'marker size: 4',
+                method:'restyle'
+            },
+            {
+                args: [{'marker.size': 2}],
+                label:'marker size: 2',
+                method:'restyle'
+            },
+            {
+                args: [{'marker.size': 1}],
+                label:'marker size: 1',
+                method:'restyle'
+            }
+        ],
+        direction: 'down',
+        pad: {'r': 0, 't': 0},
+        showactive: true,
+        type: 'dropdown',
+        x: 0.8,
+        xanchor: 'left',
+        y: 1.05,
+        yanchor: 'top'
+        }
+    ]
+    
+    const layout = {
+        hovermode:'closest',
+        title:'HPAv18 UMAP (model: densenet121, images: '+data[0].x.length+')', 
+        xaxis: {
+            showticklabels: false,
+            nticks: 10,
+            domain: [-10, 10],
+            range: [-10, 10],
+            zeroline: false
+        },
+        yaxis: {
+            showticklabels: false,
+            nticks: 10,
+            domain: [-10, 10],
+            range: [-10, 10],
+            zeroline: false
+        },
+        updatemenus: updatemenus
+    }
+    this.umap_chart = await Plotly.newPlot('chart', data, layout,{responsive: true})
+    // Plotly.relayout('chart', {
+    //     width: document.getElementById('chart').clientWidth,
+    //     height: document.getElementById('chart').clientHeight
+    // })
+    
+    // let win=null;
+    document.getElementById('chart').on('plotly_click', async (data) => {
+        Plotly.relayout('chart', {
+            width: document.getElementById('chart').clientWidth,
+            height: document.getElementById('chart').clientHeight
+        })
+        for(var i=0; i < data.points.length; i++){
+            console.log('====>', data.points[i].customdata)
+            const id = data.points[i].customdata.id
+            //pts = data.points[i].customdata.gene+'\n';
+            const image_base_url = 'https://images.proteinatlas.org/' + id.split('_')[0] + '/' + id.split('_')[1] +'_' + id.split('_')[2] + '_'+ id.split('_')[3]
+            this.app.showImage({url: image_base_url+'_blue.jpg', meta: data.points[i].customdata})
+            this.app.showImage({url: image_base_url+'_red.jpg', meta: data.points[i].customdata})
+            this.app.showImage({url: image_base_url+'_green.jpg', meta: data.points[i].customdata})
+            this.app.showImage({url: image_base_url+'_yellow.jpg', meta: data.points[i].customdata})
+            this.app.showImage({url: image_base_url+'_blue_red_green.jpg', meta: data.points[i].customdata})
+            
+            const thumbnail_url = 'https://images.proteinatlas.org/' + id.split('_')[0] + '/' + id.split('_')[1] +'_' + id.split('_')[2] + '_'+ id.split('_')[3]+ '_blue_red_green_yellow_thumb.jpg'
+            this.app.showThumbnail({url: thumbnail_url, meta: data.points[i].customdata})
+
+            await api.showStatus(data.points[i].customdata.gene+', '+ data.points[i].customdata['cell_line'] + ', ' + data.points[i].customdata.location+ ', '+data.points[i].customdata.id)
+            const screen_width = window.innerWidth
+                || document.documentElement.clientWidth
+                || document.body.clientWidth;
+            if(screen_width<1024) window.scrollTo(0,document.body.scrollHeight);
+        }
+        //api.alert('Closest point clicked:\n\n'+pts);
+    });
+    document.getElementById('chart').on('plotly_hover', async (data) => {
+        for(var i=0; i < data.points.length; i++){
+            const id = data.points[i].customdata.id
+            const thumbnail_url = 'https://images.proteinatlas.org/' + id.split('_')[0] + '/' + id.split('_')[1] +'_' + id.split('_')[2] + '_'+ id.split('_')[3]+ '_blue_red_green_yellow_thumb.jpg'
+            this.app.showThumbnail({url: thumbnail_url, meta: data.points[i].customdata})
+        }
+    });
+    }
+
+    async generateFakeData(){
+    const Xs = [], Ys = [], Meta=[], n = 100000;
+
+    for (let i = 0; i < n; i += 1) {
+        Xs.push(gaussianRand());
+        Ys.push(gaussianRand());
+        Meta.push('index: '+i)
+    }
+
+    const data = [{
+        type: "scattergl",
+        mode: "markers",
+        marker: {
+            line: {
+                width: 1,
+                color: '#404040'}
+        },
+        x: Xs,
+        y: Ys,
+        customdata: Meta
+    }]
+    return data
+    }
+    async updateUmap(table, filter){
+    filter = (filter || '') && filter.trim()
+    const filters = filter.split(' ')
+    
+    table = table.filter((row)=>{
+        let ret = false
+        for(let filter of filters){
+            ret = ret || (!filter || row.gene === filter || row['gene_ensembl_id'] === filter || row['cell_line'] === filter || row['id'] === filter || row['location'].includes(filter) )
+
+        }
+        return row.gene && ret
+    })
+    console.log('filtered: ', table)
+    
+    if(table.length<=0){
+        await api.alert('No image found.')
+        return
+    }
+    await api.showMessage(table.length + ' images found.')
+
+    const dataObj = transpose(table)
+    
+    const color_map = {}
+    for(let i=0; i<COLORS.length; i++){
+        color_map[i] = COLORS[i]
+    }
+    
+    const data = [{
+        type: "scattergl",
+        mode: "markers",
+        marker: {
+            size: 6,
+            color: dataObj.location_code.map((index)=>{
+                // 0 Nucleoplasm
+                // 2 Nucleoli
+                // 3 Nucleoli fibrillar center
+                // 4 Nuclear speckles
+                // 5 Nuclear bodies
+                const alpha = "D0"
+                
+                // Single loc nucleoli - #984EA3
+                if(index === 2){
+                    return '#984EA3' + alpha
+                }
+                // Single loc nucleoli fibrillar center - #377EB8
+                else if(index === 3){
+                    return '#377EB8' + alpha
+                }
+                // Single loc nuclear speckles -#a65628
+                else if(index === 4){
+                    return '#A65628' + alpha
+                }
+                // Single loc nuclear bodies - #FF7F00
+                else if(index === 5){
+                    return '#FF7F00' + alpha
+                }
+                // Multiloc
+                else if(typeof index === 'string'){
+                    const locs = index.split(' ')
+                    // Single loc nucleoli rim proteins (from the list I attached above) - #4DAF4A
+                    // nucleoli rim + nucleoli
+                    if(locs.includes("99") && locs.includes("2")){
+                        return '#4DAF4A' + alpha
+                    }
+                    // Multiloc nucleoli or nucleoli fibrillar center proteins 
+                    else if(locs.includes("2") || locs.includes("3")){
+                        return '#FFFF33' + alpha
+                    }
+                    else{
+                        return '#e0e0e043'
+                    }
+                    
+                }
+                else{
+                    return '#e0e0e043'
+                }
+            })
+            //colorscale: 'Viridis'
+        },
+        x: dataObj.x,
+        y: dataObj.y,
+        customdata: table
+    }]
+    this.plot(data)
+    }
+    async run(my) {
+    let rim_proteins = await api.getAttachment('rim_proteins')
+    rim_proteins = rim_proteins.split('\n').filter((gene)=>{
+        return gene.startsWith('ENSG')
+    })
+    api.showMessage(`nucleoli rim list with ${rim_proteins.length} items loaded.`)
+    console.log('rim protein======>', rim_proteins)
+    const url = "https://dl.dropbox.com/s/k9ekd4ff3fyjbfk/umap_results_fit_all_transform_all_sorted_20190422.csv"
+    Papa.parse(url, {
+        download: true,
+        header: true,
+        dynamicTyping: true,
+        skipEmptyLines: true,
+        error: (err, file, inputElem, reason)=> {
+            api.alert('Falied to load the table: ' + reason.toString())
+            this.app.loading = false
+            this.app.$forceUpdate()
+        },
+        complete: (results) => {
+
+            this.app.loading = false
+            this.app.$forceUpdate()
+            
+            const rim_locs = []
+            for(let loc of results.data){
+                if(rim_proteins.includes(loc.gene_ensembl_id)){
+                    loc.location = loc.location+','+ 'Nucleoli rim'
+                    loc.location_code = loc.location_code + ' 99'
+                    rim_locs.push(loc)
+                }
+            }
+            console.log('===============>', results)
+            api.showMessage(`${rim_locs.length} Necleoli rim proteins(antibodies) detected: `, rim_locs)
+            this.umap_data = results.data
+            this.updateUmap(this.umap_data)
+        }
+    })
+    
+    }
 }
 
 api.export(new ImJoyPlugin())
 </script>
 
-<window>
-  <div style="text-align: center;" id="app">
-    <div class="panel centered-panel" v-if="current_panel=='login'">
-      <div class="panel-header">
-        <div class="panel-title h2">HPA Image Annotator</div>
-        <span>(v{{version}})</span>
-      </div>
-      <div class="panel-body">
-        <div class="form-group">
-          <label class="form-label" for="server">Server</label>
-          <select class="form-select" v-model="selected_server_url">
-            <option>Choose an option</option>
-            <option v-for="(url, k) in servers" :value="url" :key="url">{{k}}</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label class="form-label" for="input-example-1">Name</label>
-          <input class="form-input" type="text" name="username" v-model="user.username"  placeholder="username">
-        </div>
-        <div class="form-group">
-          <label class="form-label" for="input-example-1">Password</label>
-          <input class="form-input" type="password" name="password" v-model ="user.password" placeholder="password">
-        </div>
-        <button class="btn" @click="login()">Login</button>
-      </div>
-      <div class="panel-footer">
-        <!-- buttons or inputs -->
-      </div>
-    </div>
-    <div class="panel centered-panel" v-if="current_panel=='task_selection'">
-      <div class="panel-header">
-        <div class="panel-title h2">HPA Image Annotator </div> <span>(v{{version}})</span>
-        <br>
-        <p>Please choose a task:</p>
-      </div>
-      <div class="panel-body">
-        <br>
-        <div v-for="(task, task_name) in tasks" :key="task_name">
-          <progress class="progress" style="width: 288px" :value="task.finished" :max="task.total"></progress>
-          <br>
-          <button class="btn" style="width: 280px" @click="chooseTask(task_name)"><i class="icon icon-edit"></i>&nbsp; {{task_name}}: {{task.finished}}/{{task.total}}</button>&nbsp;&nbsp;
-          <br>
-          <br>
-        </div>
-        <button v-if="user.role === 'admin'" class="btn" style="width: 280px" @click="showStatistics()">Statistics (🚧Under construction)</button>
-      </div>
-      <div class="panel-footer">
-      </div>
-    </div>
-
-    <div class="panel" v-if="current_panel=='statistics'&&statistics">
-        <button style="right: 52px; top: 10px; position: absolute;" class="btn btn-action s-circle" title="refresh" @click="getStatistics()"><i class="icon icon-refresh"></i></button>&nbsp;&nbsp;
-      <button style="right: 10px; top: 10px; position: absolute;" class="btn btn-action s-circle" title="home" @click="home()"><i class="icon icon-cross"></i></button>&nbsp;&nbsp;
-      <div v-for="(s, k) in statistics" :key="k">
-        <div class="card" style="width: 500px;max-width:100%;">
-          <div class="card-body">
-            <div class="card-header">
-              <div class="card-title h5">{{k}}</div>
-            </div>  
-            <div v-for="(v, task_name) in s" :key="task_name">
-              <div class="card-subtitle text-gray">{{task_name}}</div>
-              <div v-for="(t, ann_name) in v" :key="task_name">
-              <span class="chip">{{ann_name}}: {{t}}</span>
-              </div>
+<window lang="html">
+    <div id="app">
+        <header class="navbar">
+        <section class="navbar-section">
+            <a class="navbar-brand mr-2">HPA UMAP Explorer</a>
+            <button @click="export_image()" class="btn btn-link">Export</button>
+        </section>
+        <section class="navbar-section">
+            <div class="input-group input-inline">
+            <input class="form-input" type="text" v-model="search_text" @keyup.enter="search(search_text)" placeholder="search">
+            <button class="btn btn-primary input-group-btn" @click="search(search_text)">Search</button>
             </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  
-    <div class="panel" v-if="current_panel=='imageviewer'&&current_image_data">
-      <div v-show="!hide_controls" class="input-group floating-switch">
-        <!-- <label class="form-switch">
-          <input type="checkbox" v-model="draw_mask_mode" @change="drawMaskModeChanged">
-          <i class="form-icon"></i> <span class="hide-on-mobile">Redraw Mask</span>
-        </label> -->
-        <label class="form-switch " v-show="current_task_name === 'segmentation'">
-          <input type="checkbox" v-model="freehand_mode" @change="freehandChanged">
-          <i class="form-icon"></i> <span class="hide-on-mobile">Freehand</span>
-        </label>
-        <button style="background-color:transparent" class="btn btn-action s-circle" title="home" @click="home()"><i class="icon icon-cross"></i></button>&nbsp;&nbsp;
-      </div>
-
-      <!-- channels -->
-      <div v-show="!hide_controls" :style="{bottom: current_image_data.label_display_mode==='multiple'?'-20px': '20px'}" class="form-group floating-channel-btn">
-        <label v-if="current_task_name === 'segmentation'" class="form-checkbox channel-controls">
-          <input v-model="show_segmentation" @change="vector_source.changed()" name="hide segmentation mask" type="checkbox">
-          <i class="form-icon"></i> Segmentation
-        </label>
-        <label v-for="ch in channel_settings" :key="ch" v-show="ch.name!=='merged'" class="form-checkbox channel-controls">
-          <input v-model="ch.show" :name="ch.name" @change="channelSettingsUpdated" type="checkbox">
-          <i class="form-icon"></i> {{ch.name}}
-        </label>
-         <button :disabled="loading" v-show="current_task_name === 'segmentation'" :class="{'exclusive-label-btn': current_image_data.exclusive_label === 'Discarded'}" class="btn btn-sm small-btn channel-controls" @click="toggleExclusiveLabels('Discarded')">Discard</button>
-        <button :disabled="!mask_history||mask_history.length<=0" v-show="current_task_name === 'segmentation'" class="btn btn-sm small-btn channel-controls" @click="undoAnnotation()">Undo</button>
-        <button class="btn btn-sm s-circle channel-controls" style="background-color: transparent;" title="info" @click="info()"><i class="icon icon-message"></i></button>
-      </div>
-      <template v-if="current_image_data.label_display_mode==='multiple'">
-        <div v-show="!hide_controls" class="floating-right-btn">
-          <div class="columns">
-            <template v-for="group in LIMS_LOCATION_LABELS">
-              <template v-for="label in group">
-                <button :key="label" v-if="LIMS_TO_IF_CSV[label] && current_image_data.location_labels[LIMS_TO_IF_CSV[label]] !== undefined" :disabled="current_image_data.exclusive_label" @click="toggleLabel(LIMS_TO_IF_CSV[label])" class="column btn label-btn" :class="{'selected-label-btn': current_image_data.location_labels[LIMS_TO_IF_CSV[label]]}">{{label.slice(0,12)+(label.length>12?'.': '')}}</button>
-              </template>
-              <!-- <div class="break hide-on-mobile"></div> -->
-            </template>
-            <template v-for="(loc, k) in unsupported_labels">
-              <button  :key="k" :disabled="current_image_data.exclusive_label"  @click="toggleLabel(k)" class="column btn label-btn" :class="{'selected-label-btn': loc}">{{k.slice(0,12)+(k.length>12?'.': '')}}</button>
-            </template>
+        </section>
+        </header>
+        <div class="container">
+        <div class="loading loading-lg" v-if="loading">Loading...</div>
+        <div class="columns" v-show="!loading">
+        <div id="chart" class="column col-2"></div>
+        <div id="image-container" class="column col-2">
+            <img v-if="thumbnail" class="img-responsive rounded hpa-thumbnail" :src="thumbnail.url" :alt="thumbnail.meta.id"></img> 
+            <div v-if="images[current_index]" style="text-align: center;">
+                <br>
+            <h3>{{images[current_index].meta['gene']}} ({{images[current_index].meta['cell_line']}})</h3>
+            <p>cell line: {{images[current_index].meta['cell_line']}}</p>
+            <p>gene: {{images[current_index].meta['gene']}}</p>
+            <p>location: {{images[current_index].meta['location']}}</p>
+            <p>image id: {{ images[current_index].meta.id}} </p>
+            <button class="btn btn-primary" @click="openHPA(images[current_index].meta)">Open HPA page</button> <button class="btn" @click="openImage(images[current_index].url)"><i class="icon icon-share"></i></button>
             
-          </div>
-            <br>
-          <div class="btn-group" v-if="current_task_name !== 'segmentation'">
-            <button v-for="el in current_image_data.exclusive_labels"  :key="el" class="btn btn-sm median-btn channel-controls" :disabled="current_image_data.exclusive_label&&current_image_data.exclusive_label!==el" :class="{'exclusive-label-btn': current_image_data.exclusive_label ===el}" @click="toggleExclusiveLabels(el)">{{el}}</button>
-          </div>
-          <br>
-          <br>
-          <div class="btn-group">
-            <button :disabled="current_image_index<=0  || loading" class="btn transparent-btn" @click="previousImage()"><i class="icon icon-back"></i>&nbsp;Back</button>
-            <button :disabled="current_image_data.exclusive_label" class="btn transparent-btn" @click="saveAnnotation()">&nbsp;Save</button>
-            <button :disabled="current_image_index>=cached_image_data.length  || loading" class="btn transparent-btn" @click="nextImage()">Next&nbsp;<i class="icon icon-forward"></i></button>
-          </div>
+            </div>
+            <h2 v-else>
+                <br>
+                Click on the UMAP to see the sample image.
+            </h2>
+            
+            <div class="carousel">
+            <!-- carousel locator -->
+            <input class="carousel-locator" v-for="(img, i) in images" :id="'slide-'+i" type="radio" name="carousel-radio" hidden="" v-model="current_index" :value="i" checked="">
+            
+            <!-- carousel container -->
+            <div class="carousel-container">
+                <!-- carousel item -->
+                <figure class="carousel-item" v-for="(img, i) in images">
+                    <img class="img-responsive rounded" :src="img.url" :alt="img.meta.id" @click="openImage(images[current_index].url)">
+                </figure>
+
+            </div>
+            <!-- carousel navigation -->
+            <div class="carousel-nav">
+                <label class="nav-item text-hide c-hand" v-for="(img, i) in images" :for="'slide-'+i">{{img.meta.id}}</label>
+            </div>
+            </div>
         </div>
-      </template>
-      <template v-if="current_image_data.label_display_mode==='single'">
-        <div v-show="!hide_controls" class="btn-group floating-bottom-btn">
-          <button :disabled="current_image_index<=0 || loading" class="btn transparent-btn" @click="previousImage()"><i class="icon icon-back"></i>&nbsp;Back</button>
-          <button :disabled="current_image_data.exclusive_label" class="btn transparent-btn" @click="selectLabel(true)" :class="{'selected-label-btn': current_image_data.location_labels[current_image_data.single_label]===true}"><i class="icon icon-check"></i>&nbsp;True</button>
-          <button :disabled="current_image_data.exclusive_label" class="btn transparent-btn" @click="selectLabel(false)" :class="{'selected-label-btn': current_image_data.location_labels[current_image_data.single_label]===false}"><i class="icon icon-cross"></i>&nbsp;False</button>
-          <button :disabled="current_image_index>=cached_image_data.length || loading" class="btn transparent-btn" @click="nextImage()">Next&nbsp;<i class="icon icon-forward"></i></button>
-        </div>
-        <span v-show="!hide_controls" class="h3 floating-label">{{current_image_data.single_label}}</span>
-      </template>
-      <template v-if="current_task_name === 'segmentation'">
-        <div v-show="!hide_controls" class="btn-group floating-bottom-btn">
-          <button :disabled="current_image_index===0 || loading" class="btn transparent-btn" @click="previousImage()"><i class="icon icon-back"></i>&nbsp;Back</button>
-          <button :disabled="current_image_data.exclusive_label || !selected_feature" class="btn transparent-btn" @click="deleteAnnotation()" ><i class="icon icon-cross"></i>Remove&nbsp;</button>
-          <button :disabled="current_image_data.exclusive_label || loading" class="btn transparent-btn"  @click="saveMaskAnnotation();nextImage();"><i class="icon icon-check"></i>
-            Save
-          </button>
-          <button :disabled="current_image_index>=cached_image_data.length || loading" class="btn transparent-btn" @click="nextImage()">Next&nbsp;<i class="icon icon-forward"></i></button>
-        </div>
-      </template>
-      
-      <div v-if="loading" class="loading loading-lg floating"></div>
-      <div id="map" ref="map" v-show="current_panel=='imageviewer'" :style="{height: innerHeight}"></div>
     </div>
-  </div>
+    </div>
+    </div>
+
 </window>
+<attachment name="rim_proteins">
+ENSG00000051180
+ENSG00000125872
+ENSG00000128245
+ENSG00000131591
+ENSG00000147050
+ENSG00000164924
+ENSG00000180071
+ENSG00000181638
+ENSG00000183878
+ENSG00000198874
+ENSG00000225528
+ENSG00000230453
+ENSG00000232112
+ENSG00000122557
+ENSG00000067365
+ENSG00000163563
+ENSG00000188649
+ENSG00000123983
+ENSG00000188368
+ENSG00000174485
+ENSG00000173145
+ENSG00000139289
+ENSG00000197385
+ENSG00000137876
+ENSG00000135953
+ENSG00000166261
+ENSG00000133114
+ENSG00000097096
+ENSG00000205476
+ENSG00000145391
+ENSG00000178691
+ENSG00000125089
+ENSG00000214274
+ENSG00000108592
+ENSG00000162650
+ENSG00000122406
+ENSG00000036549
+ENSG00000178685
+ENSG00000011260
+ENSG00000170270
+ENSG00000085721
+ENSG00000100722
+ENSG00000138801
+ENSG00000087502
+ENSG00000163584
+ENSG00000261236
+ENSG00000264668
+ENSG00000175573
+ENSG00000101457
+ENSG00000203805
+ENSG00000077080
+ENSG00000132823
+ENSG00000067334
+ENSG00000198945
+ENSG00000148291
+ENSG00000188976
+ENSG00000171490
+ENSG00000111615
+ENSG00000008382
+ENSG00000169592
+ENSG00000167394
+ENSG00000134146
+ENSG00000086189
+ENSG00000175182
+ENSG00000151304
+ENSG00000105447
+ENSG00000153237
+ENSG00000180257
+ENSG00000149262
+ENSG00000104047
+ENSG00000221944
+ENSG00000189091
+ENSG00000110104
+ENSG00000103550
+ENSG00000088205
+ENSG00000164091
+ENSG00000175216
+ENSG00000100029
+ENSG00000107937
+ENSG00000164332
+ENSG00000285396
+ENSG00000126749
+ENSG00000155329
+ENSG00000136045
+ENSG00000133773
+ENSG00000159335
+ENSG00000144711
+ENSG00000010626
+ENSG00000138138
+ENSG00000165732
+ENSG00000153044
+ENSG00000171055
+ENSG00000145220
+ENSG00000197498
+ENSG00000119950
+ENSG00000071889
+ENSG00000158552
+ENSG00000124383
+ENSG00000162755
+ENSG00000176222
+ENSG00000131558
+ENSG00000112578
+ENSG00000137802
+ENSG00000183856
+ENSG00000203965
+ENSG00000145908
+ENSG00000148704
+ENSG00000172331
+ENSG00000180758
+ENSG00000171824
+ENSG00000198265
+ENSG00000140538
+ENSG00000134697
+ENSG00000170027
+ENSG00000117395
+ENSG00000067533
+ENSG00000145555
+ENSG00000148296
+ENSG00000048405
+ENSG00000021826
+ENSG00000161036
+ENSG00000103479
+ENSG00000171497
+ENSG00000178662
+ENSG00000160208
+ENSG00000277149
+ENSG00000174718
+ENSG00000253313
+ENSG00000055483
+ENSG00000181163
+ENSG00000166913
+ENSG00000175793
+ENSG00000197724
+ENSG00000128596
+ENSG00000108953
+ENSG00000123485
+ENSG00000156711
+ENSG00000135638
+ENSG00000100503
+ENSG00000175832
+ENSG00000170468
+ENSG00000109189
+ENSG00000185000
+ENSG00000148843
+ENSG00000163938
+ENSG00000121570
+ENSG00000111206
+ENSG00000149948
+ENSG00000155438
+ENSG00000163064
+ENSG00000184897
+ENSG00000187837
+ENSG00000134308
+ENSG00000179295
+ENSG00000182944
+ENSG00000115053
+ENSG00000148773
+</attachment>
 <style lang="css">
-  body{
-    color: #448aff!important;
-    overflow: hidden;
-  }
-  .centered-panel{
-    background-color: #448aff0f;
-    width: 400px;
-    height: 450px;
-    max-height: 100%;
-    max-width: 100%;
-    left: 50%;
-    top: 50%;
-    position: absolute;
-    -webkit-transform: translate3d(-50%, -50%, 0);
-    -moz-transform: translate3d(-50%, -50%, 0);
-    transform: translate3d(-50%, -50%, 0);
-  }
-  .ol-layers:first-child{
-    background-color: black;
-  }
-
-  .floating-label{
-    color:#ffefdbc2;
-    position: absolute;
-    left: 50%;
-    z-index: 999;
-    top: 40px;
-    -webkit-transform: translate3d(-50%, -50%, 0);
-    -moz-transform: translate3d(-50%, -50%, 0);
-      transform: translate3d(-50%, -50%, 0);
-  }
-
-  @media screen and (max-width: 800px) {
-    .floating-label{
-      top: 90px!important;
-    }
-  }
-  
-  .floating-switch{
-    position: absolute;
-    right: 5px;
-    z-index: 999;
-    top: 10px;
-  }
-
-  .ol-mouse-position{
-    top:unset;
-    bottom: 3px;
-  }
-  @media all and (max-width: 600px) {
-    .floating-channel-btn{
-      text-align: left!important;
-      top: 10px!important;
-      bottom: unset!important;
-      left: 5px!important;
-      -webkit-transform:unset!important;
-      -moz-transform:unset!important;
-      transform: unset!important;
-      bottom: 60px;
-    }
-    .channel-controls{
-      display: block;
-    }
-  }
-
-  @media all and (min-width: 600px) {
-    .channel-controls{
-      display: inline-block;
-    }
-  }
-
-  .floating-channel-btn{
+    #chart{
+    width: 800px;
+    height: 800px;
+    max-width: calc( 100% + 140px );
+    margin-left: -70px;
+}
+#image-container{
     text-align: center;
-    width: 100%;
-    position: absolute;
-    left: 50%;
-    -webkit-transform: translate3d(-50%, -50%, 0);
-    -moz-transform: translate3d(-50%, -50%, 0);
-    transform: translate3d(-50%, -50%, 0);
-    bottom: 20px;
-    z-index: 666;
-  }
+    width: 400px;
+    height: 400px;
+    max-width: 100%;
+}
+.carousel{
+    margin: 20px;
+}
 
-
-  .floating-bottom-btn {
+.hpa-thumbnail{
     position: absolute;
-    left: calc(50% - 180px);
-    bottom: 5px;
-    z-index: 999;
-  }
-  @media all and (max-width: 900px) {
-    .floating-right-btn{
-      width: 220px!important;
-    }
-  }
-  .floating-right-btn{
-    position: absolute;
-    right: 3px;
-    top: 80px;
-    width: 330px;
-    z-index: 999;
-  }
-  .floating-left-btn{
-    position: absolute;
-    left: 3px;
-    top: 80px;
-    width: 330px;
-    z-index: 999;
-  }
-  .label-btn {
-    padding-top: 0px;
-    font-size: small;
-    margin-left: 0px;
-    height: 26px;
-    flex: none;
-    width: 110px;
-    background-color:#fff3;
-  }
-  .exclusive-label-btn{
-    background-color: rgb(248, 27, 2)!important;
-  }
-  .highlight-btn{
-    background-color: white!important;
-  }
-  .label-btn:hover, .label-btn:focus{
-    background-color:rgba(255, 255, 255, 0.42);
-  }
-  .selected-label-btn{
-    background-color: #3580ff7d!important;
-    color: white!important;
-  }
-  .break {
-    flex-basis: 100%;
-    height: 0;
-  }
-  .transparent-btn, .transparent-btn:focus {
-    width: 90px;
-    background-color:#fff3;
-  }
-  .transparent-btn:hover {
-    background-color:rgba(255, 255, 255, 0.42);
-  }
-  .small-btn{
-    width: 60px;
-    background: transparent;
-    border: none;
-    background-color:#fff3;
-    margin-bottom: 3px;
-  }
-  
-  .median-btn{
-    width: 80px;
-    background: transparent;
-    border: none;
-    background-color:#fff3;
-    margin-bottom: 3px;
-  }
-  .floating {
-    position: absolute;
-    left: 50%;
-    top: 30%;
-  }
-  #toolbar {
-    position: absolute;
-    top: 112px;
-    left: 10px;
-  }
-  #toolbar > div:nth-child(1){
-    fill: #448aff;
-  }
-
-  .ol-layer{
-    top: 0px;
-  }
-
-  #map{
-    max-height: 100%;
-    min-height: 50vh!important;
-  }
-  .icon::before {
-    position: relative;
-  }
-  .navbar {
-    padding-left: 10px;
-  }
-  .navbar .navbar-brand {
-    font-size: 1.5rem;
-    text-decoration: none;
-  }
-  
-  .mouse-position{
-    padding-left: 124px;
-    padding-top: 10px;
-  }
-  
-  @media all and (max-width: 512px) { /* Change Width Here */
-    .hide-on-mobile {
-        display: none;
-    }
-  }
+    left: 30px;
+    top: 100px;
+}
 </style>
-
