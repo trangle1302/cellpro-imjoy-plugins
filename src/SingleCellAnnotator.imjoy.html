@@ -279,7 +279,7 @@ const app = new Vue({
     renderWindow: null,
     interactor: null,
     renderer: null,
-    modifyInteraction: null,
+    //modifyInteraction: null,
     drawInteraction: null,
     itkInteraction: null,
     draw_mask_mode: true,
@@ -1187,11 +1187,11 @@ const app = new Vue({
       if(!source){
         console.error("Please specify an annotation layer source")
       }
-      if (this.modifyInteraction) {
-        this.map.removeInteraction(this.modifyInteraction)
-      }
-      this.modifyInteraction = new Modify({source: source});
-      this.map.addInteraction(this.modifyInteraction);
+      //if (this.modifyInteraction) {
+      //  this.map.removeInteraction(this.modifyInteraction)
+      //}
+      //this.modifyInteraction = new Modify({source: source});
+      //this.map.addInteraction(this.modifyInteraction);
       if (this.drawInteraction) {
         this.map.removeInteraction(this.drawInteraction)
       }
@@ -1217,8 +1217,8 @@ const app = new Vue({
       if(!this.map) return;
       if(this.drawInteraction)
       this.map.removeInteraction(this.drawInteraction);
-      if(this.modifyInteraction)
-      this.map.removeInteraction(this.modifyInteraction);
+      //if(this.modifyInteraction)
+      //this.map.removeInteraction(this.modifyInteraction);
     },
     toggleLabel(k){
       if(this.current_image_data.location_labels[k]){
