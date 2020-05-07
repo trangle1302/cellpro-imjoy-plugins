@@ -34,7 +34,7 @@ a localization pattern.
     "https://unpkg.com/spectre.css/dist/spectre-exp.min.css",
     "https://unpkg.com/spectre.css/dist/spectre-icons.min.css"],
     "dependencies": [],
-    "defaults": {"w": 50, "h":20, "fullscreen": true},
+    "defaults": {"w": 50, "h":20, "fullscreen": true, "as_dialog": true},
     "cover": "https://imjoy-team.github.io/imjoy-plugins/hpa-umap/hpa-umap-cover.gif"
 }
 </config>
@@ -97,7 +97,7 @@ const COLORS = [
 class ImJoyPlugin {
     async setup() {
         const self = this
-        this.store = {images: [], current_index: 0, loading: true, thumbnail: null, search_text: ''}
+        this.store = {images: [], current_index: 0, search_query: '', selected_mode:'rim', loading: true, thumbnail: null, search_text: ''}
         this.app = new Vue({
         el: '#app',
         data: this.store,
@@ -121,6 +121,7 @@ class ImJoyPlugin {
                 this.thumbnail = obj
             },
             search(text){
+                this.search_query = text;
                 self.updateUmap(self.umap_data, text)
             },
             async export_image(){
@@ -131,6 +132,48 @@ class ImJoyPlugin {
                 url = await Plotly.toImage(self.umap_chart, {format:'svg', height:1024, width: 1024})
                 await api.exportFile(convertBase64ToFile(url), 'HPA_V18_UMAP_densenet121.svg')
                 await api.showStatus('done')
+            },
+            async export_csv(){
+                api.showMessage("Exporting as csv. This may take some time")
+                
+                let export_string = "ID,X,Y,GENE,LOCATIONS, ENSEMBL\n"
+                self.umap_data.forEach((row)=>{
+                    if(typeof row.location_code === 'string'){
+                        const locs =  row.location_code.split(' ')
+                        // Single loc nucleoli rim proteins (from the list I attached above) - #4DAF4A
+                        // nucleoli rim from the green_rim_genes list
+                        if(locs.includes("green")){
+                            export_string += row["id"] + ","
+                            export_string += row["x"] + ","
+                            export_string += row["y"] + ","
+                            export_string += row["gene"] + ","
+                            export_string += "\"" + row["location"] + "\","
+                            export_string += row["gene_ensembl_id"]
+                            export_string += "\n"
+                        }
+                    }
+                })
+                api.exportFile(export_string, 'single-loc-nucleoli-rim-green.csv')
+
+                export_string = "ID,X,Y,GENE,LOCATIONS, ENSEMBL\n"
+                self.umap_data.forEach((row)=>{
+                    if(row.location_code === 2){
+                        export_string += row["id"] + ","
+                        export_string += row["x"] + ","
+                        export_string += row["y"] + ","
+                        export_string += row["gene"] + ","
+                        export_string += "\"" + row["location"] + "\","
+                        export_string += row["gene_ensembl_id"]
+                        export_string += "\n"
+
+                    }
+                })
+                api.exportFile(export_string, 'single-loc-nucleoli-purple.csv')
+                
+            },
+            setMode(mode){
+                this.selected_mode = mode;
+                self.updateUmap(self.umap_data, this.search_query)
             }
         }
     })
@@ -302,7 +345,10 @@ class ImJoyPlugin {
                     // Single loc nucleoli rim proteins (from the list I attached above) - #4DAF4A
                     // nucleoli rim from the green_rim_genes list
                     if(locs.includes("green")){
-                        return '#4DAF4A' + alpha
+                        if(this.app.selected_mode === 'rim')
+                            return '#4DAF4A' + alpha
+                        else
+                            return '#984EA3' + alpha
                     }
                     // Multiloc nucleoli, nucleoli fibrillar center proteins or nucleoli rim from the yellow_rim_genes list
                     else if(locs.includes("2") || locs.includes("3") || locs.includes("yellow")){
@@ -385,8 +431,12 @@ api.export(new ImJoyPlugin())
     <div id="app">
         <header class="navbar">
         <section class="navbar-section">
-            <a class="navbar-brand mr-2">HPA UMAP Explorer</a>
-            <button @click="export_image()" class="btn btn-link">Export</button>
+            <a class="navbar-brand mr-2">HPA Nucleolus UMAP</a>
+            <button @click="export_image(); export_csv();" class="btn btn-link">Export</button>
+            <div class="btn-group btn-group-block">
+                <button @click="setMode('rim')" class="btn" :class="{'btn-primary': selected_mode==='rim'}">rim highlight</button>
+                <button @click="setMode('nuc')" class="btn" :class="{'btn-primary': selected_mode==='nuc'}">nucleoli only</button>
+            </div> 
         </section>
         <section class="navbar-section">
             <div class="input-group input-inline">
