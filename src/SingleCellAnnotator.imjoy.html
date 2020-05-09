@@ -1319,19 +1319,22 @@ api.export(new ImJoyPlugin())
       </div>
     </div>
 
-    <div class="panel" v-if="current_panel=='statistics'&&statistics">
-        <button style="right: 52px; top: 10px; position: absolute;" class="btn btn-action s-circle" title="refresh" @click="getStatistics()"><i class="icon icon-refresh"></i></button>&nbsp;&nbsp;
+    <div class="panel statistics-panel" v-if="current_panel=='statistics'&&statistics">
+      <button style="right: 52px; top: 10px; position: absolute;" class="btn btn-action s-circle" title="refresh" @click="getStatistics()"><i class="icon icon-refresh"></i></button>&nbsp;&nbsp;
       <button style="right: 10px; top: 10px; position: absolute;" class="btn btn-action s-circle" title="home" @click="home()"><i class="icon icon-cross"></i></button>&nbsp;&nbsp;
-      <div v-for="(s, k) in statistics" :key="k">
-        <div class="card" style="width: 500px;max-width:100%;">
-          <div class="card-body">
-            <div class="card-header">
-              <div class="card-title h5">{{k}}</div>
-            </div>  
-            <div v-for="(v, task_name) in s" :key="task_name">
-              <div class="card-subtitle text-gray">{{task_name}}</div>
-              <div v-for="(t, ann_name) in v" :key="task_name">
-              <span class="chip">{{ann_name}}: {{t}}</span>
+      <p style="font: bold 32px arial,serif">Statistics</p>
+      <div class="panel-body">
+        <div v-for="(s, k) in statistics" :key="k">
+          <div class="card" style="width: 500px;max-width:100%;">
+            <div class="card-body">
+              <div class="card-header">
+                <div class="card-title h5">{{k}}</div>
+              </div>  
+              <div v-for="(v, task_name) in s" :key="task_name">
+                <div class="card-subtitle text-gray">{{task_name}}</div>
+                <div v-for="(t, ann_name) in v" :key="task_name">
+                <span class="chip">{{ann_name}}: {{t}}</span>
+                </div>
               </div>
             </div>
           </div>
@@ -1427,6 +1430,21 @@ api.export(new ImJoyPlugin())
     background-color: #448aff0f;
     width: 400px;
     height: 450px;
+    max-height: 100%;
+    max-width: 100%;
+    left: 50%;
+    top: 50%;
+    position: absolute;
+    -webkit-transform: translate3d(-50%, -50%, 0);
+    -moz-transform: translate3d(-50%, -50%, 0);
+    transform: translate3d(-50%, -50%, 0);
+  }
+  .statistics-panel{
+    background-color: #448aff0f;
+    width: 600px;
+    height: auto;
+    min-height: 300px;
+    max-width: 800px;
     max-height: 100%;
     max-width: 100%;
     left: 50%;
