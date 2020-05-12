@@ -8,7 +8,7 @@
   "type": "window",
   "tags": [],
   "ui": "",
-  "version": "0.1.61",
+  "version": "0.1.70",
   "api_version": "0.1.7",
   "description": "Annotate images for HPA single-cell image classification",
   "icon": "extension",
@@ -316,6 +316,7 @@ const app = new Vue({
     innerHeight: '100vh',
     isMobile: false,
     version: null,
+    current_displayed_image: null,
     LIMS_LOCATION_LABELS: LIMS_LOCATION_LABELS,
     LIMS_TO_IF_CSV: LIMS_TO_IF_CSV,
     LIMS_VALUES: Object.values(LIMS_TO_IF_CSV)
@@ -1025,6 +1026,7 @@ const app = new Vue({
         extent = [0, 0, image.width, image.height];
         url = image.url;
       }
+      this.current_displayed_image = url;
 
       const projection = new Projection({
           code: 'image',
@@ -1223,6 +1225,33 @@ const app = new Vue({
       this.current_image_data.exclusive_label = false;
       this.current_image_data.labels_changed = true;
     },
+    async report(){
+      const comment = await api.prompt('Sharing this image to the cellprofiling slack, please type your comment on this image.')
+      if(comment){
+        const response = await fetch( this.selected_server_url + '/reports', {
+          method: 'POST',
+          mode: 'cors',
+          cache: 'no-cache',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${this.user.access_token}`,
+          },
+          body: JSON.stringify({
+            report:{
+              comment: comment,
+              task_id: this.current_image_data.cell_id,
+              location_labels: this.current_image_data.location_labels,
+              exclusive_labels: this.current_image_data.exclusive_labels,
+            }, image: this.current_displayed_image })
+        });
+        if(response.status !== 200){
+          api.alert('Failed to send report: ' + response.status)
+        }
+      }
+      else{
+        api.showMessage('Sharing canceled.')
+      }
+    },
     home(){
       this.current_panel='task_selection';
       this.current_task_name = null;
@@ -1348,6 +1377,7 @@ api.export(new ImJoyPlugin())
           <input type="checkbox" v-model="draw_mask_mode" @change="drawMaskModeChanged">
           <i class="form-icon"></i> <span class="hide-on-mobile">Redraw Mask</span>
         </label> -->
+        <button style="background-color:transparent" class="btn" title="report" @click="report()"><i class="icon icon-share"></i></button>&nbsp;&nbsp;
         <label class="form-switch " v-show="current_task_name === 'segmentation'">
           <input type="checkbox" v-model="freehand_mode" @change="freehandChanged">
           <i class="form-icon"></i> <span class="hide-on-mobile">Freehand</span>
