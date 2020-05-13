@@ -8,7 +8,7 @@
   "type": "window",
   "tags": [],
   "ui": "",
-  "version": "0.1.70",
+  "version": "0.1.71",
   "api_version": "0.1.7",
   "description": "Annotate images for HPA single-cell image classification",
   "icon": "extension",
@@ -305,6 +305,9 @@ const app = new Vue({
     default_extend_value: 50,
     current_extend_value: 50,
     statistics: {},
+    reports: {},
+    // show reports or statistics in statistics panel, [Reports, Statistics]
+    show_reports_statistics: null,
     // from here this is communication to backend, to develop/activate
     tasks: null,
     current_task_name: null,
@@ -536,6 +539,7 @@ const app = new Vue({
       }
     },
     async getStatistics(){
+      this.show_reports_statistics = 'Statistics'
       const response2 = await fetch(this.selected_server_url + "/statistics", {
         method: 'GET',
         headers: {'Authorization': `Bearer ${this.user.access_token}`},
@@ -1225,6 +1229,11 @@ const app = new Vue({
       this.current_image_data.exclusive_label = false;
       this.current_image_data.labels_changed = true;
     },
+    async showReport(){
+      const res = await this.fetchURLData("/reports")
+      this.show_reports_statistics = 'Reports'
+      this.reports = res.reports
+    },
     async report(){
       const comment = await api.prompt('Sharing this image to the cellprofiling slack, please type your comment on this image.')
       if(comment){
@@ -1349,10 +1358,34 @@ api.export(new ImJoyPlugin())
     </div>
 
     <div class="panel statistics-panel" v-if="current_panel=='statistics'&&statistics">
-      <button style="right: 52px; top: 10px; position: absolute;" class="btn btn-action s-circle" title="refresh" @click="getStatistics()"><i class="icon icon-refresh"></i></button>&nbsp;&nbsp;
+      <button style="right: 94px; top: 10px; position: absolute; font: 11px arial,serif;" class="btn btn-action s-circle" title="load reports" @click="showReport()"><b>Rep</b></button>&nbsp;&nbsp;
+      <button style="right: 52px; top: 12px; position: absolute; font: 11px arial,serif;" class="btn btn-action s-circle" title="load statistics" @click="getStatistics()"><b>Stats</b></button>&nbsp;&nbsp;
       <button style="right: 10px; top: 10px; position: absolute;" class="btn btn-action s-circle" title="home" @click="home()"><i class="icon icon-cross"></i></button>&nbsp;&nbsp;
-      <p style="font: bold 32px arial,serif">Statistics</p>
-      <div class="panel-body">
+      <p style="font: bold 32px arial,serif">{{show_reports_statistics}}</p>
+      <div class="panel-body" v-show="show_reports_statistics==='Reports'">
+        <div v-for="(s, report_event) in reports" :key="report_event">
+          <div class="card" style="width: 500px;max-width:100%;">
+            <div class="card-body">
+              <div class="card-header">
+                <div class="card-title h5">{{report_event}}</div>
+              </div>  
+              <div v-for="(v, item) in s" :key="item">
+                <div class="card-subtitle text-gray"><b>{{item}}</b></div>
+                <div v-if="(typeof v)!=='object'">
+                  <span class="chip">{{v}}</span>
+                </div>
+                <div v-if="Array.isArray(v)" v-for="value in v" :key="item">
+                  <span class="chip">{{value}}</span>
+                  </div>
+                <div v-if="(typeof v)==='object'&&(!Array.isArray(v))" v-for="(value, anno_item) in v" :key="item">
+                <span class="chip">{{anno_item}}: {{value}}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="panel-body" v-show="show_reports_statistics==='Statistics'">
         <div v-for="(s, k) in statistics" :key="k">
           <div class="card" style="width: 500px;max-width:100%;">
             <div class="card-body">
