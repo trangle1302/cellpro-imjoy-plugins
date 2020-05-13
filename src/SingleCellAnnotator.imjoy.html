@@ -1229,14 +1229,46 @@ const app = new Vue({
       this.current_image_data.exclusive_label = false;
       this.current_image_data.labels_changed = true;
     },
+    screenShot(){
+      var mapCanvas = document.createElement('canvas');
+      var size = this.map.getSize();
+      mapCanvas.width = size[0];
+      mapCanvas.height = size[1];
+      var mapContext = mapCanvas.getContext('2d');
+      Array.prototype.forEach.call(document.querySelectorAll('.ol-layer canvas'), function(canvas) {
+        if (canvas.width > 0) {
+          var opacity = canvas.parentNode.style.opacity;
+          mapContext.globalAlpha = opacity === '' ? 1 : Number(opacity);
+          var transform = canvas.style.transform;
+          // Get the transform parameters from the style's transform matrix
+          var matrix = transform.match(/^matrix\(([^\(]*)\)$/)[1].split(',').map(Number);
+          // Apply the transform to the export map context
+          CanvasRenderingContext2D.prototype.setTransform.apply(mapContext, matrix);
+          mapContext.drawImage(canvas, 0, 0);
+        }
+      });
+      //if (navigator.msSaveBlob) {
+        //api.alert(JSON.stringify(mapCanvas.toDataURL))
+        // link download attribuute does not work on MS browsers
+      //  navigator.msSaveBlob(mapCanvas.msToBlob(), 'map.png');
+      //} else {
+      //  var link = document.getElementById('image-download');
+      //  link.href = mapCanvas.toDataURL();
+      //  link.click();
+      //};
+      //map.renderSync();
+      return mapCanvas.toDataURL('image/jpeg', 1.0)
+    },
     async showReport(){
       const res = await this.fetchURLData("/reports")
       this.show_reports_statistics = 'Reports'
       this.reports = res.reports
+      api.alert(this.selected_server_url + '/reports/' + 'wei-2020-05-12--22:42:01-CEST.thumbnail.png')
     },
     async report(){
       const comment = await api.prompt('Sharing this image to the cellprofiling slack, please type your comment on this image.')
       if(comment){
+        const screenshot = this.screenShot()
         const response = await fetch( this.selected_server_url + '/reports', {
           method: 'POST',
           mode: 'cors',
@@ -1251,7 +1283,10 @@ const app = new Vue({
               task_id: this.current_image_data.cell_id,
               location_labels: this.current_image_data.location_labels,
               exclusive_labels: this.current_image_data.exclusive_labels,
-            }, image: this.current_displayed_image })
+            },
+            image: this.current_displayed_image,
+            screenshot: screenshot
+          })
         });
         if(response.status !== 200){
           api.alert('Failed to send report: ' + response.status)
