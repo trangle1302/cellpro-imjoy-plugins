@@ -8,7 +8,7 @@
   "type": "window",
   "tags": [],
   "ui": "",
-  "version": "0.1.71",
+  "version": "0.1.72",
   "api_version": "0.1.7",
   "description": "Annotate images for HPA single-cell image classification",
   "icon": "extension",
@@ -1379,9 +1379,9 @@ api.export(new ImJoyPlugin())
       <div class="panel-body">
         <br>
         <div v-for="(task, task_name) in tasks" :key="task_name">
-          <progress class="progress" style="width: 288px" :value="task.finished" :max="task.total"></progress>
+          <progress class="progress" style="width: 280px" :value="task.finished" :max="task.total"></progress>
           <br>
-          <button class="btn" style="width: 280px" @click="chooseTask(task_name)"><i class="icon icon-edit"></i>&nbsp; {{task_name}}: {{task.finished}}/{{task.total}}</button>&nbsp;&nbsp;
+          <button class="btn" style="width: 280px" @click="chooseTask(task_name)"><i class="icon icon-edit"></i>&nbsp; {{task_name}}: {{task.finished}}/{{task.total}}</button>
           <br>
           <br>
         </div>
@@ -1414,6 +1414,12 @@ api.export(new ImJoyPlugin())
                 <div v-if="(typeof v)==='object'&&(!Array.isArray(v))" v-for="(value, anno_item) in v" :key="item">
                 <span class="chip">{{anno_item}}: {{value}}</span>
                 </div>
+              </div>
+              <div v-if="s.summary">
+                <div class="card-subtitle text-gray"><b>Thumbnail image</b></div>
+                <a :href="s.summary.screenshot_url" target="_blank" style="font: 14px arial,serif;">(show screenshot image)</a>
+                <br>
+                <img :src="s.summary.thumbnail_url">
               </div>
             </div>
           </div>
