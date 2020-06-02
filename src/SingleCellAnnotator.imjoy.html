@@ -187,11 +187,11 @@ const LIMS_LOCATION_LABELS = {
         "Nucleoplasm",
         "Nuc membrane",
         "Nucleoli",
-        "Nucleoli Fibrillar center",
+        "Nuc Fib C",
         "Nucl speckles",
-        "Nuclear bodies",
+        "Nuc bodies",
         "Kinetochore",
-        "Mitotic chromosome",
+        "Mit chrom",
     ],
   "Secretory":
     [
@@ -204,30 +204,30 @@ const LIMS_LOCATION_LABELS = {
     ],
   "Cytoskeletal localizations":
     [
-        "Csk(Int Fil)",
-        "Csk(actin)",
-        "Focal Adhesions",
-        "Csk(mt)",
-        "Csk(mt end)",
-        "Csk(cyt bridge)",
+        "Int Fil",
+        "Actin Fil",
+        "Focal Adh",
+        "MTs",
+        "MT ends",
+        "Cyt bridge",
         "Midbody",
         "Midbody ring",
-        "Cleavage furrow",
-        "Mitotic spindle",
+        "Cl furrow",
+        "Spindle",
         "Primary cilia",
-        "Centriolar satelite",
+        "Satellites",
         "Centrosome",
     ],
   "Others":
     [
-        "Lipid droplets",
-        "Plasma membrane",
-        "Cell Junctions",
+        "Lipid drop",
+        "PM",
+        "Junctions",
         "Mitochondria",
         "Aggresome",
         "Cytosol",
-        "Cytoplasmic bodies",
-        "Rods & Rings",
+        "Cyt bodies",
+        "R&R",
   ],
 }
 
@@ -235,11 +235,11 @@ const LIMS_TO_IF_CSV = {
   "Nucleoplasm": "Nucleoplasm",
   "Nuc membrane": "Nuclear membrane",
   "Nucleoli": "Nucleoli",
-  "Nucleoli Fibrillar center": "Nucleoli fibrillar center",
+  "Nuc Fib C": "Nucleoli fibrillar center",
   "Nucl speckles": "Nuclear speckles",
-  "Nuclear bodies": "Nuclear bodies",
+  "Nuc bodies": "Nuclear bodies",
   "Kinetochore": null,
-  "Mitotic chromosome": "Mitotic chromosome",
+  "Mit chrom": "Mitotic chromosome",
 
   "ER": "Endoplasmic reticulum",
   "Golgi": "Golgi apparatus",
@@ -248,28 +248,27 @@ const LIMS_TO_IF_CSV = {
   "Endosomes": "Endosomes",
   "Lysosomes": "Lysosomes",
 
-  "Csk(Int Fil)": "Intermediate filaments",
-  "Csk(actin)": "Actin filaments",
-  "Focal Adhesions": "Focal adhesion sites",
-  "Csk(mt)": "Microtubules",
-  "Csk(mt end)": "Microtubule ends",
-  "Csk(cyt bridge)": "Cytokinetic bridge",
+  "Int Fil": "Intermediate filaments",
+  "Actin Fil": "Actin filaments",
+  "Focal Adh": "Focal adhesion sites",
+  "MTs": "Microtubules",
+  "MT ends": "Microtubule ends",
+  "Cyt bridge": "Cytokinetic bridge",
   "Midbody": "Midbody",
   "Midbody ring": "Midbody ring",
-  "Cleavage furrow": "Cleavage furrow",
-  "Mitotic spindle": "Mitotic spindle",
+  "Cl furrow": "Cleavage furrow",
+  "Spindle": "Mitotic spindle",
   "Primary cilia": null,
-  "Centriolar satalite": "Centriolar satellite",
+  "Satellites": "Centriolar satellite",
   "Centrosome": "Centrosome",
-  "Lipid droplets": "Lipid droplets",
-  "Plasma membrane": "Plasma membrane",
-  "Cell Junctions": "Cell Junctions",
+  "Lipid drop": "Lipid droplets",
+  "PM": "Plasma membrane",
+  "Junctions": "Cell Junctions",
   "Mitochondria": "Mitochondria",
   "Aggresome": "Aggresome",
   "Cytosol": "Cytosol",
-  "Cytoplasmic bodies": "Cytoplasmic bodies",
-  "Rods & Rings": "Rods & Rings",
-    
+  "Cyt bodies": "Cytoplasmic bodies",
+  "R&R": "Rods & Rings",    
 }
 
 const app = new Vue({
@@ -1501,7 +1500,7 @@ api.export(new ImJoyPlugin())
           <div class="columns">
             <template v-for="group in LIMS_LOCATION_LABELS">
               <template v-for="label in group">
-                <button :key="label" v-if="LIMS_TO_IF_CSV[label] && current_image_data.location_labels[LIMS_TO_IF_CSV[label]] !== undefined" :disabled="current_image_data.exclusive_label" @click="toggleLabel(LIMS_TO_IF_CSV[label])" class="column btn label-btn" :class="{'selected-label-btn': current_image_data.location_labels[LIMS_TO_IF_CSV[label]]}">{{label.slice(0,12)+(label.length>12?'.': '')}}</button>
+                <button style="font-size: 12px" :key="label" v-if="LIMS_TO_IF_CSV[label] && current_image_data.location_labels[LIMS_TO_IF_CSV[label]] !== undefined" :disabled="current_image_data.exclusive_label" @click="toggleLabel(LIMS_TO_IF_CSV[label])" class="column btn label-btn" :class="{'selected-label-btn': current_image_data.location_labels[LIMS_TO_IF_CSV[label]]}">{{label.slice(0,12)+(label.length>12?'.': '')}}</button>
               </template>
               <!-- <div class="break hide-on-mobile"></div> -->
             </template>
