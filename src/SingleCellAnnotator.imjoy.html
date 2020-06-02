@@ -24,7 +24,8 @@
       "https://cdn.jsdelivr.net/gh/openlayers/openlayers.github.io@master/en/v6.1.1/css/ol.css",
       "https://cdn.jsdelivr.net/gh/openlayers/openlayers.github.io@master/en/v6.1.1/build/ol.js",
       "https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.3.0/Chart.js",
-      "https://canvasjs.com/assets/script/canvasjs.min.js"
+      "https://canvasjs.com/assets/script/canvasjs.min.js",
+      "https://www.gstatic.com/charts/loader.js"
   ],
   "dependencies": [],
   "defaults": {"fullscreen": true},
@@ -577,6 +578,30 @@ const app = new Vue({
         }]
       });
       chart.render();
+    },
+    drawChart() {
+      var data = google.visualization.arrayToDataTable([
+      ['Task', 'Hours per Day'],
+      ['Work', 8],
+      ['Eat', 2],
+      ['TV', 4],
+      ['Gym', 2],
+      ['Sleep', 8]
+      ]);
+
+      // Optional; add a title and set the width and height of the chart
+      var options = {'title':'My Average Day', 'width':550, 'height':400};
+
+      // Display the chart inside the <div> element with id="piechart"
+      var chart = new google.visualization.BarChart(document.getElementById('piechart'));
+      chart.draw(data, options);
+    },
+    async barChartshow(){
+      // Load google charts
+      google.charts.load('current', {'packages':['corechart']});
+      google.charts.setOnLoadCallback(this.drawChart);
+
+      // Draw the chart and set the chart values
     },
     async getTaskList(){
       const response2 = await fetch(this.selected_server_url + "/tasks", {
@@ -1488,7 +1513,9 @@ api.export(new ImJoyPlugin())
               </div>  
               <div v-for="(v, task_name) in s" :key="task_name">
                 <div class="card-subtitle text-gray">{{task_name}}</div>
-                <div onload="statChart()" id="chartContainer" style="height: 370px; width: 100%;"></div>
+                <div id="piechart">
+                  <span><i title="show piechart" class="icon icon-cross" @click="barChartshow()"></i></span>
+                </div>
                 <div v-for="(t, ann_name) in v" :key="task_name">
                   <span class="chip">{{ann_name}}: {{t}}</span>
                 </div>
