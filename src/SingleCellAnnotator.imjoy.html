@@ -467,7 +467,7 @@ const app = new Vue({
       const locs = {}
       if(this.current_image_data.location_labels){
         for(let k in this.current_image_data.location_labels){
-          if((!this.LIMS_VALUES.includes(k))&&(k !== 'Microtubule organizing center')){
+          if(!this.LIMS_VALUES.includes(k)){
             locs[k] = this.current_image_data.location_labels[k]
           }
         }
