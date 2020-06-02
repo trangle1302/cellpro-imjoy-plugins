@@ -8,7 +8,7 @@
   "type": "window",
   "tags": [],
   "ui": "",
-  "version": "0.1.72",
+  "version": "0.1.75",
   "api_version": "0.1.7",
   "description": "Annotate images for HPA single-cell image classification",
   "icon": "extension",
@@ -22,7 +22,9 @@
       "https://static.imjoy.io/spectre.css/spectre-exp.min.css",
       "https://static.imjoy.io/spectre.css/spectre-icons.min.css",
       "https://cdn.jsdelivr.net/gh/openlayers/openlayers.github.io@master/en/v6.1.1/css/ol.css",
-      "https://cdn.jsdelivr.net/gh/openlayers/openlayers.github.io@master/en/v6.1.1/build/ol.js"
+      "https://cdn.jsdelivr.net/gh/openlayers/openlayers.github.io@master/en/v6.1.1/build/ol.js",
+      "https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.3.0/Chart.js",
+      "https://canvasjs.com/assets/script/canvasjs.min.js"
   ],
   "dependencies": [],
   "defaults": {"fullscreen": true},
@@ -34,7 +36,7 @@
 const SERVERS = {
   'development': 'https://wet-grasshopper-41.telebit.io',
   'production': 'https://unlucky-shrimp-3.telebit.io',
-  'localhost': 'http://127.0.0.1:5000'
+  'localhost': 'https://cuddly-moth-61.telebit.io'
 }
 
 const Map = ol.Map;
@@ -547,6 +549,35 @@ const app = new Vue({
       const res2 = await response2.json()
       this.statistics = res2.statistics
       console.log( this.statistics )
+    },
+    async statChart(){
+      var chart = new CanvasJS.Chart("chartContainer", {
+        animationEnabled: true,
+        theme: "light2", // "light1", "light2", "dark1", "dark2"
+        title:{
+          text: "Top Oil Reserves"
+        },
+        axisY: {
+          title: "Reserves(MMbbl)"
+        },
+        data: [{        
+          type: "column",  
+          showInLegend: true, 
+          legendMarkerColor: "grey",
+          legendText: "MMbbl = one million barrels",
+          dataPoints: [      
+            { y: 300878, label: "Venezuela" },
+            { y: 266455,  label: "Saudi" },
+            { y: 169709,  label: "Canada" },
+            { y: 158400,  label: "Iran" },
+            { y: 142503,  label: "Iraq" },
+            { y: 101500, label: "Kuwait" },
+            { y: 97800,  label: "UAE" },
+            { y: 80000,  label: "Russia" }
+          ]
+        }]
+      });
+      chart.render();
     },
     async getTaskList(){
       const response2 = await fetch(this.selected_server_url + "/tasks", {
@@ -1434,8 +1465,9 @@ api.export(new ImJoyPlugin())
               </div>  
               <div v-for="(v, task_name) in s" :key="task_name">
                 <div class="card-subtitle text-gray">{{task_name}}</div>
+                <div onload="statChart()" id="chartContainer" style="height: 370px; width: 100%;"></div>
                 <div v-for="(t, ann_name) in v" :key="task_name">
-                <span class="chip">{{ann_name}}: {{t}}</span>
+                  <span class="chip">{{ann_name}}: {{t}}</span>
                 </div>
               </div>
             </div>
@@ -1734,7 +1766,12 @@ api.export(new ImJoyPlugin())
     padding-left: 124px;
     padding-top: 10px;
   }
-  
+  .container {
+    width: 700px ;
+    margin-left: auto ;
+    margin-right: auto ;
+    padding-top: 10%;
+    }
   @media all and (max-width: 512px) { /* Change Width Here */
     .hide-on-mobile {
         display: none;
