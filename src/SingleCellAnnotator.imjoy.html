@@ -25,7 +25,8 @@
       "https://cdn.jsdelivr.net/gh/openlayers/openlayers.github.io@master/en/v6.1.1/build/ol.js",
       "https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.3.0/Chart.js",
       "https://canvasjs.com/assets/script/canvasjs.min.js",
-      "https://www.gstatic.com/charts/loader.js"
+      "https://www.gstatic.com/charts/loader.js",
+      "https://www.google.com/jsapi"
   ],
   "dependencies": [],
   "defaults": {"fullscreen": true},
@@ -307,6 +308,10 @@ const app = new Vue({
     default_extend_value: 50,
     current_extend_value: 50,
     statistics: {},
+    showStatKeys: {
+      idName: null,
+      theData: null
+    },
     reports: {},
     // show reports or statistics in statistics panel, [Reports, Statistics]
     show_reports_statistics: null,
@@ -550,7 +555,9 @@ const app = new Vue({
       this.statistics = res2.statistics
       console.log( this.statistics )
     },
-    async drawChart(idName, theData) {
+    async drawChart() {
+      const idName = this.showStatKeys.idName;
+      const theData = this.showStatKeys.theData;
       console.log(JSON.stringify(theData))
       const modifiedData = Object.assign({}, theData)
       let xyLabels = ['Task', 'Counts']
@@ -574,8 +581,10 @@ const app = new Vue({
     },
     async barChartShow(theData, idName){
       // Load google charts
+      this.showStatKeys.idName = idName;
+      this.showStatKeys.theData = theData;
       google.charts.load('current', {'packages':['corechart']});
-      await google.charts.setOnLoadCallback(this.drawChart(idName, theData));
+      await google.charts.setOnLoadCallback(this.drawChart);
 
       // Draw the chart and set the chart values
     },
