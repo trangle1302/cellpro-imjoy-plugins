@@ -566,7 +566,6 @@ const app = new Vue({
         const keyGroup = Object.keys(theData)
         const valueGroup = Object.values(theData)
         for (let i=0; i<valueGroup.length; i++){modifiedData[keyGroup[i]] = parseFloat(valueGroup[i])}
-        api.alert(JSON.stringify(modifiedData))
       };
       let passData = Object.entries(modifiedData)
       passData.splice(0, 0, xyLabels)
@@ -1499,8 +1498,9 @@ api.export(new ImJoyPlugin())
               <div v-for="(v, task_name) in s" :key="task_name">
                 <div class="card-subtitle text-gray">{{task_name}}</div>
                 <div :id="k + task_name">
-                  <span><i title="show piechart" class="icon icon-cross" @click="barChartShow(v, k + task_name)"></i></span>
+                  <span><button title="show chart" @click="barChartShow(v, k + task_name)">chart</button></span>
                 </div>
+                <br>
                 <div v-for="(t, ann_name) in v" :key="task_name">
                   <span class="chip">{{ann_name}}: {{t}}</span>
                 </div>
