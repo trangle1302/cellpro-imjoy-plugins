@@ -550,61 +550,32 @@ const app = new Vue({
       this.statistics = res2.statistics
       console.log( this.statistics )
     },
-    async statChart(){
-      var chart = new CanvasJS.Chart("chartContainer", {
-        animationEnabled: true,
-        theme: "light2", // "light1", "light2", "dark1", "dark2"
-        title:{
-          text: "Top Oil Reserves"
-        },
-        axisY: {
-          title: "Reserves(MMbbl)"
-        },
-        data: [{        
-          type: "column",  
-          showInLegend: true, 
-          legendMarkerColor: "grey",
-          legendText: "MMbbl = one million barrels",
-          dataPoints: [      
-            { y: 300878, label: "Venezuela" },
-            { y: 266455,  label: "Saudi" },
-            { y: 169709,  label: "Canada" },
-            { y: 158400,  label: "Iran" },
-            { y: 142503,  label: "Iraq" },
-            { y: 101500, label: "Kuwait" },
-            { y: 97800,  label: "UAE" },
-            { y: 80000,  label: "Russia" }
-          ]
-        }]
-      });
-      chart.render();
-    },
-    drawChart() {
-      var data = google.visualization.arrayToDataTable([
-      ['Task', 'Hours per Day'],
-      ['Work', 8],
-      ['Eat', 2],
-      ['TV', 4],
-      ['Gym', 2],
-      ['Sleep', 20],
-      ['Work', 8],
-      ['Eat', 2],
-      ['TV', 4],
-      ['Gym', 2],
-      ['Sleep', 20]
-      ]);
+    async drawChart(idName, theData) {
+      console.log(JSON.stringify(theData))
+      const modifiedData = Object.assign({}, theData)
+      let xyLabels = ['Task', 'Counts']
+      if(idName.includes('Average time elasped')){
+        xyLabels = ['Task', 's/image']
+        const keyGroup = Object.keys(theData)
+        const valueGroup = Object.values(theData)
+        for (let i=0; i<valueGroup.length; i++){modifiedData[keyGroup[i]] = parseFloat(valueGroup[i])}
+        api.alert(JSON.stringify(modifiedData))
+      };
+      let passData = Object.entries(modifiedData)
+      passData.splice(0, 0, xyLabels)
+      var data = google.visualization.arrayToDataTable(passData);
 
       // Optional; add a title and set the width and height of the chart
-      var options = {'title':'My Average Day', 'width':480, 'height':400};
+      var options = {'title':'', 'width':480, 'height':400};
 
       // Display the chart inside the <div> element with id="piechart"
-      var chart = new google.visualization.BarChart(document.getElementById('piechart'));
+      var chart = new google.visualization.BarChart(document.getElementById(idName));
       chart.draw(data, options);
     },
-    async barChartshow(){
+    async barChartShow(theData, idName){
       // Load google charts
       google.charts.load('current', {'packages':['corechart']});
-      google.charts.setOnLoadCallback(this.drawChart);
+      await google.charts.setOnLoadCallback(this.drawChart(idName, theData));
 
       // Draw the chart and set the chart values
     },
@@ -1518,8 +1489,8 @@ api.export(new ImJoyPlugin())
               </div>  
               <div v-for="(v, task_name) in s" :key="task_name">
                 <div class="card-subtitle text-gray">{{task_name}}</div>
-                <div id="piechart">
-                  <span><i title="show piechart" class="icon icon-cross" @click="barChartshow()"></i></span>
+                <div :id="k + task_name">
+                  <span><i title="show piechart" class="icon icon-cross" @click="barChartShow(v, k + task_name)"></i></span>
                 </div>
                 <div v-for="(t, ann_name) in v" :key="task_name">
                   <span class="chip">{{ann_name}}: {{t}}</span>
