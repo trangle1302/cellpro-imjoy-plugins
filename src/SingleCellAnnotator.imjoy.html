@@ -414,7 +414,7 @@ const app = new Vue({
         }
         else if(event.code === 'KeyD'){
           
-          this.toggleExclusiveLabels('Discarded')
+          this.toggleExclusiveLabels('Discard')
         }
         else if(event.code === 'KeyS'){
           if(this.current_image_data.labels_changed){
@@ -1542,7 +1542,7 @@ api.export(new ImJoyPlugin())
           <input v-model="ch.show" :name="ch.name" @change="channelSettingsUpdated" type="checkbox">
           <i class="form-icon"></i> {{ch.name}}
         </label>
-         <button :disabled="loading" v-show="current_task_name === 'segmentation'" :class="{'exclusive-label-btn': current_image_data.exclusive_label === 'Discarded'}" class="btn btn-sm small-btn channel-controls" @click="toggleExclusiveLabels('Discarded')">Discard</button>
+         <button :disabled="loading" v-show="current_task_name === 'segmentation'" :class="{'exclusive-label-btn': current_image_data.exclusive_label === 'Discard'}" class="btn btn-sm small-btn channel-controls" @click="toggleExclusiveLabels('Discard')">Discard</button>
         <button :disabled="!mask_history||mask_history.length<=0" v-show="current_task_name === 'segmentation'" class="btn btn-sm small-btn channel-controls" @click="undoAnnotation()">Undo</button>
         <button class="btn btn-sm s-circle channel-controls" style="background-color: transparent;" title="info" @click="info()"><i class="icon icon-message"></i></button>
       </div>
