@@ -177,7 +177,7 @@ async function composeChannels(channels, channel_settings, alpha, brightness){
         }else{
           src = channelERData.data
           for(let i=0, ii=src.length;i<ii;i++){
-            src[i] = parseInt(src[i] * 0.5)
+            src[i] = src[i]
           }  
         }
       }
@@ -185,7 +185,8 @@ async function composeChannels(channels, channel_settings, alpha, brightness){
         src = rgb_channels[j].data;
         if(j!== 2){
           for(let i=0, ii=src.length;i<ii;i++){
-            src[i] = parseInt(src[i] * 0.5 + channelERData.data[i] * 0.5)
+            src[i] = src[i]+ channelERData.data[i]
+            src[i] = src[i] > 255?255:src[i] 
           }
         }   
       }
