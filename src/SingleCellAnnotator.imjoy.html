@@ -331,7 +331,6 @@ const app = new Vue({
     renderWindow: null,
     interactor: null,
     renderer: null,
-    //modifyInteraction: null,
     drawInteraction: null,
     itkInteraction: null,
     draw_mask_mode: true,
@@ -605,14 +604,12 @@ const app = new Vue({
       const res2 = await response2.json()
       this.statistics = res2.statistics
       console.log( this.statistics )
-      // update the collectChartData
       this.collectChartData = []
       for (const [key, group] of Object.entries(this.statistics)){
         for (const [task_name, value] of Object.entries(group)){
           this.collectChartData.splice(0, 0, [key+task_name, value])
         }
       }
-      // console.log(JSON.stringify(this.collectChartData))
     },
     async drawChart() {
       const idName = this.showStatKeys.idName;
@@ -630,20 +627,16 @@ const app = new Vue({
       passData.splice(0, 0, xyLabels)
       var data = google.visualization.arrayToDataTable(passData);
 
-      // Optional; add a title and set the width and height of the chart
       var options = {'title':'', 'width':480, 'height':400};
 
-      // Display the chart inside the <div> element with id="piechart"
       var chart = new google.visualization.BarChart(document.getElementById(idName));
       chart.draw(data, options);
     },
     async barChartShow(chartkeys){
-      // Load google charts
       this.showStatKeys.idName = chartkeys[0];
       this.showStatKeys.theData = chartkeys[1];
       google.charts.load('current', {'packages':['corechart']});
       await google.charts.setOnLoadCallback(this.drawChart);
-      // Draw the chart and set the chart values
     },
     async getTaskList(){
       const response2 = await fetch(this.selected_server_url + "/tasks", {
@@ -1110,10 +1103,6 @@ const app = new Vue({
       for(let k of Object.keys(channels)){
         if(!channel_settings[k]){
           channel_settings[k] = {name: k, show: true}
-          // don't show ER by default
-          //if(k==='ER'){
-          //  channel_settings[k].show = false;
-          //}
         }
       }
       let url, extent;
@@ -1195,7 +1184,6 @@ const app = new Vue({
         else{
           this.mask_history.push({'remove': event.feature})
         }
-        // this.current_image_data.mask_changed.removed.push(event.feature.values_.cell_idx)
         this.current_image_data.mask_adjusted = true
       });
       var vector_layer = new VectorLayer({
@@ -1313,9 +1301,6 @@ const app = new Vue({
         type: 'Polygon',
         freehand: freehand
       });
-      // this.drawInteraction.on('drawend', async (evt) => {
-          
-      // });
       this.map.addInteraction(this.drawInteraction);
       if(this.current_task_name !== 'segmentation'){
         if(this.channel_settings['Mask'])
@@ -1359,16 +1344,6 @@ const app = new Vue({
           mapContext.drawImage(canvas, 0, 0);
         }
       });
-      //if (navigator.msSaveBlob) {
-        //api.alert(JSON.stringify(mapCanvas.toDataURL))
-        // link download attribuute does not work on MS browsers
-      //  navigator.msSaveBlob(mapCanvas.msToBlob(), 'map.png');
-      //} else {
-      //  var link = document.getElementById('image-download');
-      //  link.href = mapCanvas.toDataURL();
-      //  link.click();
-      //};
-      //map.renderSync();
       return mapCanvas.toDataURL('image/jpeg', 1.0)
     },
     async showReport(){
@@ -1443,16 +1418,6 @@ const app = new Vue({
     },
     channelSettingsUpdated(event){
       // make sure ER and Microtubule are not turned on at the same time
-      if(event.target.name === 'ER' && event.target.value === 'on'){
-        //if(this.channel_settings['Microtubule']){
-        //  this.channel_settings['Microtubule'].show = false
-        //}
-      }
-      else if(event.target.name === 'Microtubule' && event.target.value === 'on'){
-        //if(this.channel_settings['ER']){
-        //  this.channel_settings['ER'].show = false
-        //}
-      }
       this.$forceUpdate()
       this.displayMap(this.current_image_data.channels, this.channel_settings);
     },
