@@ -106,16 +106,28 @@ async function getImageData(url) {
   });
 };
 
-const colormap = {'Microtubule': 0, 'Protein': 1, 'ER': 0, 'Nuclei': 2, 'Mask': 3}
+const colormap = {'Microtubule': 0, 'Protein': 1, 'ER': 4, 'Nuclei': 2, 'Mask': 3}
 
 async function composeChannels(channels, channel_settings, alpha, brightness){
   if(alpha<0) alpha = 0;
   if(alpha>1) alpha = 1;
   brightness = brightness || 1.0;
   const rgb_channels = []
-  const canvas = document.createElement('canvas') 
+  const canvas = document.createElement('canvas')
+  let channelER = false;
+  let channelERData = null;
   for(let k in channel_settings){
     if(channels[k] && colormap.hasOwnProperty(k)){
+      if(channel_settings[k].show){
+        if(k==='ER'){
+          channelER=true;
+          channelERData = await getImageData(channels['ER'])
+        }
+      };
+    }
+  }
+  for(let k in channel_settings){
+    if(channels[k] && colormap.hasOwnProperty(k)&&(k!=='ER')){
       if(channel_settings[k].show){
         const imgData = await getImageData(channels[k]);
         rgb_channels[colormap[k]] = imgData;
@@ -133,9 +145,42 @@ async function composeChannels(channels, channel_settings, alpha, brightness){
   let i, j, v;
   const data = imgData.data
   // set color channels
-  for(j=0;j<3;j++){
-    if(rgb_channels[j]){
-      const src = rgb_channels[j].data;
+  if(!channelER){
+    for(j=0;j<3;j++){
+      if(rgb_channels[j]){
+        const src = rgb_channels[j].data;
+        for(i=0;i<channel_offset;i++){
+          if(brightness===1){
+            data[i*4+j] = src[i]
+          }
+          else{
+            v = src[i]*brightness;
+            data[i*4+j] = v>255?255:parseInt(v);
+          }
+        }
+      }
+    }
+  }else{
+    for(j=0;j<3;j++){
+      let src
+      if(!rgb_channels[j]){
+        if (j===2){
+          continue;
+        }else{
+          src = channelERData.data
+          for(let i=0, ii=src.length;i<ii;i++){
+            src[i] = parseInt(src[i] * 0.5)
+          }  
+        }
+      }
+      if(rgb_channels[j]){
+        src = rgb_channels[j].data;
+        if(j!== 2){
+          for(let i=0, ii=src.length;i<ii;i++){
+            src[i] = parseInt(src[i] * 0.5 + channelERData.data[i] * 0.5)
+          }
+        }   
+      }
       for(i=0;i<channel_offset;i++){
         if(brightness===1){
           data[i*4+j] = src[i]
@@ -145,7 +190,7 @@ async function composeChannels(channels, channel_settings, alpha, brightness){
           data[i*4+j] = v>255?255:parseInt(v);
         }
       }
-    }
+    }    
   }
   // set alpha channel
   if(rgb_channels[3]){
@@ -1013,9 +1058,9 @@ const app = new Vue({
         if(!channel_settings[k]){
           channel_settings[k] = {name: k, show: true}
           // don't show ER by default
-          if(k==='ER'){
-            channel_settings[k].show = false;
-          }
+          //if(k==='ER'){
+          //  channel_settings[k].show = false;
+          //}
         }
       }
       let url, extent;
