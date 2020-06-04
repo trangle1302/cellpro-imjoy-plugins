@@ -8,7 +8,7 @@
   "type": "window",
   "tags": [],
   "ui": "",
-  "version": "0.1.74",
+  "version": "0.1.75",
   "api_version": "0.1.7",
   "description": "Annotate images for HPA single-cell image classification",
   "icon": "extension",
@@ -131,6 +131,12 @@ async function composeChannels(channels, channel_settings, alpha, brightness){
       if(channel_settings[k].show){
         const imgData = await getImageData(channels[k]);
         rgb_channels[colormap[k]] = imgData;
+        canvas.width = imgData.width
+        canvas.height = imgData.height
+      }
+    } else if (channels[k] && colormap.hasOwnProperty(k)&&(k==='ER')){
+      if(channel_settings[k].show){
+        const imgData = await getImageData(channels[k]);
         canvas.width = imgData.width
         canvas.height = imgData.height
       }
@@ -1376,14 +1382,14 @@ const app = new Vue({
     channelSettingsUpdated(event){
       // make sure ER and Microtubule are not turned on at the same time
       if(event.target.name === 'ER' && event.target.value === 'on'){
-        if(this.channel_settings['Microtubule']){
-          this.channel_settings['Microtubule'].show = false
-        }
+        //if(this.channel_settings['Microtubule']){
+        //  this.channel_settings['Microtubule'].show = false
+        //}
       }
       else if(event.target.name === 'Microtubule' && event.target.value === 'on'){
-        if(this.channel_settings['ER']){
-          this.channel_settings['ER'].show = false
-        }
+        //if(this.channel_settings['ER']){
+        //  this.channel_settings['ER'].show = false
+        //}
       }
       this.$forceUpdate()
       this.displayMap(this.current_image_data.channels, this.channel_settings);
