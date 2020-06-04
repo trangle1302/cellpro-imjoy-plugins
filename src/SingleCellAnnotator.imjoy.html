@@ -1143,12 +1143,27 @@ const app = new Vue({
       })
 
       if(this.image_layer && this.map){
-        this.map.setView( new View({
-          projection: projection,
-          center: getCenter(extent),
-          zoom: 1,
-          minZoom: -10
-        }))
+        try {
+          let view = this.map.getView()
+          const zoom = view && view.getZoom()
+          const center = view &&  view.getCenter()
+          view = null
+          this.map.setView( new View({
+            projection: projection,
+            center: center || getCenter(extent),
+            zoom: zoom || 1,
+            minZoom: -10
+          }))
+        }
+        catch(err){
+          console.log('Issue: ' + err)
+          this.map.setView( new View({
+            projection: projection,
+            center: getCenter(extent),
+            zoom: 1,
+            minZoom: -10
+          }))
+        }
         this.image_layer.setSource(image_source)
         return
       }
