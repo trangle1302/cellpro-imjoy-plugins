@@ -22,7 +22,9 @@
       "https://static.imjoy.io/spectre.css/spectre-exp.min.css",
       "https://static.imjoy.io/spectre.css/spectre-icons.min.css",
       "https://cdn.jsdelivr.net/gh/openlayers/openlayers.github.io@master/en/v6.1.1/css/ol.css",
-      "https://cdn.jsdelivr.net/gh/openlayers/openlayers.github.io@master/en/v6.1.1/build/ol.js"
+      "https://cdn.jsdelivr.net/gh/openlayers/openlayers.github.io@master/en/v6.1.1/build/ol.js",
+      "https://www.gstatic.com/charts/loader.js",
+      "https://www.google.com/jsapi"
   ],
   "dependencies": [],
   "defaults": {"fullscreen": true},
@@ -355,6 +357,11 @@ const app = new Vue({
     default_extend_value: 50,
     current_extend_value: 50,
     statistics: {},
+    showStatKeys: {
+      idName: null,
+      theData: null,
+    },
+    collectChartData:[],
     reports: {},
     // show reports or statistics in statistics panel, [Reports, Statistics]
     show_reports_statistics: null,
@@ -589,6 +596,7 @@ const app = new Vue({
       }
     },
     async getStatistics(){
+      this.current_panel = 'statistics'
       this.show_reports_statistics = 'Statistics'
       const response2 = await fetch(this.selected_server_url + "/statistics", {
         method: 'GET',
@@ -597,6 +605,45 @@ const app = new Vue({
       const res2 = await response2.json()
       this.statistics = res2.statistics
       console.log( this.statistics )
+      // update the collectChartData
+      this.collectChartData = []
+      for (const [key, group] of Object.entries(this.statistics)){
+        for (const [task_name, value] of Object.entries(group)){
+          this.collectChartData.splice(0, 0, [key+task_name, value])
+        }
+      }
+      // console.log(JSON.stringify(this.collectChartData))
+    },
+    async drawChart() {
+      const idName = this.showStatKeys.idName;
+      const theData = this.showStatKeys.theData;
+      console.log(JSON.stringify(theData))
+      const modifiedData = Object.assign({}, theData)
+      let xyLabels = ['Task', 'Counts']
+      if(idName.includes('Average time elasped')){
+        xyLabels = ['Task', 's/image']
+        const keyGroup = Object.keys(theData)
+        const valueGroup = Object.values(theData)
+        for (let i=0; i<valueGroup.length; i++){modifiedData[keyGroup[i]] = parseFloat(valueGroup[i])}
+      };
+      let passData = Object.entries(modifiedData)
+      passData.splice(0, 0, xyLabels)
+      var data = google.visualization.arrayToDataTable(passData);
+
+      // Optional; add a title and set the width and height of the chart
+      var options = {'title':'', 'width':480, 'height':400};
+
+      // Display the chart inside the <div> element with id="piechart"
+      var chart = new google.visualization.BarChart(document.getElementById(idName));
+      chart.draw(data, options);
+    },
+    async barChartShow(chartkeys){
+      // Load google charts
+      this.showStatKeys.idName = chartkeys[0];
+      this.showStatKeys.theData = chartkeys[1];
+      google.charts.load('current', {'packages':['corechart']});
+      await google.charts.setOnLoadCallback(this.drawChart);
+      // Draw the chart and set the chart values
     },
     async getTaskList(){
       const response2 = await fetch(this.selected_server_url + "/tasks", {
@@ -1396,7 +1443,10 @@ const app = new Vue({
     },
     async showStatistics(){
       await this.getStatistics()
-      this.current_panel = 'statistics'
+      // show all the charts
+      for (let item of this.collectChartData){
+        await this.barChartShow(item)
+      }
     }
   }
 })
@@ -1465,7 +1515,7 @@ api.export(new ImJoyPlugin())
 
     <div class="panel statistics-panel" v-if="current_panel=='statistics'&&statistics">
       <button style="right: 94px; top: 10px; position: absolute; font: 11px arial,serif;" class="btn btn-action s-circle" title="load reports" @click="showReport()"><b>Rep</b></button>&nbsp;&nbsp;
-      <button style="right: 52px; top: 12px; position: absolute; font: 11px arial,serif;" class="btn btn-action s-circle" title="load statistics" @click="getStatistics()"><b>Stats</b></button>&nbsp;&nbsp;
+      <button style="right: 52px; top: 12px; position: absolute; font: 11px arial,serif;" class="btn btn-action s-circle" title="load statistics" @click="showStatistics()"><b>Stats</b></button>&nbsp;&nbsp;
       <button style="right: 10px; top: 10px; position: absolute;" class="btn btn-action s-circle" title="home" @click="home()"><i class="icon icon-cross"></i></button>&nbsp;&nbsp;
       <p style="font: bold 32px arial,serif">{{show_reports_statistics}}</p>
       <div class="panel-body" v-show="show_reports_statistics==='Reports'">
@@ -1508,9 +1558,7 @@ api.export(new ImJoyPlugin())
               </div>  
               <div v-for="(v, task_name) in s" :key="task_name">
                 <div class="card-subtitle text-gray">{{task_name}}</div>
-                <div v-for="(t, ann_name) in v" :key="task_name">
-                <span class="chip">{{ann_name}}: {{t}}</span>
-                </div>
+                <div :id="k + task_name"></div>
               </div>
             </div>
           </div>
@@ -1808,7 +1856,6 @@ api.export(new ImJoyPlugin())
     padding-left: 124px;
     padding-top: 10px;
   }
-  
   @media all and (max-width: 512px) { /* Change Width Here */
     .hide-on-mobile {
         display: none;
