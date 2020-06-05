@@ -139,14 +139,11 @@ async function composeChannels(channels, channel_settings, alpha, brightness){
   const channel_offset = canvas.width * canvas.height * 4
   let i, j, v;
   const data = imgData.data
-
   // get rgb_channels data
-
   if(alpha<0) alpha = 0;
   if(alpha>1) alpha = 1;
   brightness = brightness || 1.0;
   const rgb_channels = []
-
   for(j=0;j<3;j++){
     if(!color_channels[j].length){
       continue
@@ -154,31 +151,21 @@ async function composeChannels(channels, channel_settings, alpha, brightness){
       rgb_channels[j] = color_channels[j][0]
     }
     const src = rgb_channels[j].data;
-    if(color_channels[j].length===1){
-      for(i=0;i<channel_offset;i++){
-        if(brightness===1){
-          data[i*4+j] = src[i]
-        }
-        else{
-          v = src[i]*brightness;
-          data[i*4+j] = v>255?255:parseInt(v);
-        }
-      }
-    }else{
+    if(color_channels[j].length===2){
       let tempo_number
       for(let i=0, ii=src.length;i<ii;i++){
         tempo_number = src[i]+ color_channels[j][1].data[i]
         if (tempo_number > 255)tempo_number = 255
         src[i] = tempo_number
       }
-      for(i=0;i<channel_offset;i++){
-        if(brightness===1){
-          data[i*4+j] = src[i]
-        }
-        else{
-          v = src[i]*brightness;
-          data[i*4+j] = v>255?255:parseInt(v);
-        }
+    }
+    for(i=0;i<channel_offset;i++){
+      if(brightness===1){
+        data[i*4+j] = src[i]
+      }
+      else{
+        v = src[i]*brightness;
+        data[i*4+j] = v>255?255:parseInt(v);
       }
     }
   }
