@@ -147,15 +147,15 @@ async function composeChannels(channels, channel_settings, alpha, brightness){
     if(!color_channels[j].length){
       continue
     }
-    for(i=0;i<channel_offset;i++){
-      pixel_index = i*4+j
-      v = 0;
-      for(let k=0, ii=color_channels[j].length; k<ii; k++){
-        src = color_channels[j][k].data;
-        v = v + src[i]
+    for(let k=0; k<color_channels[j].length; k++){
+      src = color_channels[j][k].data;
+      for(i=0;i<channel_offset;i++){
+          pixel_index = i*4+j
+          v = data[pixel_index];
+          v = v + src[i]
+          if(brightness!==1) v = v*brightness;
+          data[pixel_index] = v>255?255:parseInt(v);
       }
-      if(brightness!==1)v = v*brightness;
-      data[pixel_index] = v>255?255:parseInt(v);
     }
   }
   // set alfa channel for mask
