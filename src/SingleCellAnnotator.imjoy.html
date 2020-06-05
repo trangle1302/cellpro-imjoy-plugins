@@ -8,7 +8,7 @@
   "type": "window",
   "tags": [],
   "ui": "",
-  "version": "0.1.78",
+  "version": "0.1.80",
   "api_version": "0.1.7",
   "description": "Annotate images for HPA single-cell image classification",
   "icon": "extension",
@@ -107,51 +107,60 @@ async function getImageData(url) {
       img.src = url;
   });
 };
-
-const colormap = {'Microtubule': 0, 'Protein': 1, 'ER': 0, 'Nuclei': 2, 'Mask': 3}
-
 async function composeChannels(channels, channel_settings, alpha, brightness){
-  if(alpha<0) alpha = 0;
-  if(alpha>1) alpha = 1;
-  brightness = brightness || 1.0;
-  const rgb_channels = []
-  const canvas = document.createElement('canvas') 
-  for(let k in channel_settings){
-    if(channels[k] && colormap.hasOwnProperty(k)){
-      if(channel_settings[k].show){
-        const imgData = await getImageData(channels[k]);
-        rgb_channels[colormap[k]] = imgData;
-        canvas.width = imgData.width
-        canvas.height = imgData.height
+  const color_channels = [
+    ['Microtubule', 'ER'],
+    ['Protein', 'ER'],
+    ['Nuclei'],
+    ['Mask']
+  ]
+  // replace channel name with data
+  for(let i=0;i<color_channels.length;i++){
+    for(let j=0;j<color_channels[i].length;j++){
+      const ch_name = color_channels[i][j]
+      if(channel_settings[ch_name].show){
+        color_channels[i][j] = await getImageData(channels[ch_name])
       }
     }
-    if(!colormap.hasOwnProperty(k)){
-      console.warn('No color map defined for ' + k)
+    // filter out empty channels
+    color_channels[i] = color_channels[i].filter(item=>typeof(item)!=='string')
+  }
+  // set canvas
+  const canvas = document.createElement('canvas')
+  for(let i=0;i<color_channels.length;i++){
+    if(color_channels[i].length){
+      canvas.width = color_channels[i][0].width
+      canvas.height = color_channels[i][0].height
+      break
     }
   }
   const ctx = canvas.getContext('2d');
   const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height)
   const channel_offset = canvas.width * canvas.height * 4
-  let i, j, v;
+  let i, j, v, src, pixel_index;
   const data = imgData.data
-  // set color channels
+  // set data channels
+  if(alpha<0) alpha = 0;
+  if(alpha>1) alpha = 1;
+  brightness = brightness || 1.0;
   for(j=0;j<3;j++){
-    if(rgb_channels[j]){
-      const src = rgb_channels[j].data;
+    if(!color_channels[j].length){
+      continue
+    }
+    for(let k=0; k<color_channels[j].length; k++){
+      src = color_channels[j][k].data;
       for(i=0;i<channel_offset;i++){
-        if(brightness===1){
-          data[i*4+j] = src[i]
-        }
-        else{
-          v = src[i]*brightness;
-          data[i*4+j] = v>255?255:parseInt(v);
-        }
+          pixel_index = i*4+j
+          v = data[pixel_index];
+          v = v + src[i]
+          if(brightness!==1) v = v*brightness;
+          data[pixel_index] = v>255?255:parseInt(v);
       }
     }
   }
-  // set alpha channel
-  if(rgb_channels[3]){
-    const src = rgb_channels[3].data;
+  // set alfa channel for mask
+  if(color_channels[3].length){
+    src = color_channels[3][0].data;
     for(i=0;i<channel_offset;i++){
       if(src[i]>0){
         data[i*4+3] = parseInt(alpha*255);
@@ -160,10 +169,9 @@ async function composeChannels(channels, channel_settings, alpha, brightness){
         data[i*4+3] = 255;
       }
     }
-  }
-  else{
+  }else{
     for(i=0;i<channel_offset;i++){
-      data[i*4+3] = 255; 
+    data[i*4+3] = 255; 
     }
   }
   ctx.putImageData(imgData, 0, 0);
@@ -280,7 +288,6 @@ const app = new Vue({
     renderWindow: null,
     interactor: null,
     renderer: null,
-    //modifyInteraction: null,
     drawInteraction: null,
     itkInteraction: null,
     draw_mask_mode: true,
@@ -554,14 +561,12 @@ const app = new Vue({
       const res2 = await response2.json()
       this.statistics = res2.statistics
       console.log( this.statistics )
-      // update the collectChartData
       this.collectChartData = []
       for (const [key, group] of Object.entries(this.statistics)){
         for (const [task_name, value] of Object.entries(group)){
           this.collectChartData.splice(0, 0, [key+task_name, value])
         }
       }
-      // console.log(JSON.stringify(this.collectChartData))
     },
     async drawChart() {
       const idName = this.showStatKeys.idName;
@@ -579,20 +584,16 @@ const app = new Vue({
       passData.splice(0, 0, xyLabels)
       var data = google.visualization.arrayToDataTable(passData);
 
-      // Optional; add a title and set the width and height of the chart
       var options = {'title':'', 'width':480, 'height':400};
 
-      // Display the chart inside the <div> element with id="piechart"
       var chart = new google.visualization.BarChart(document.getElementById(idName));
       chart.draw(data, options);
     },
     async barChartShow(chartkeys){
-      // Load google charts
       this.showStatKeys.idName = chartkeys[0];
       this.showStatKeys.theData = chartkeys[1];
       google.charts.load('current', {'packages':['corechart']});
       await google.charts.setOnLoadCallback(this.drawChart);
-      // Draw the chart and set the chart values
     },
     async getTaskList(){
       const response2 = await fetch(this.selected_server_url + "/tasks", {
@@ -1059,10 +1060,6 @@ const app = new Vue({
       for(let k of Object.keys(channels)){
         if(!channel_settings[k]){
           channel_settings[k] = {name: k, show: true}
-          // don't show ER by default
-          if(k==='ER'){
-            channel_settings[k].show = false;
-          }
         }
       }
       let url, extent;
@@ -1144,7 +1141,6 @@ const app = new Vue({
         else{
           this.mask_history.push({'remove': event.feature})
         }
-        // this.current_image_data.mask_changed.removed.push(event.feature.values_.cell_idx)
         this.current_image_data.mask_adjusted = true
       });
       var vector_layer = new VectorLayer({
@@ -1262,9 +1258,6 @@ const app = new Vue({
         type: 'Polygon',
         freehand: freehand
       });
-      // this.drawInteraction.on('drawend', async (evt) => {
-          
-      // });
       this.map.addInteraction(this.drawInteraction);
       if(this.current_task_name !== 'segmentation'){
         if(this.channel_settings['Mask'])
@@ -1308,16 +1301,6 @@ const app = new Vue({
           mapContext.drawImage(canvas, 0, 0);
         }
       });
-      //if (navigator.msSaveBlob) {
-        //api.alert(JSON.stringify(mapCanvas.toDataURL))
-        // link download attribuute does not work on MS browsers
-      //  navigator.msSaveBlob(mapCanvas.msToBlob(), 'map.png');
-      //} else {
-      //  var link = document.getElementById('image-download');
-      //  link.href = mapCanvas.toDataURL();
-      //  link.click();
-      //};
-      //map.renderSync();
       return mapCanvas.toDataURL('image/jpeg', 1.0)
     },
     async showReport(){
@@ -1392,16 +1375,6 @@ const app = new Vue({
     },
     channelSettingsUpdated(event){
       // make sure ER and Microtubule are not turned on at the same time
-      if(event.target.name === 'ER' && event.target.value === 'on'){
-        if(this.channel_settings['Microtubule']){
-          this.channel_settings['Microtubule'].show = false
-        }
-      }
-      else if(event.target.name === 'Microtubule' && event.target.value === 'on'){
-        if(this.channel_settings['ER']){
-          this.channel_settings['ER'].show = false
-        }
-      }
       this.$forceUpdate()
       this.displayMap(this.current_image_data.channels, this.channel_settings);
     },
