@@ -8,7 +8,7 @@
   "type": "window",
   "tags": [],
   "ui": "",
-  "version": "0.1.79",
+  "version": "0.1.80",
   "api_version": "0.1.7",
   "description": "Annotate images for HPA single-cell image classification",
   "icon": "extension",
@@ -137,42 +137,30 @@ async function composeChannels(channels, channel_settings, alpha, brightness){
   const ctx = canvas.getContext('2d');
   const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height)
   const channel_offset = canvas.width * canvas.height * 4
-  let i, j, v;
+  let i, j, v, src, pixel_index;
   const data = imgData.data
-  // get rgb_channels data
+  // set data channels
   if(alpha<0) alpha = 0;
   if(alpha>1) alpha = 1;
   brightness = brightness || 1.0;
-  const rgb_channels = []
   for(j=0;j<3;j++){
     if(!color_channels[j].length){
       continue
-    }else{
-      rgb_channels[j] = color_channels[j][0]
-    }
-    const src = rgb_channels[j].data;
-    if(color_channels[j].length===2){
-      let tempo_number
-      for(let i=0, ii=src.length;i<ii;i++){
-        tempo_number = src[i]+ color_channels[j][1].data[i]
-        if (tempo_number > 255)tempo_number = 255
-        src[i] = tempo_number
-      }
     }
     for(i=0;i<channel_offset;i++){
-      if(brightness===1){
-        data[i*4+j] = src[i]
+      pixel_index = i*4+j
+      v = 0;
+      for(let k=0, ii=color_channels[j].length; k<ii; k++){
+        src = color_channels[j][k].data;
+        v = v + src[i]
       }
-      else{
-        v = src[i]*brightness;
-        data[i*4+j] = v>255?255:parseInt(v);
-      }
+      if(brightness!==1)v = v*brightness;
+      data[pixel_index] = v>255?255:parseInt(v);
     }
   }
   // set alfa channel for mask
   if(color_channels[3].length){
-    rgb_channels[3] = color_channels[3][0]
-    const src = rgb_channels[3].data;
+    src = color_channels[3][0].data;
     for(i=0;i<channel_offset;i++){
       if(src[i]>0){
         data[i*4+3] = parseInt(alpha*255);
