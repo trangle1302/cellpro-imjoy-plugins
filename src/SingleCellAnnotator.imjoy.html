@@ -8,7 +8,7 @@
   "type": "window",
   "tags": [],
   "ui": "",
-  "version": "0.1.78",
+  "version": "0.1.79",
   "api_version": "0.1.7",
   "description": "Annotate images for HPA single-cell image classification",
   "icon": "extension",
@@ -107,44 +107,31 @@ async function getImageData(url) {
       img.src = url;
   });
 };
-
-const colormap = {'Microtubule': 0, 'Protein': 1, 'ER': 4, 'Nuclei': 2, 'Mask': 3}
-
 async function composeChannels(channels, channel_settings, alpha, brightness){
-  if(alpha<0) alpha = 0;
-  if(alpha>1) alpha = 1;
-  brightness = brightness || 1.0;
-  const rgb_channels = []
-  const canvas = document.createElement('canvas')
-  let channelER = false;
-  let channelERData = null;
-  for(let k in channel_settings){
-    if(channels[k] && colormap.hasOwnProperty(k)){
-      if(channel_settings[k].show){
-        if(k==='ER'){
-          channelER=true;
-          channelERData = await getImageData(channels['ER'])
-        }
-      };
+  const color_channels = [
+    ['Microtubule', 'ER'],
+    ['Protein', 'ER'],
+    ['Nuclei'],
+    ['Mask']
+  ]
+  // replace channel name with data
+  for(let i=0;i<color_channels.length;i++){
+    for(let j=0;j<color_channels[i].length;j++){
+      const ch_name = color_channels[i][j]
+      if(channel_settings[ch_name].show){
+        color_channels[i][j] = await getImageData(channels[ch_name])
+      }
     }
+    // filter out empty channels
+    color_channels[i] = color_channels[i].filter(item=>typeof(item)!=='string')
   }
-  for(let k in channel_settings){
-    if(channels[k] && colormap.hasOwnProperty(k)&&(k!=='ER')){
-      if(channel_settings[k].show){
-        const imgData = await getImageData(channels[k]);
-        rgb_channels[colormap[k]] = imgData;
-        canvas.width = imgData.width
-        canvas.height = imgData.height
-      }
-    } else if (channels[k] && colormap.hasOwnProperty(k)&&(k==='ER')){
-      if(channel_settings[k].show){
-        const imgData = await getImageData(channels[k]);
-        canvas.width = imgData.width
-        canvas.height = imgData.height
-      }
-    }
-    if(!colormap.hasOwnProperty(k)){
-      console.warn('No color map defined for ' + k)
+  // set canvas
+  const canvas = document.createElement('canvas')
+  for(let i=0;i<color_channels.length;i++){
+    if(color_channels[i].length){
+      canvas.width = color_channels[i][0].width
+      canvas.height = color_channels[i][0].height
+      break
     }
   }
   const ctx = canvas.getContext('2d');
@@ -152,42 +139,37 @@ async function composeChannels(channels, channel_settings, alpha, brightness){
   const channel_offset = canvas.width * canvas.height * 4
   let i, j, v;
   const data = imgData.data
-  // set color channels
-  if(!channelER){
-    for(j=0;j<3;j++){
-      if(rgb_channels[j]){
-        const src = rgb_channels[j].data;
-        for(i=0;i<channel_offset;i++){
-          if(brightness===1){
-            data[i*4+j] = src[i]
-          }
-          else{
-            v = src[i]*brightness;
-            data[i*4+j] = v>255?255:parseInt(v);
-          }
-        }
-      }
+
+  // get rgb_channels data
+
+  if(alpha<0) alpha = 0;
+  if(alpha>1) alpha = 1;
+  brightness = brightness || 1.0;
+  const rgb_channels = []
+
+  for(j=0;j<3;j++){
+    if(!color_channels[j].length){
+      continue
+    }else{
+      rgb_channels[j] = color_channels[j][0]
     }
-  }else{
-    for(j=0;j<3;j++){
-      let src
-      if(!rgb_channels[j]){
-        if (j===2){
-          continue;
-        }else{
-          src = channelERData.data 
+    const src = rgb_channels[j].data;
+    if(color_channels[j].length===1){
+      for(i=0;i<channel_offset;i++){
+        if(brightness===1){
+          data[i*4+j] = src[i]
+        }
+        else{
+          v = src[i]*brightness;
+          data[i*4+j] = v>255?255:parseInt(v);
         }
       }
-      if(rgb_channels[j]){
-        src = rgb_channels[j].data;
-        if(j!== 2){
-          let tempo_number
-          for(let i=0, ii=src.length;i<ii;i++){
-            tempo_number = src[i]+ channelERData.data[i]
-            if (tempo_number > 255)tempo_number = 255
-            src[i] = tempo_number
-          }
-        }   
+    }else{
+      let tempo_number
+      for(let i=0, ii=src.length;i<ii;i++){
+        tempo_number = src[i]+ color_channels[j][1].data[i]
+        if (tempo_number > 255)tempo_number = 255
+        src[i] = tempo_number
       }
       for(i=0;i<channel_offset;i++){
         if(brightness===1){
@@ -198,10 +180,11 @@ async function composeChannels(channels, channel_settings, alpha, brightness){
           data[i*4+j] = v>255?255:parseInt(v);
         }
       }
-    }    
+    }
   }
-  // set alpha channel
-  if(rgb_channels[3]){
+  // set alfa channel for mask
+  if(color_channels[3].length){
+    rgb_channels[3] = color_channels[3][0]
     const src = rgb_channels[3].data;
     for(i=0;i<channel_offset;i++){
       if(src[i]>0){
@@ -211,10 +194,9 @@ async function composeChannels(channels, channel_settings, alpha, brightness){
         data[i*4+3] = 255;
       }
     }
-  }
-  else{
+  }else{
     for(i=0;i<channel_offset;i++){
-      data[i*4+3] = 255; 
+    data[i*4+3] = 255; 
     }
   }
   ctx.putImageData(imgData, 0, 0);
