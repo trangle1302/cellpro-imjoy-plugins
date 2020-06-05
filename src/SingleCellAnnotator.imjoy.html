@@ -8,7 +8,7 @@
   "type": "window",
   "tags": [],
   "ui": "",
-  "version": "0.1.77",
+  "version": "0.1.78",
   "api_version": "0.1.7",
   "description": "Annotate images for HPA single-cell image classification",
   "icon": "extension",
@@ -1574,7 +1574,7 @@ api.export(new ImJoyPlugin())
           </div>
             <br>
           <div class="btn-group" v-if="current_task_name !== 'segmentation'">
-            <button v-for="el in current_image_data.exclusive_labels"  :key="el" class="btn btn-sm median-btn channel-controls" :disabled="current_image_data.exclusive_label&&current_image_data.exclusive_label!==el" :class="{'exclusive-label-btn': current_image_data.exclusive_label ===el}" @click="toggleExclusiveLabels(el)">{{el}}</button>
+            <button v-for="el in current_image_data.exclusive_labels"  :key="el" class="btn btn-sm exclusive-btn channel-controls" :disabled="current_image_data.exclusive_label&&current_image_data.exclusive_label!==el" :class="{'exclusive-label-btn': current_image_data.exclusive_label ===el}" @click="toggleExclusiveLabels(el)">{{el}}</button>
           </div>
           <br>
           <br>
@@ -1743,6 +1743,14 @@ api.export(new ImJoyPlugin())
     flex: none;
     width: 110px;
     background-color:#fff3;
+  }
+  .exclusive-btn{
+    height: 26px;
+    width: 95px;
+    background: transparent;
+    border: none;
+    background-color:#fff3;
+    margin-bottom: 3px;
   }
   .exclusive-label-btn{
     background-color: rgb(248, 27, 2)!important;
