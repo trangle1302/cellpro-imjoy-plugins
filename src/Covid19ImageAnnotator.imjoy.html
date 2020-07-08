@@ -1586,6 +1586,10 @@ api.export(new ImJoyPlugin())
             </div>            
           </div>
         </div>
+        <span v-show="!hide_controls" class="h3 floating-label">
+          <h4>Image Name</h4>
+          <h5>Status</h5>
+        </span>
       </template>
       <template v-if="current_image_data.label_display_mode==='single'">
         <div v-show="!hide_controls" class="btn-group floating-bottom-btn">
