@@ -106,12 +106,17 @@ async function getImageData(url) {
   });
 };
 async function composeChannels(channels, channel_settings, alpha, brightness){
+  //if(this.current_task_name==='covid-annotation'){
+  //      if (Object.keys(channel_settings).includes('Mask')){
+  //        delete channel_settings['Mask']
+  //      }
+  //    }
   const color_channels = [
     ['Microtubule', 'ER'],
     ['Protein', 'ER'],
-    ['Nuclei'],
-    ['Mask']
+    ['Nuclei']
   ]
+  //['Mask']
   // replace channel name with data
   for(let i=0;i<color_channels.length;i++){
     for(let j=0;j<color_channels[i].length;j++){
@@ -169,7 +174,7 @@ async function composeChannels(channels, channel_settings, alpha, brightness){
     }
   }
   // set alfa channel for mask
-  if(color_channels[3].length){
+  if(color_channels.length==4 && color_channels[3].length){
     src = color_channels[3][0].data;
     for(i=0;i<channel_offset;i++){
       if(src[i]>0){
@@ -320,8 +325,8 @@ const app = new Vue({
     alpha: 0.2,
     hide_controls: false,
     show_segmentation: true,
-    default_extend_value: 50,
-    current_extend_value: 50,
+    default_extend_value: 0,
+    current_extend_value: 0,
     statistics: {},
     showStatKeys: {
       idName: null,
@@ -415,6 +420,9 @@ const app = new Vue({
         }
         // alpha channel mask
         else if(event.code === 'KeyA'){
+          if (this.current_task_name=='covid-annotation'){
+            api.alert('No Mask')
+            return;}
           if(this.channel_settings['Mask'].show)
             this.channel_settings['Mask'].show = false;
           else
@@ -662,6 +670,11 @@ const app = new Vue({
     async fetchCellImage(cell_id){
       const imageData = JSON.parse(JSON.stringify(imageDataTemplate));
       imageData.cell_id = cell_id;
+      //api.alert(JSON.stringify(this.current_task_name))
+      if(this.current_task_name==='covid-annotation'){
+        imageData.cell_id = cell_id + '/covid';
+      }
+      //api.alert(JSON.stringify(cell_id))
       let image_url = "/images/" + this.current_task_name + "/" + imageData.cell_id;
       imageData.extend = this.current_extend_value;
       image_url += "?extend="+imageData.extend+"&maskout=1";
@@ -669,7 +682,13 @@ const app = new Vue({
       imageData.bbox = response.bbox;
       imageData.mask_geojson = response.mask;
       //ER, Microtubule, Nuclei, Protein,
+      // remove mask channels if task_name==covid-annotation
       imageData.channels = response.images;
+      if(this.current_task_name==='covid-annotation'){
+        if (Object.keys(imageData.channels).includes('Mask')){
+          delete imageData.channels['Mask']
+        }
+      }
       if(!response.available_labels){
         throw new Error("no available labels.")
       }
@@ -1082,6 +1101,12 @@ const app = new Vue({
       await this.nextImage()
     },
     async displayMap(channels, channel_settings, brightness){
+      //api.alert('Show me: ' + JSON.stringify(this.current_task_name))
+      if(this.current_task_name==='covid-annotation'){
+        if (Object.keys(channel_settings).includes('Mask')){
+          delete channel_settings['Mask']
+        }
+      }
       for(let k of Object.keys(channels)){
         if(!channel_settings[k]){
           channel_settings[k] = {name: k, show: true}
@@ -1285,12 +1310,18 @@ const app = new Vue({
       });
       this.map.addInteraction(this.drawInteraction);
       if(this.current_task_name !== 'segmentation'){
+        if (this.current_task_name==='covid-annotation'){
+          api.alert('No Mask')
+          return;}
         if(this.channel_settings['Mask'])
           this.channel_settings['Mask'].show = false
         this.displayMap(this.current_image_data.channels, this.channel_settings);
       }
     },
     stopMaskAnnotation(){
+      if (this.current_task_name==='covid-annotation'){
+          api.alert('No Mask')
+          return;}
       if(this.channel_settings['Mask'])
       this.channel_settings['Mask'].show = true
       this.displayMap(this.current_image_data.channels, this.channel_settings);
