@@ -116,7 +116,7 @@ async function composeChannels(channels, channel_settings, alpha, brightness){
     ['Protein', 'ER'],
     ['Nuclei']
   ]
-  //['Mask']
+  //['Mask'] @hao, this is something to be fixed for other modes
   // replace channel name with data
   for(let i=0;i<color_channels.length;i++){
     for(let j=0;j<color_channels[i].length;j++){
@@ -681,6 +681,9 @@ const app = new Vue({
       const response = await this.fetchURLData(image_url)
       imageData.bbox = response.bbox;
       imageData.mask_geojson = response.mask;
+      if(this.current_task_name==='covid-annotation'){
+        imageData.mask_geojson.features = null
+      }
       //ER, Microtubule, Nuclei, Protein,
       // remove mask channels if task_name==covid-annotation
       imageData.channels = response.images;
@@ -717,6 +720,7 @@ const app = new Vue({
       return imageData
     },
     updateSavedCellIdx(imageData){
+      if(this.current_task_name==='covid-annotation')return;
       imageData.saved_cell_idx_list = []
       
       const features = imageData.mask_geojson.features;
@@ -1052,6 +1056,7 @@ const app = new Vue({
       await this.uploadAnnotation();
     },
     showMaskAnnotation(mask_geojson){
+      if(this.current_task_name==='covid-annotation')return;
       this.vector_source.clear()
       const features = (new GeoJSON()).readFeatures(mask_geojson)
       this.vector_source.addFeatures(features)
