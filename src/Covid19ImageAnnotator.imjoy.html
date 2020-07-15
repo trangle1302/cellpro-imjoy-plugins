@@ -1592,26 +1592,53 @@ api.export(new ImJoyPlugin())
         <button :disabled="!mask_history||mask_history.length<=0" v-show="current_task_name === 'segmentation'" class="btn btn-sm small-btn channel-controls" @click="undoAnnotation()">Undo</button>
         <button class="btn btn-sm s-circle channel-controls" style="background-color: transparent;" title="info" @click="info()"><i class="icon icon-message"></i></button>
         <br>
-        <div class="btn-group">
-          <button :disabled="current_image_index<=0  || loading" class="btn transparent-btn" @click="previousImage()"><i class="icon icon-back"></i>&nbsp;Back</button>
-          <button :disabled="current_image_data.exclusive_label" class="btn transparent-btn" @click="toggleExclusiveLabels('Discard')">&nbsp;Discard</button>
-          <button :disabled="current_image_index>=cached_image_data.length  || loading" class="btn transparent-btn" @click="nextImage()">Next&nbsp;<i class="icon icon-forward"></i></button>
-        </div>
-        <br>
-        <br>
-        <div class="btn-group">
-          <button style="font-size: 12px;" :disabled="current_image_index<=0  || loading" class="btn transparent-btn" @click="previousImage()"><i class="icon icon-back"></i>&nbsp;Previous well</button>
-          <button style="font-size: 12px;" :disabled="current_image_data.exclusive_label" class="btn transparent-btn" @click="toggleExclusiveLabels('Discard')">&nbsp;Select well</button>
-          <button style="font-size: 12px;" :disabled="current_image_index>=cached_image_data.length  || loading" class="btn transparent-btn" @click="nextImage()">Next well&nbsp;<i class="icon icon-forward"></i></button>
+        <div v-if="current_task_name==='covid-annotation'">
+          <div class="btn-group" >
+            <button :disabled="current_image_index<=0  || loading" class="btn transparent-btn" @click="previousImage()"><i class="icon icon-back"></i>&nbsp;Back</button>
+            <button :disabled="current_image_data.exclusive_label" class="btn transparent-btn" @click="toggleExclusiveLabels('Discard')">&nbsp;Discard</button>
+            <button :disabled="current_image_index>=cached_image_data.length  || loading" class="btn transparent-btn" @click="nextImage()">Next&nbsp;<i class="icon icon-forward"></i></button>
+          </div>
+          <br>
+          <div class="btn-group">
+            <button style="font-size: 12px;" :disabled="current_image_index<=0  || loading" class="btn transparent-btn" @click="previousImage()"><i class="icon icon-back"></i>&nbsp;<b>Back</b>(well)</button>
+            <button style="font-size: 12px;" :disabled="current_image_data.exclusive_label" class="btn transparent-btn" @click="toggleExclusiveLabels('Discard')">&nbsp;<b>GoTo</b>(well)</button>
+            <button style="font-size: 12px;" :disabled="current_image_index>=cached_image_data.length  || loading" class="btn transparent-btn" @click="nextImage()"><b>Next</b>(well)&nbsp;<i class="icon icon-forward"></i></button>
+          </div>
         </div>
       </div>
-      <template v-if="current_image_data.label_display_mode==='multiple'">
+      <template v-if="current_task_name==='precise-annotation'">	
+        <div v-show="!hide_controls" class="floating-right-btn">	
+          <div class="columns">	
+            <template v-for="group in LIMS_LOCATION_LABELS">	
+              <template v-for="label in group">	
+                <button style="font-size: 12px" :key="label" v-if="LIMS_TO_IF_CSV[label] && current_image_data.location_labels[LIMS_TO_IF_CSV[label]] !== undefined" :disabled="current_image_data.exclusive_label" @click="toggleLabel(LIMS_TO_IF_CSV[label])" class="column btn label-btn" :class="{'selected-label-btn': current_image_data.location_labels[LIMS_TO_IF_CSV[label]]}">{{label.slice(0,12)+(label.length>12?'.': '')}}</button>	
+              </template>	
+              <!-- <div class="break hide-on-mobile"></div> -->	
+            </template>	
+            <template v-for="(loc, k) in unsupported_labels">	
+              <button  :key="k" :disabled="current_image_data.exclusive_label"  @click="toggleLabel(k)" class="column btn label-btn" :class="{'selected-label-btn': loc}">{{k.slice(0,12)+(k.length>12?'.': '')}}</button>	
+            </template>	     
+          </div>	
+            <br>	
+          <div class="btn-group" v-if="current_task_name !== 'segmentation'">	
+            <button v-for="el in current_image_data.exclusive_labels"  :key="el" class="btn btn-sm exclusive-btn channel-controls" :disabled="current_image_data.exclusive_label&&current_image_data.exclusive_label!==el" :class="{'exclusive-label-btn': current_image_data.exclusive_label ===el}" @click="toggleExclusiveLabels(el)">{{el}}</button>	
+          </div>	
+          <br>	
+          <br>	
+          <div class="btn-group">	
+            <button :disabled="current_image_index<=0  || loading" class="btn transparent-btn" @click="previousImage()"><i class="icon icon-back"></i>&nbsp;Back</button>	
+            <button :disabled="current_image_data.exclusive_label" class="btn transparent-btn" @click="saveAnnotation()">&nbsp;Save</button>	
+            <button :disabled="current_image_index>=cached_image_data.length  || loading" class="btn transparent-btn" @click="nextImage()">Next&nbsp;<i class="icon icon-forward"></i></button>	
+          </div>	
+        </div>
+      </template> 
+      <template v-if="current_task_name==='covid-annotation'">
         <div v-show="!hide_controls" class="floating-right-btn">
-          <div class="columns" v-for="annotation_category in config_data.annotation_categories">
+          <div class="columns is-mobile" v-for="annotation_category in config_data.annotation_categories">
             <div>
-              <h4>{{annotation_category}}</h4>
+              <h5>{{annotation_category}}</h5>
               <template v-for="(label, display_label) in config_data.labels.protein_labels">
-                <button style="font-size: 12px" :key="label" :disabled="current_image_data.exclusive_label" class="column btn label-btn" :class="{'selected-label-btn': current_image_data.location_labels[LIMS_TO_IF_CSV[label]]}">{{display_label.slice(0,12)+(display_label.length>12?'.': '')}}</button>
+                <button :key="label" :disabled="current_image_data.exclusive_label" class="column btn covid-label-btn" :class="{'selected-label-btn': current_image_data.location_labels[LIMS_TO_IF_CSV[label]]}">{{display_label.slice(0,12)+(display_label.length>12?'.': '')}}</button>
                 <!-- <div class="break hide-on-mobile"></div> -->
               </template>
               <br>
@@ -1766,7 +1793,7 @@ api.export(new ImJoyPlugin())
   .floating-right-btn{
     position: absolute;
     right: 3px;
-    top: 80px;
+    top: 60px;
     width: 330px;
     z-index: 999;
   }
@@ -1786,9 +1813,18 @@ api.export(new ImJoyPlugin())
     width: 110px;
     background-color:#fff3;
   }
+  .covid-label-btn {
+    padding-top: 0px;
+    font-size: 13px;
+    margin-left: 0px;
+    height: 20px;
+    flex: none;
+    width: 110px;
+    background-color:#fff3;
+  }
   .exclusive-btn{
-    height: 26px;
-    width: 95px;
+    height: 23px;
+    width: 90px;
     background: transparent;
     border: none;
     background-color:#fff3;
