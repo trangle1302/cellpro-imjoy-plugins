@@ -681,23 +681,16 @@ const app = new Vue({
       const response = await this.fetchURLData(image_url)
       imageData.bbox = response.bbox;
       imageData.mask_geojson = response.mask;
-      if(this.current_task_name==='covid-annotation'){
-        imageData.mask_geojson.features = null
-      }
       //ER, Microtubule, Nuclei, Protein,
       // remove mask channels if task_name==covid-annotation
       imageData.channels = response.images;
-      if(this.current_task_name==='covid-annotation'){
-        if (Object.keys(imageData.channels).includes('Mask')){
-          delete imageData.channels['Mask']
-        }
-      }
       if(!response.available_labels){
         throw new Error("no available labels.")
       }
       //api.alert(JSON.stringify(response.available_labels))
       imageData.exclusive_labels = response.available_labels.exclusive_labels
       if(response.available_labels.location_labels){
+        //api.alert(JSON.stringify(response.available_labels.location_labels))
         const labels = Object.keys(response.available_labels.location_labels);
         if(labels.length==1){
           imageData.label_display_mode = 'single'
@@ -717,6 +710,33 @@ const app = new Vue({
       }
       // record the current cell indice list
       this.updateSavedCellIdx(imageData)
+
+
+      // Here is for covid-annotation only
+      if(this.current_task_name==='covid-annotation'){
+        if (Object.keys(imageData.channels).includes('Mask')){
+          delete imageData.channels['Mask']
+        }
+        // remove mask_geojson
+        imageData.mask_geojson.features = null;
+        // set labels
+        let index, category_name, record_label, k, v
+        imageData.labels = {}
+        for (index in this.config_data.annotation_categories){
+          category_name = this.config_data.annotation_categories[index]
+          imageData.labels[category_name] = {}
+          imageData.labels[category_name].labels = {}
+          imageData.labels[category_name].labels.location_labels = {}
+          for (k in this.config_data.labels.location_labels){
+            record_label =  this.config_data.labels.location_labels[k]
+            imageData.labels[category_name].labels.location_labels[record_label] = false
+          }
+          imageData.labels[category_name].labels.exclusive_label = null
+          imageData.labels[category_name].labels.scv_labels = false
+        }
+        // should rename here for the saved_location_label @ hao
+        imageData.saved_location_label = Object.assign({}, imageData.labels)
+      }
 
       return imageData
     },
@@ -1345,6 +1365,16 @@ const app = new Vue({
       this.current_image_data.exclusive_label = false;
       this.current_image_data.labels_changed = true;
     },
+    toggleCovidLabel(annotation_category, k){
+      if(this.current_image_data.labels[annotation_category].labels.location_labels[k]){
+        this.current_image_data.labels[annotation_category].labels.location_labels[k]=false
+      }
+      else{
+        this.current_image_data.labels[annotation_category].labels.location_labels[k]=true
+      }
+      this.current_image_data.labels[annotation_category].labels.exclusive_label = false;
+      this.current_image_data.labels_changed = true;
+    },
     screenShot(){
       var mapCanvas = document.createElement('canvas');
       var size = this.map.getSize();
@@ -1596,6 +1626,7 @@ api.export(new ImJoyPlugin())
         <div v-if="current_task_name==='covid-annotation'">
           <div class="btn-group" >
             <button :disabled="current_image_index<=0  || loading" class="btn transparent-btn" @click="previousImage()"><i class="icon icon-back"></i>&nbsp;Back</button>
+            <button :disabled="current_image_data.exclusive_label" class="btn transparent-btn" @click="saveAnnotation()">&nbsp;Save</button>
             <button :disabled="current_image_index>=cached_image_data.length  || loading" class="btn transparent-btn" @click="nextImage()">Next&nbsp;<i class="icon icon-forward"></i></button>
           </div>
           <br>
@@ -1612,7 +1643,7 @@ api.export(new ImJoyPlugin())
             <div>
               <h5>{{annotation_category}}</h5>
               <template v-for="(label, display_label) in config_data.labels.location_labels">
-                <button :key="label" :disabled="current_image_data.exclusive_label" class="column btn covid-label-btn" :class="{'selected-label-btn': current_image_data.location_labels[LIMS_TO_IF_CSV[label]]}">{{display_label.slice(0,12)+(display_label.length>12?'.': '')}}</button>
+                <button :key="label" :disabled="current_image_data.labels[annotation_category].labels.exclusive_label" class="column btn covid-label-btn" :class="{'selected-label-btn': current_image_data.labels[annotation_category].labels.location_labels[config_data.labels.location_labels[display_label]]}" @click="toggleCovidLabel(annotation_category, config_data.labels.location_labels[display_label])">{{display_label.slice(0,12)+(display_label.length>12?'.': '')}}</button>
                 <!-- <div class="break hide-on-mobile"></div> -->
               </template>
               <template class="btn-group">
