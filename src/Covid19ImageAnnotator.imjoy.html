@@ -1036,8 +1036,12 @@ const app = new Vue({
       if(res.success){
         this.current_image_data.mask_adjusted = false;
         this.current_image_data.labels_changed = false;
-        this.current_image_data.saved_location_label = Object.assign({}, this.current_image_data.location_labels)
-        this.updateSavedCellIdx(this.current_image_data)
+        if(this.current_task_name==='covid-annotation'){
+          this.current_image_data.saved_location_label = Object.assign({}, this.current_image_data.labels)
+        }else{
+          this.current_image_data.saved_location_label = Object.assign({}, this.current_image_data.location_labels)
+          this.updateSavedCellIdx(this.current_image_data)
+        }
       }
       else{
         alert('Failed to upload the annotaiton, error: ' + res.error);
@@ -1064,6 +1068,19 @@ const app = new Vue({
       }
     },
     async toggleExclusiveLabels(type){
+      this.current_image_data.labels_changed = true;
+      if(this.current_image_data.exclusive_label === type){
+        this.current_image_data.exclusive_label = false;
+        this.current_image_data.location_labels = Object.assign({}, this.current_image_data.saved_location_label)
+      }
+      else{
+        this.current_image_data.exclusive_label = type
+        
+      }
+      this.$forceUpdate()
+      await this.uploadAnnotation();
+    },
+    async toggleCovidExclusiveLabels(type){
       this.current_image_data.labels_changed = true;
       if(this.current_image_data.exclusive_label === type){
         this.current_image_data.exclusive_label = false;
@@ -1626,14 +1643,15 @@ api.export(new ImJoyPlugin())
         <div v-if="current_task_name==='covid-annotation'">
           <div class="btn-group" >
             <button :disabled="current_image_index<=0  || loading" class="btn transparent-btn" @click="previousImage()"><i class="icon icon-back"></i>&nbsp;Back</button>
+            <button :disabled="current_image_data.exclusive_label" class="btn transparent-btn" @click="saveAnnotation()">&nbsp;Discard</button>
             <button :disabled="current_image_data.exclusive_label" class="btn transparent-btn" @click="saveAnnotation()">&nbsp;Save</button>
             <button :disabled="current_image_index>=cached_image_data.length  || loading" class="btn transparent-btn" @click="nextImage()">Next&nbsp;<i class="icon icon-forward"></i></button>
           </div>
           <br>
           <div class="btn-group">
-            <button style="font-size: 12px;" :disabled="current_image_index<=0  || loading" class="btn transparent-btn" @click="previousImage()"><i class="icon icon-back"></i>&nbsp;<b>Back</b>(well)</button>
-            <button style="font-size: 12px;" :disabled="current_image_data.exclusive_label" class="btn transparent-btn" @click="toggleExclusiveLabels('Discard')">&nbsp;<b>GoTo</b>(well)</button>
-            <button style="font-size: 12px;" :disabled="current_image_index>=cached_image_data.length  || loading" class="btn transparent-btn" @click="nextImage()"><b>Next</b>(well)&nbsp;<i class="icon icon-forward"></i></button>
+            <button :disabled="current_image_index<=0  || loading" class="btn transparent-well-btn" @click="previousImage()"><i class="icon icon-back"></i>&nbsp;<b>Back</b>(well)</button>
+            <button :disabled="current_image_data.exclusive_label" class="btn transparent-well-btn" @click="toggleExclusiveLabels('Discard')">&nbsp;<b>GoTo</b>(well)</button>
+            <button :disabled="current_image_index>=cached_image_data.length  || loading" class="btn transparent-well-btn" @click="nextImage()"><b>Next</b>(well)&nbsp;<i class="icon icon-forward"></i></button>
           </div>
         </div>
       </div>
@@ -1646,12 +1664,12 @@ api.export(new ImJoyPlugin())
                 <button :key="label" :disabled="current_image_data.labels[annotation_category].labels.exclusive_label" class="column btn covid-label-btn" :class="{'selected-label-btn': current_image_data.labels[annotation_category].labels.location_labels[config_data.labels.location_labels[display_label]]}" @click="toggleCovidLabel(annotation_category, config_data.labels.location_labels[display_label])">{{display_label.slice(0,12)+(display_label.length>12?'.': '')}}</button>
                 <!-- <div class="break hide-on-mobile"></div> -->
               </template>
-              <template class="btn-group">
-                <button v-for="el in config_data.labels.single_cell_variation"  :key="el" class="btn scv-label-btn" :disabled="current_image_data.exclusive_label&&current_image_data.exclusive_label!==el" :class="{'exclusive-label-btn': current_image_data.exclusive_label ===el}" @click="toggleExclusiveLabels(el)">{{el}}</button>
-              </template>
               <br>
               <template class="btn-group">
-                <button v-for="el in config_data.labels.exclusive_labels"  :key="el" class="btn btn-sm exclusive-btn channel-controls" :disabled="current_image_data.exclusive_label&&current_image_data.exclusive_label!==el" :class="{'exclusive-label-btn': current_image_data.exclusive_label ===el}" @click="toggleExclusiveLabels(el)">{{el}}</button>
+                <button v-for="el in config_data.labels.single_cell_variation"  :key="el" class="btn btn-sm exclusive-btn channel-controls scv-label-btn" :disabled="current_image_data.exclusive_label&&current_image_data.exclusive_label!==el" :class="{'exclusive-label-btn': current_image_data.exclusive_label ===el}" @click="toggleExclusiveLabels(el)">{{el}}</button>
+              </template>
+              <template class="btn-group">
+                <button v-for="el in config_data.labels.exclusive_labels" :key="el" class="btn btn-sm exclusive-btn channel-controls" :disabled="current_image_data.exclusive_label&&current_image_data.exclusive_label!==el" :class="{'exclusive-label-btn': current_image_data.exclusive_label ===el}" @click="toggleExclusiveLabels(el)">{{el}}</button>
               </template>
             </div>            
           </div>
@@ -1878,7 +1896,7 @@ api.export(new ImJoyPlugin())
   .highlight-btn{
     background-color: white!important;
   }
-  .label-btn:hover, .label-btn:focus{
+  .label-btn:hover, .label-btn:focus, .covid-label-btn:hover, .covid-label-btn:focus{
     background-color:rgba(255, 255, 255, 0.42);
   }
   .selected-label-btn{
@@ -1894,6 +1912,13 @@ api.export(new ImJoyPlugin())
     background-color:#fff3;
   }
   .transparent-btn:hover {
+    background-color:rgba(255, 255, 255, 0.42);
+  }
+  .transparent-well-btn, .transparent-well-btn:focus {
+    width: 120px;
+    background-color:rgba(87, 100, 29, 0.274);
+  }
+  .transparent-well-btn:hover {
     background-color:rgba(255, 255, 255, 0.42);
   }
   .small-btn{
