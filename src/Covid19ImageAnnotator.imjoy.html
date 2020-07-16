@@ -979,47 +979,58 @@ const app = new Vue({
         sendData.start_time = this.current_image_data.start_time;
         sendData.time_elapsed = this.current_image_data.time_elapsed;
       }
-      
-      if (this.current_image_data.labels_changed){
-        if(this.current_image_data.exclusive_label){
-          sendData.labels = this.current_image_data.exclusive_label;
-        }
-        else{
-          sendData.labels = this.current_image_data.location_labels;
-        }
-        if(typeof sendData.labels === 'object'){
-          let noLabel = true;
-          for (let loc in sendData.labels){
-            if(sendData.labels[loc] === null){
-              sendData.labels[loc] = false
-            }
-            else{
-              noLabel = false;
-            }
+      if (this.current_task_name==='covid-annotation'){
+        if (this.current_image_data.labels_changed){
+          if(this.current_image_data.exclusive_label){
+            sendData.labels = this.current_image_data.exclusive_label;
           }
-          if (noLabel && this.current_image_data.label_display_mode==='multiple'){
-            const anwser = await api.confirm("No label label selected, is that correct?")
-            if (!anwser){
-              return
-            }
-          };
+          else{
+            sendData.labels = this.current_image_data.labels;
+          }
         }
+      }else{
+        if (this.current_image_data.labels_changed){
+          if(this.current_image_data.exclusive_label){
+            sendData.labels = this.current_image_data.exclusive_label;
+          }
+          else{
+            sendData.labels = this.current_image_data.location_labels;
+          }
+          if(typeof sendData.labels === 'object'){
+            let noLabel = true;
+            for (let loc in sendData.labels){
+              if(sendData.labels[loc] === null){
+                sendData.labels[loc] = false
+              }
+              else{
+                noLabel = false;
+              }
+            }
+            if (noLabel && this.current_image_data.label_display_mode==='multiple'){
+              const anwser = await api.confirm("No label label selected, is that correct?")
+              if (!anwser){
+                return
+              }
+            };
+          }
+        }
+        if (this.current_image_data.mask_adjusted){
+          // sendData
+          sendData.extend = this.current_image_data.extend;
+          sendData.bbox = this.current_image_data.bbox;
+          // set the masks
+          const allFeatures = this.vector_source.getFeatures();
+          const format = new ol.format.GeoJSON();
+          const routeFeatures = format.writeFeaturesObject(allFeatures, {decimals: 1});
+          routeFeatures['bbox'] = this.current_image_data.mask_geojson.bbox;
+          this.current_image_data.mask_geojson = routeFeatures;
+          sendData.mask = this.current_image_data.mask_geojson;
+          sendData.mask_diff = this.getMaskDiff(this.current_image_data);
+        };
       }
-      if (this.current_image_data.mask_adjusted){
-        // sendData
-        sendData.extend = this.current_image_data.extend;
-        sendData.bbox = this.current_image_data.bbox;
-        // set the masks
-        const allFeatures = this.vector_source.getFeatures();
-        const format = new ol.format.GeoJSON();
-        const routeFeatures = format.writeFeaturesObject(allFeatures, {decimals: 1});
-        routeFeatures['bbox'] = this.current_image_data.mask_geojson.bbox;
-        this.current_image_data.mask_geojson = routeFeatures;
-        sendData.mask = this.current_image_data.mask_geojson;
-        sendData.mask_diff = this.getMaskDiff(this.current_image_data);
-      };
-    
+   
       // this is the url to send the current annotation
+      api.alert(JSON.stringify(sendData))
       const sub_url = "/annotations/" + this.current_task_name + "/" + this.current_image_data.cell_id;
       const url_post = this.selected_server_url + sub_url;
       const response = await fetch(url_post, {
