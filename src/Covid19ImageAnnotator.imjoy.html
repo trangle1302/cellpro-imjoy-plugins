@@ -695,6 +695,7 @@ const app = new Vue({
       if(!response.available_labels){
         throw new Error("no available labels.")
       }
+      //api.alert(JSON.stringify(response.available_labels))
       imageData.exclusive_labels = response.available_labels.exclusive_labels
       if(response.available_labels.location_labels){
         const labels = Object.keys(response.available_labels.location_labels);
@@ -1595,7 +1596,6 @@ api.export(new ImJoyPlugin())
         <div v-if="current_task_name==='covid-annotation'">
           <div class="btn-group" >
             <button :disabled="current_image_index<=0  || loading" class="btn transparent-btn" @click="previousImage()"><i class="icon icon-back"></i>&nbsp;Back</button>
-            <button :disabled="current_image_data.exclusive_label" class="btn transparent-btn" @click="toggleExclusiveLabels('Discard')">&nbsp;Discard</button>
             <button :disabled="current_image_index>=cached_image_data.length  || loading" class="btn transparent-btn" @click="nextImage()">Next&nbsp;<i class="icon icon-forward"></i></button>
           </div>
           <br>
@@ -1606,6 +1606,30 @@ api.export(new ImJoyPlugin())
           </div>
         </div>
       </div>
+      <template v-if="current_task_name==='covid-annotation'">
+        <div v-show="!hide_controls" class="floating-right-btn">
+          <div class="columns is-mobile" v-for="annotation_category in config_data.annotation_categories">
+            <div>
+              <h5>{{annotation_category}}</h5>
+              <template v-for="(label, display_label) in config_data.labels.location_labels">
+                <button :key="label" :disabled="current_image_data.exclusive_label" class="column btn covid-label-btn" :class="{'selected-label-btn': current_image_data.location_labels[LIMS_TO_IF_CSV[label]]}">{{display_label.slice(0,12)+(display_label.length>12?'.': '')}}</button>
+                <!-- <div class="break hide-on-mobile"></div> -->
+              </template>
+              <template class="btn-group">
+                <button v-for="el in config_data.labels.single_cell_variation"  :key="el" class="btn scv-label-btn" :disabled="current_image_data.exclusive_label&&current_image_data.exclusive_label!==el" :class="{'exclusive-label-btn': current_image_data.exclusive_label ===el}" @click="toggleExclusiveLabels(el)">{{el}}</button>
+              </template>
+              <br>
+              <template class="btn-group">
+                <button v-for="el in config_data.labels.exclusive_labels"  :key="el" class="btn btn-sm exclusive-btn channel-controls" :disabled="current_image_data.exclusive_label&&current_image_data.exclusive_label!==el" :class="{'exclusive-label-btn': current_image_data.exclusive_label ===el}" @click="toggleExclusiveLabels(el)">{{el}}</button>
+              </template>
+            </div>            
+          </div>
+        </div>
+        <span v-show="!hide_controls" class="h3 floating-label">
+          <h4>Image Name</h4>
+          <h5>Status</h5>
+        </span>
+      </template>
       <template v-if="current_task_name==='precise-annotation'">	
         <div v-show="!hide_controls" class="floating-right-btn">	
           <div class="columns">	
@@ -1632,28 +1656,6 @@ api.export(new ImJoyPlugin())
           </div>	
         </div>
       </template> 
-      <template v-if="current_task_name==='covid-annotation'">
-        <div v-show="!hide_controls" class="floating-right-btn">
-          <div class="columns is-mobile" v-for="annotation_category in config_data.annotation_categories">
-            <div>
-              <h5>{{annotation_category}}</h5>
-              <template v-for="(label, display_label) in config_data.labels.protein_labels">
-                <button :key="label" :disabled="current_image_data.exclusive_label" class="column btn covid-label-btn" :class="{'selected-label-btn': current_image_data.location_labels[LIMS_TO_IF_CSV[label]]}">{{display_label.slice(0,12)+(display_label.length>12?'.': '')}}</button>
-                <!-- <div class="break hide-on-mobile"></div> -->
-              </template>
-              <br>
-              <br>
-              <template class="btn-group" v-if="current_task_name !== 'segmentation'">
-                <button v-for="el in config_data.labels.exclusive_labels"  :key="el" class="btn btn-sm exclusive-btn channel-controls" :disabled="current_image_data.exclusive_label&&current_image_data.exclusive_label!==el" :class="{'exclusive-label-btn': current_image_data.exclusive_label ===el}" @click="toggleExclusiveLabels(el)">{{el}}</button>
-              </template>
-            </div>            
-          </div>
-        </div>
-        <span v-show="!hide_controls" class="h3 floating-label">
-          <h4>Image Name</h4>
-          <h5>Status</h5>
-        </span>
-      </template>
       <template v-if="current_image_data.label_display_mode==='single'">
         <div v-show="!hide_controls" class="btn-group floating-bottom-btn">
           <button :disabled="current_image_index<=0 || loading" class="btn transparent-btn" @click="previousImage()"><i class="icon icon-back"></i>&nbsp;Back</button>
@@ -1821,6 +1823,15 @@ api.export(new ImJoyPlugin())
     flex: none;
     width: 110px;
     background-color:#fff3;
+  }
+  .scv-label-btn {
+    padding-top: 0px;
+    font-size: 13px;
+    margin-left: 0px;
+    height: 20px;
+    flex: none;
+    width: 110px;
+    background-color:#17202A;
   }
   .exclusive-btn{
     height: 23px;
