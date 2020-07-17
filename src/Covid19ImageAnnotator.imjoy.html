@@ -508,6 +508,17 @@ const app = new Vue({
         }
       }
       return locs      
+    },
+    annotation_variation: function(){
+      const annotation_categories = Object.keys(this.current_image_data.labels)
+      if (annotation_categories.length !== 2){
+        return "Error: should be two categories only"
+      }else{
+        if (JSON.stringify(this.current_image_data.labels[annotation_categories[0]])===JSON.stringify(this.current_image_data.labels[annotation_categories[1]])){
+          return "Identical"
+        }else{return "Different"}
+        return "Error: God knows" 
+      }
     }
   },
   methods: {
@@ -876,6 +887,7 @@ const app = new Vue({
       }
     },
     async saveAnnotation(){
+      if(this.current_task_name!=='covid-annotation')
       this.current_image_data.exclusive_label = false;
       this.current_image_data.labels_changed = true;
       await this.nextImage();
@@ -985,6 +997,7 @@ const app = new Vue({
           sendData.discard = this.current_image_data.discard
         }  
         if (this.current_image_data.labels_changed&&(!this.current_image_data.discard)){
+          sendData.annotation_variation = this.annotation_variation
           sendData.labels = {}
           for(let k of Object.keys(this.current_image_data.labels)){
             sendData.labels[k] = {}
@@ -1720,8 +1733,8 @@ api.export(new ImJoyPlugin())
           </div>
         </div>
         <span v-show="!hide_controls" class="h3 floating-label">
-          <h4>Image Name</h4>
-          <h5>Status</h5>
+          <h4>{{current_image_data.cell_id}}</h4>
+          <h5>annotation_variation: {{annotation_variation}}</h5>
         </span>
       </template>
       <template v-if="current_task_name==='precise-annotation'">	
