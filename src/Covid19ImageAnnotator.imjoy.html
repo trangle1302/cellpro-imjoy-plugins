@@ -720,19 +720,19 @@ const app = new Vue({
         // remove mask_geojson
         imageData.mask_geojson.features = null;
         // set labels
-        let index, category_name, record_label, k, v
+        let index, annotation_category, record_label, k, v
         imageData.labels = {}
         for (index in this.config_data.annotation_categories){
-          category_name = this.config_data.annotation_categories[index]
-          imageData.labels[category_name] = {}
-          imageData.labels[category_name].labels = {}
-          imageData.labels[category_name].labels.location_labels = {}
+          annotation_category = this.config_data.annotation_categories[index]
+          imageData.labels[annotation_category] = {}
+          imageData.labels[annotation_category].labels = {}
+          imageData.labels[annotation_category].labels.location_labels = {}
           for (k in this.config_data.labels.location_labels){
             record_label =  this.config_data.labels.location_labels[k]
-            imageData.labels[category_name].labels.location_labels[record_label] = false
+            imageData.labels[annotation_category].labels.location_labels[record_label] = false
           }
-          imageData.labels[category_name].labels.exclusive_label = null
-          imageData.labels[category_name].labels.single_cell_variation = false
+          imageData.labels[annotation_category].labels.exclusive_label = null
+          imageData.labels[annotation_category].labels.single_cell_variation = false
         }
         // should rename here for the saved_location_label @ hao
         imageData.saved_location_label = Object.assign({}, imageData.labels)
@@ -980,12 +980,19 @@ const app = new Vue({
         sendData.time_elapsed = this.current_image_data.time_elapsed;
       }
       if (this.current_task_name==='covid-annotation'){
+      // consider about the discard button later  
         if (this.current_image_data.labels_changed){
-          if(this.current_image_data.exclusive_label){
-            sendData.labels = this.current_image_data.exclusive_label;
-          }
-          else{
-            sendData.labels = this.current_image_data.labels;
+          sendData.labels = {}
+          for(let k of Object.keys(this.current_image_data.labels)){
+            sendData.labels[k] = {}
+            sendData.labels[k].labels = {}
+            if(this.current_image_data.labels[k].labels.exclusive_label){
+              sendData.labels[k].labels.exclusive_label = this.current_image_data.labels[k].labels.exclusive_label;
+            }
+            else{
+              sendData.labels[k].labels.location_labels = this.current_image_data.labels[k].labels.location_labels;
+              sendData.labels[k].labels.single_cell_variation = this.current_image_data.labels[k].labels.single_cell_variation
+            }
           }
         }
       }else{
@@ -1032,6 +1039,7 @@ const app = new Vue({
       // this is the url to send the current annotation
       api.alert(JSON.stringify(sendData))
       const sub_url = "/annotations/" + this.current_task_name + "/" + this.current_image_data.cell_id;
+      /*
       const url_post = this.selected_server_url + sub_url;
       const response = await fetch(url_post, {
           method: 'POST',
@@ -1044,7 +1052,8 @@ const app = new Vue({
           body: JSON.stringify(sendData)
         });
       const res= await response.json();
-      if(res.success){
+      if(res.success)*/
+      if(true){
         this.current_image_data.mask_adjusted = false;
         this.current_image_data.labels_changed = false;
         if(this.current_task_name==='covid-annotation'){
@@ -1091,17 +1100,20 @@ const app = new Vue({
       this.$forceUpdate()
       await this.uploadAnnotation();
     },
-    async toggleCovidExclusiveLabels(type){
+    async toggleCovidExclusiveLabels(annotation_category, type){
       this.current_image_data.labels_changed = true;
-      if(this.current_image_data.exclusive_label === type){
-        this.current_image_data.exclusive_label = false;
-        this.current_image_data.location_labels = Object.assign({}, this.current_image_data.saved_location_label)
+      if(this.current_image_data.labels[annotation_category].labels.exclusive_label === type){
+        // the order for the following two lines matters
+        this.current_image_data.labels[annotation_category].labels.location_labels = Object.assign({}, this.current_image_data.saved_location_label[annotation_category].labels.location_labels)
+        this.current_image_data.labels[annotation_category].labels.exclusive_label = false;
+        // here saved_location_label includes all labels
       }
       else{
-        this.current_image_data.exclusive_label = type
+        this.current_image_data.labels[annotation_category].labels.exclusive_label = type
         
       }
       this.$forceUpdate()
+      // this one is temporarily muted
       await this.uploadAnnotation();
     },
     showMaskAnnotation(mask_geojson){
@@ -1687,10 +1699,10 @@ api.export(new ImJoyPlugin())
               </template>
               <br>
               <template class="btn-group">
-                <button class="btn btn-sm covid-label-btn channel-controls scv-label-btn" :disabled="current_image_data.exclusive_label" :class="{'selected-label-btn': current_image_data.labels[annotation_category].labels.single_cell_variation}" @click="toggleCovidSCVLabel(annotation_category)">{{config_data.labels.single_cell_variation}}</button>
+                <button class="btn btn-sm channel-controls scv-label-btn" :disabled="current_image_data.labels[annotation_category].labels.exclusive_label" :class="{'selected-scv-label-btn': current_image_data.labels[annotation_category].labels.single_cell_variation}" @click="toggleCovidSCVLabel(annotation_category)">{{config_data.labels.single_cell_variation}}</button>
               </template>
               <template class="btn-group">
-                <button v-for="el in config_data.labels.exclusive_labels" :key="el" class="btn btn-sm exclusive-btn channel-controls" :disabled="current_image_data.exclusive_label&&current_image_data.exclusive_label!==el" :class="{'exclusive-label-btn': current_image_data.exclusive_label ===el}" @click="toggleExclusiveLabels(el)">{{el}}</button>
+                <button v-for="el in config_data.labels.exclusive_labels" :key="el" class="btn btn-sm exclusive-btn channel-controls" :disabled="current_image_data.labels[annotation_category].labels.exclusive_label&&current_image_data.labels[annotation_category].labels.exclusive_label!==el" :class="{'exclusive-covid-label-btn': current_image_data.labels[annotation_category].labels.exclusive_label ===el}" @click="toggleCovidExclusiveLabels(annotation_category, el)">{{el}}</button>
               </template>
             </div>            
           </div>
@@ -1914,6 +1926,9 @@ api.export(new ImJoyPlugin())
   .exclusive-label-btn{
     background-color: rgb(248, 27, 2)!important;
   }
+  .exclusive-covid-label-btn{
+    background-color: rgb(146, 49, 49)!important;
+  }
   .highlight-btn{
     background-color: white!important;
   }
@@ -1922,6 +1937,10 @@ api.export(new ImJoyPlugin())
   }
   .selected-label-btn{
     background-color: #3580ff7d!important;
+    color: white!important;
+  }
+  .selected-scv-label-btn{
+    background-color: #35ffab7d!important;
     color: white!important;
   }
   .break {
