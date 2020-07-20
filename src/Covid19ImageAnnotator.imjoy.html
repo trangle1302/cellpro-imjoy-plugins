@@ -345,6 +345,7 @@ const app = new Vue({
     cached_well_data: [],
     current_image_data: null,
     current_well_data: null,
+    same_well_images_indexes: [],
     current_image_index: 0,
     current_well_index: 0,
     loading_cache: false,
@@ -523,6 +524,26 @@ const app = new Vue({
         }else{return "Different"}
         return "Error: God knows" 
       }
+    },
+    identify_label: function(){
+      const all_labels = this.current_image_data.labels
+      //api.alert("Tell me if you are here")
+      const image_index = this.cached_image_data.indexOf(this.current_image_data)
+      if(this.same_well_images_indexes.length <=0 ){
+        if(!image_index){
+          if(this.cached_image_data[1]&&this.cached_image_data[1].cell_id.includes(this.current_well_data)){
+            this.cached_image_data[1].labels = all_labels
+          }
+        }else{
+          return
+        }
+      }
+      let set_image_index
+      for (let i in this.same_well_images_indexes){
+        set_image_index = this.same_well_images_indexes[i]
+        this.cached_image_data[set_image_index].labels = all_labels
+      }
+      return
     }
   },
   methods: {
@@ -862,11 +883,12 @@ const app = new Vue({
           const cell_id = tasks[i];
           api.showProgress((i+1)/tasks.length)
           const imageData = await this.fetchCellImage(cell_id)
+          this.cached_image_data.push(imageData)
           if(!this.current_image_data && this.current_task_name){
+            this.current_image_data = imageData
             this.showImage(imageData)
             this.$forceUpdate();
           }
-          this.cached_image_data.push(imageData)
         }
         // remove older images
         // for covid-annotation, this.cell_per_batch is actually about well
@@ -1024,6 +1046,25 @@ const app = new Vue({
       if(this.current_task_name==='covid-annotation'){
         const well_info = imageData.cell_id.split('_')
         this.current_well_data = well_info.slice(0, 2).join('_')
+        const image_index = this.cached_image_data.indexOf(imageData)
+        //api.alert(image_index)
+        this.same_well_images_indexes = []
+        for (let i=1; i<this.cached_image_data.length; i++){
+          if(!this.cached_image_data[image_index + i])break;
+          if(this.cached_image_data[image_index + i].cell_id.includes(this.current_well_data)){
+            this.same_well_images_indexes.push(image_index + i)
+          }else{
+            break
+          }
+        }
+        for (let i=1; i<image_index+1; i++){
+          if(this.cached_image_data[image_index - i].cell_id.includes(this.current_well_data)){
+            this.same_well_images_indexes.push(image_index - i)
+          }else{
+            break
+          }
+        }
+        console.log(image_index + ":" + JSON.stringify(this.same_well_images_indexes))
       }      
       this.current_image_data = imageData;
       imageData.start_time = new Date().getTime();
@@ -1142,7 +1183,7 @@ const app = new Vue({
       }
    
       // this is the url to send the current annotation
-      api.alert(JSON.stringify(sendData))
+      //api.alert(JSON.stringify(sendData))
       const sub_url = "/annotations/" + this.current_task_name + "/" + this.current_image_data.cell_id;
       /*
       const url_post = this.selected_server_url + sub_url;
@@ -1824,6 +1865,7 @@ api.export(new ImJoyPlugin())
         <span v-show="!hide_controls" class="h3 floating-label">
           <h4>{{current_image_data.cell_id.split('/')[0]}}</h4>
           <h5>annotation_variation: {{annotation_variation}}</h5>
+          <h6>{{identify_label}}</h6>
         </span>
       </template>
       <template v-if="current_task_name==='precise-annotation'">	
