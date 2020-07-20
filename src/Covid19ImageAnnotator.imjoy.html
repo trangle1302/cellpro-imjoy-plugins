@@ -339,8 +339,10 @@ const app = new Vue({
     // from here this is communication to backend, to develop/activate
     tasks: null,
     current_task_name: null,
-    cell_per_batch: 10,
+    cell_per_batch: 2,
     cached_image_data: [],
+    // this is for covid-annotation use
+    cached_well_data: [],
     current_image_data: null,
     current_image_index: 0,
     loading_cache: false,
@@ -821,7 +823,7 @@ const app = new Vue({
       }
       try{
         this.loading_cache = task_name;
-        let url = "/tasks/" + task_name + "?num=" + this.cell_per_batch
+        let url = "/tasks/" + task_name + "?num=" + this.cell_per_batch        
         if(init){
           url = url + '&init=1'
         }
@@ -830,6 +832,21 @@ const app = new Vue({
         if(tasks.length<=0){
           api.showMessage('No more images in this task.')
           return
+        }
+        // here is for covid-annotation
+        if(task_name==='covid-annotation'){
+          const wells = response.wells
+          for (let j=0; j<wells.length; j++){
+            if(task_name !== this.loading_cache){
+              console.error('Switching tasks, quit caching')
+              break
+            }
+            if(!this.current_task_name){
+              api.showProgress(0)
+              return
+            }
+            this.cached_well_data.push(wells[j])
+          }
         }
         for(let i=0;i< tasks.length; i++){
           if(task_name !== this.loading_cache){
@@ -850,9 +867,26 @@ const app = new Vue({
           this.cached_image_data.push(imageData)
         }
         // remove older images
-        if(this.cached_image_data.length>this.cell_per_batch*3){
-          this.cached_image_data = this.cached_image_data.slice(this.cell_per_batch)
-          console.log('Removing images from the cache.',  this.cached_image_data.length)
+        // for covid-annotation, this.cell_per_batch is actually about well
+        if (task_name==='covid-annotation'){
+          if(this.cached_well_data.length > this.cell_per_batch*3){
+            this.cached_well_data = this.cached_well_data.slice(this.cell_per_batch)
+            const beggin_well = this.cached_well_data[0]
+            let slice_index = 0
+            for (let i=0; i<this.cached_image_data.length; i++){
+              if (this.cached_image_data[i].cell_id.includes(beggin_well)){
+                slice_index = i
+                break
+              }
+            }
+            this.cached_image_data = this.cached_image_data.slice(slice_index)
+            console.log('Removing well images from the cache.',  "now there are", this.cached_well_data.length, "wells,", "with", this.cached_image_data.length, "images catched")
+          }
+        }else{
+          if(this.cached_image_data.length> this.cell_per_batch*3){
+            this.cached_image_data = this.cached_image_data.slice(this.cell_per_batch)
+            console.log('Removing images from the cache.',  this.cached_image_data.length)
+          }
         }
         api.showProgress(100)
         if(!this.isMobile) api.showStatus(`A new batch with ${tasks.length} images loaded`)
@@ -893,6 +927,16 @@ const app = new Vue({
       await this.nextImage();
     },
     async nextImage(){
+      this.loadMoreIfNeeded();
+      await this.checkNewMask()
+      if(this.current_image_data.labels_changed){
+        await this.uploadAnnotation();
+      }
+      this.current_image_index++;
+      if(this.cached_image_data[this.current_image_index])
+      await this.showImage(this.cached_image_data[this.current_image_index]);
+    },
+    async nextWell(){
       this.loadMoreIfNeeded();
       await this.checkNewMask()
       if(this.current_image_data.labels_changed){
