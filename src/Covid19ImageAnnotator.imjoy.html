@@ -339,12 +339,14 @@ const app = new Vue({
     // from here this is communication to backend, to develop/activate
     tasks: null,
     current_task_name: null,
-    cell_per_batch: 2,
+    cell_per_batch: 4,
     cached_image_data: [],
     // this is for covid-annotation use
     cached_well_data: [],
     current_image_data: null,
+    current_well_data: null,
     current_image_index: 0,
+    current_well_index: 0,
     loading_cache: false,
     innerHeight: '100vh',
     isMobile: false,
@@ -932,17 +934,56 @@ const app = new Vue({
       if(this.current_image_data.labels_changed){
         await this.uploadAnnotation();
       }
+      this.current_image_index = this.cached_image_data.indexOf(this.current_image_data)
       this.current_image_index++;
       if(this.cached_image_data[this.current_image_index])
+      await this.showImage(this.cached_image_data[this.current_image_index]);
+    },
+    async previousWell(){
+      await this.checkNewMask()
+      if(this.current_image_data.labels_changed){
+        await this.uploadAnnotation();
+      }
+      this.current_well_index = this.cached_well_data.indexOf(this.current_well_data)
+      if(this.current_well_index<=0){
+        this.current_well_index = 0;
+      }else{
+        this.current_well_index--;
+        const the_well = this.cached_well_data[this.current_well_index]
+        let image_index = 0
+        for (let i=0; i<this.cached_image_data.length; i++){
+          if (this.cached_image_data[i].cell_id.includes(the_well)){
+            image_index = i
+            break
+          }
+        }
+        this.current_image_index = image_index
+      }
       await this.showImage(this.cached_image_data[this.current_image_index]);
     },
     async nextWell(){
       this.loadMoreIfNeeded();
       await this.checkNewMask()
+      // adjust this part later
       if(this.current_image_data.labels_changed){
         await this.uploadAnnotation();
       }
-      this.current_image_index++;
+      //this.current_well_index
+      if (!this.cached_well_data[this.current_well_index + 1]){
+        console.log("loading new wells")
+        this.getNewImageBatch(this.current_task_name)
+      }
+      this.current_well_index = this.cached_well_data.indexOf(this.current_well_data)
+      this.current_well_index++;
+      const the_well = this.cached_well_data[this.current_well_index]
+      let image_index = 0
+      for (let i=0; i<this.cached_image_data.length; i++){
+        if (this.cached_image_data[i].cell_id.includes(the_well)){
+          image_index = i
+          break
+        }
+      }
+      this.current_image_index = image_index
       if(this.cached_image_data[this.current_image_index])
       await this.showImage(this.cached_image_data[this.current_image_index]);
     },
@@ -980,6 +1021,10 @@ const app = new Vue({
       }
       if(!this.isMobile) api.showStatus(imageData.cell_id)
       console.log('current image: ', imageData)
+      if(this.current_task_name==='covid-annotation'){
+        const well_info = imageData.cell_id.split('_')
+        this.current_well_data = well_info.slice(0, 2).join('_')
+      }      
       this.current_image_data = imageData;
       imageData.start_time = new Date().getTime();
       // annotation viewer
@@ -1751,9 +1796,9 @@ api.export(new ImJoyPlugin())
           </div>
           <br>
           <div class="btn-group">
-            <button :disabled="current_image_index<=0  || loading" class="btn transparent-well-btn" @click="previousImage()"><i class="icon icon-back"></i>&nbsp;<b>Back</b>(well)</button>
+            <button :disabled="current_well_index<=0  || loading" class="btn transparent-well-btn" @click="previousWell()"><i class="icon icon-back"></i>&nbsp;<b>Back</b>(well)</button>
             <button :disabled="current_image_data.exclusive_label" class="btn transparent-well-btn" @click="toggleExclusiveLabels('Discard')">&nbsp;<b>GoTo</b>(well)</button>
-            <button :disabled="current_image_index>=cached_image_data.length  || loading" class="btn transparent-well-btn" @click="nextImage()"><b>Next</b>(well)&nbsp;<i class="icon icon-forward"></i></button>
+            <button :disabled="current_well_index>=cached_well_data.length  || loading" class="btn transparent-well-btn" @click="nextWell()"><b>Next</b>(well)&nbsp;<i class="icon icon-forward"></i></button>
           </div>
         </div>
       </div>
