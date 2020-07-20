@@ -1822,7 +1822,7 @@ api.export(new ImJoyPlugin())
           </div>
         </div>
         <span v-show="!hide_controls" class="h3 floating-label">
-          <h4>{{current_image_data.cell_id}}</h4>
+          <h4>{{current_image_data.cell_id.split('/')[0]}}</h4>
           <h5>annotation_variation: {{annotation_variation}}</h5>
         </span>
       </template>
