@@ -8,7 +8,7 @@
   "type": "window",
   "tags": [],
   "ui": "",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "api_version": "0.1.7",
   "description": "Annotate images for Covid image classification",
   "icon": "extension",
@@ -1019,6 +1019,69 @@ const app = new Vue({
         }
       }
     },
+    async goToWell(){
+      const the_well = await api.prompt('Please type the plate and well you want to go, the format should be like 1672_A2.')
+      if(!the_well){
+        console.log("no well info typed. please try again")
+        return}
+      if(this.current_image_data.labels_changed){
+        await this.uploadAnnotation();
+      }
+      //const the_well = "1672_A2"
+      const insert_index = Math.min(...this.same_well_images_indexes)
+
+      try{
+        this.loading_cache = this.current_task_name;
+        let url = "/tasks/" + this.current_task_name + "?num=1" + "&well=" + the_well
+        const response = await this.fetchURLData(url);
+        const tasks = response.tasks;
+        if(tasks.length<=0){
+          api.showMessage('No more images in this task.')
+          return
+        }
+        // here is for covid-annotation
+        const wells = response.wells
+        if(wells.length!==1){console.log("This is the wells found: " + JSON.stringify(wells)); return}
+        console.log("This is the wells found: " + JSON.stringify(wells))
+        console.log("This is the images found: " + JSON.stringify(tasks))
+        for (let j=0; j<wells.length; j++){
+          if(this.current_task_name !== this.loading_cache){
+            console.error('Switching tasks, quit caching')
+            break
+          }
+          if(!this.current_task_name){
+            api.showProgress(0)
+            return
+          }
+          this.cached_well_data.push(this.cached_well_data.splice(this.current_well_index, 0, wells[j]))
+        }
+        for(let i=0;i< tasks.length; i++){
+          if(this.current_task_name !== this.loading_cache){
+            console.error('Switching tasks, quit caching')
+            break
+          }
+          if(!this.current_task_name){
+            api.showProgress(0)
+            return
+          }
+          const cell_id = tasks[i];
+          api.showProgress((i+1)/tasks.length)
+          const imageData = await this.fetchCellImage(cell_id)
+          this.cached_image_data.splice(insert_index, 0, imageData)
+          if(!i && this.current_task_name){
+            this.current_image_data = this.cached_image_data[insert_index]
+            this.well_timer.start_time = new Date().getTime()
+            this.showImage(this.cached_image_data[insert_index])
+            this.$forceUpdate();
+          }
+        }
+      }catch(e){
+        console.error(e)
+      }
+      finally{
+        this.loading_cache = false;
+      }
+    },
     async nextWell(){
       //this.loadMoreIfNeeded();
       await this.checkNewMask()
@@ -1104,7 +1167,7 @@ const app = new Vue({
         this.current_well_data = well_info.slice(0, 2).join('_')
         const image_index = this.cached_image_data.indexOf(imageData)
         //api.alert(image_index)
-        this.same_well_images_indexes = []
+        this.same_well_images_indexes = [image_index]
         for (let i=1; i<this.cached_image_data.length; i++){
           if(!this.cached_image_data[image_index + i])break;
           if(this.cached_image_data[image_index + i].cell_id.includes(this.current_well_data)){
@@ -1246,7 +1309,7 @@ const app = new Vue({
       }
    
       // this is the url to send the current annotation
-      api.alert(JSON.stringify(sendData))
+      console.log(JSON.stringify(sendData))
       const sub_url = "/annotations/" + this.current_task_name + "/" + this.current_image_data.cell_id;
       /*
       const url_post = this.selected_server_url + sub_url;
@@ -1871,7 +1934,7 @@ api.export(new ImJoyPlugin())
           <input type="checkbox" v-model="draw_mask_mode" @change="drawMaskModeChanged">
           <i class="form-icon"></i> <span class="hide-on-mobile">Redraw Mask</span>
         </label> -->
-        <button style="background-color:transparent" class="btn" title="navigate to well" @click="">&nbsp;Well</button>
+        <button style="background-color:transparent" class="btn" title="navigate to well" @click="goToWell()">&nbsp;Well</button>
         <button style="background-color:transparent" class="btn" title="report" @click="report()"><i class="icon icon-share"></i></button>&nbsp;&nbsp;
         <label class="form-switch " v-show="current_task_name === 'segmentation'">
           <input type="checkbox" v-model="freehand_mode" @change="freehandChanged">
