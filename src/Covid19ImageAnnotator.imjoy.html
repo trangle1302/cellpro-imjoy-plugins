@@ -339,10 +339,20 @@ const app = new Vue({
     // from here this is communication to backend, to develop/activate
     tasks: null,
     current_task_name: null,
-    cell_per_batch: 10,
+    cell_per_batch: 4,
     cached_image_data: [],
+    // this is for covid-annotation use
+    cached_well_data: [],
     current_image_data: null,
+    current_well_data: null,
+    same_well_images_indexes: [],
+    next_well_image_available: null,
+    previous_well_image_available: null,
     current_image_index: 0,
+    current_well_index: 0,
+    discard_well: false,
+    load_image_index: 0,
+    well_timer: {},
     loading_cache: false,
     innerHeight: '100vh',
     isMobile: false,
@@ -508,6 +518,49 @@ const app = new Vue({
         }
       }
       return locs      
+    },
+    annotation_variation: function(){
+      const annotation_categories = Object.keys(this.current_image_data.labels)
+      if (annotation_categories.length !== 2){
+        return "Error: should be two categories only"
+      }else{
+        if (JSON.stringify(this.current_image_data.labels[annotation_categories[0]])===JSON.stringify(this.current_image_data.labels[annotation_categories[1]])){
+          return "Identical"
+        }else{return "Different"}
+        return "Error: God knows" 
+      }
+    },
+    identify_label: function(){
+      this.current_image_data.discard = this.discard_well
+      const all_labels = this.current_image_data.labels
+      const well_label_changed = this.current_image_data.labels_changed
+      //api.alert("Tell me if you are here")
+      this.previous_well_image_available = false
+      this.next_well_image_available = false
+      const image_index = this.cached_image_data.indexOf(this.current_image_data)
+      if(this.same_well_images_indexes.length <=0 ){
+        if(this.cached_image_data[image_index + 1]){
+          if(this.cached_image_data[image_index + 1].cell_id.includes(this.current_well_data)){
+            this.next_well_image_available = true
+            this.cached_image_data[image_index + 1].labels = all_labels
+            this.cached_image_data[image_index + 1].labels_changed = well_label_changed
+            this.cached_image_data[image_index + 1].discard = this.discard_well
+          }
+        }
+        return
+      }
+
+      let set_image_index
+      //api.alert(JSON.stringify(this.same_well_images_indexes))
+      if (this.same_well_images_indexes[0] < image_index)this.previous_well_image_available = true
+      if (this.same_well_images_indexes[this.same_well_images_indexes.length -1] > image_index)this.next_well_image_available = true
+      for (let i in this.same_well_images_indexes){
+        set_image_index = this.same_well_images_indexes[i]
+        this.cached_image_data[set_image_index].labels = all_labels
+        this.cached_image_data[set_image_index].labels_changed = well_label_changed
+        this.cached_image_data[set_image_index].discard = this.discard_well
+      }
+      return
     }
   },
   methods: {
@@ -655,7 +708,7 @@ const app = new Vue({
       }
       this.loading = true;
       this.channel_settings = {};
-      this.getNewImageBatch(this.current_task_name, true);
+      await this.getNewImageBatch(this.current_task_name, true);
     },
     async fetchConfig(config_url){
       const response = await fetch(config_url)
@@ -681,22 +734,16 @@ const app = new Vue({
       const response = await this.fetchURLData(image_url)
       imageData.bbox = response.bbox;
       imageData.mask_geojson = response.mask;
-      if(this.current_task_name==='covid-annotation'){
-        imageData.mask_geojson.features = null
-      }
       //ER, Microtubule, Nuclei, Protein,
       // remove mask channels if task_name==covid-annotation
       imageData.channels = response.images;
-      if(this.current_task_name==='covid-annotation'){
-        if (Object.keys(imageData.channels).includes('Mask')){
-          delete imageData.channels['Mask']
-        }
-      }
       if(!response.available_labels){
         throw new Error("no available labels.")
       }
+      //api.alert(JSON.stringify(response.available_labels))
       imageData.exclusive_labels = response.available_labels.exclusive_labels
       if(response.available_labels.location_labels){
+        //api.alert(JSON.stringify(response.available_labels.location_labels))
         const labels = Object.keys(response.available_labels.location_labels);
         if(labels.length==1){
           imageData.label_display_mode = 'single'
@@ -716,6 +763,33 @@ const app = new Vue({
       }
       // record the current cell indice list
       this.updateSavedCellIdx(imageData)
+
+
+      // Here is for covid-annotation only
+      if(this.current_task_name==='covid-annotation'){
+        if (Object.keys(imageData.channels).includes('Mask')){
+          delete imageData.channels['Mask']
+        }
+        // remove mask_geojson
+        imageData.mask_geojson.features = null;
+        // set labels
+        let index, annotation_category, record_label, k, v
+        imageData.labels = {}
+        for (index in this.config_data.annotation_categories){
+          annotation_category = this.config_data.annotation_categories[index]
+          imageData.labels[annotation_category] = {}
+          imageData.labels[annotation_category].labels = {}
+          imageData.labels[annotation_category].labels.location_labels = {}
+          for (k in this.config_data.labels.location_labels){
+            record_label =  this.config_data.labels.location_labels[k]
+            imageData.labels[annotation_category].labels.location_labels[record_label] = false
+          }
+          imageData.labels[annotation_category].labels.exclusive_label = null
+          imageData.labels[annotation_category].labels.single_cell_variation = false
+        }
+        // should rename here for the saved_location_label @ hao
+        imageData.saved_location_label = Object.assign({}, imageData.labels)
+      }
 
       return imageData
     },
@@ -789,7 +863,7 @@ const app = new Vue({
       }
       try{
         this.loading_cache = task_name;
-        let url = "/tasks/" + task_name + "?num=" + this.cell_per_batch
+        let url = "/tasks/" + task_name + "?num=" + this.cell_per_batch        
         if(init){
           url = url + '&init=1'
         }
@@ -798,6 +872,21 @@ const app = new Vue({
         if(tasks.length<=0){
           api.showMessage('No more images in this task.')
           return
+        }
+        // here is for covid-annotation
+        if(task_name==='covid-annotation'){
+          const wells = response.wells
+          for (let j=0; j<wells.length; j++){
+            if(task_name !== this.loading_cache){
+              console.error('Switching tasks, quit caching')
+              break
+            }
+            if(!this.current_task_name){
+              api.showProgress(0)
+              return
+            }
+            this.cached_well_data.push(wells[j])
+          }
         }
         for(let i=0;i< tasks.length; i++){
           if(task_name !== this.loading_cache){
@@ -811,16 +900,36 @@ const app = new Vue({
           const cell_id = tasks[i];
           api.showProgress((i+1)/tasks.length)
           const imageData = await this.fetchCellImage(cell_id)
+          this.cached_image_data.push(imageData)
           if(!this.current_image_data && this.current_task_name){
+            this.current_image_data = imageData
+            if(this.current_task_name==='covid-annotation')this.well_timer.start_time = new Date().getTime()
             this.showImage(imageData)
             this.$forceUpdate();
           }
-          this.cached_image_data.push(imageData)
         }
         // remove older images
-        if(this.cached_image_data.length>this.cell_per_batch*3){
-          this.cached_image_data = this.cached_image_data.slice(this.cell_per_batch)
-          console.log('Removing images from the cache.',  this.cached_image_data.length)
+        // for covid-annotation, this.cell_per_batch is actually about well
+        if (task_name==='covid-annotation'){
+          if(this.cached_well_data.length > this.cell_per_batch*3){
+            console.log("Have you been here?")
+            this.cached_well_data = this.cached_well_data.slice(this.cell_per_batch)
+            const beggin_well = this.cached_well_data[0]
+            let slice_index = 0
+            for (let i=0; i<this.cached_image_data.length; i++){
+              if (this.cached_image_data[i].cell_id.includes(beggin_well)){
+                slice_index = i
+                break
+              }
+            }
+            this.cached_image_data = this.cached_image_data.slice(slice_index)
+            console.log('Removing well images from the cache.',  "now there are", this.cached_well_data.length, "wells,", "with", this.cached_image_data.length, "images catched")
+          }
+        }else{
+          if(this.cached_image_data.length> this.cell_per_batch*3){
+            this.cached_image_data = this.cached_image_data.slice(this.cell_per_batch)
+            console.log('Removing images from the cache.',  this.cached_image_data.length)
+          }
         }
         api.showProgress(100)
         if(!this.isMobile) api.showStatus(`A new batch with ${tasks.length} images loaded`)
@@ -835,7 +944,7 @@ const app = new Vue({
     },
     async previousImage(){
       await this.checkNewMask()
-      if(this.current_image_data.labels_changed){
+      if(this.current_image_data.labels_changed&&(this.current_task_name!=='covid-annotation')){
         await this.uploadAnnotation();
       }
       this.current_image_index = this.cached_image_data.indexOf(this.current_image_data)
@@ -855,19 +964,106 @@ const app = new Vue({
       }
     },
     async saveAnnotation(){
-      this.current_image_data.exclusive_label = false;
-      this.current_image_data.labels_changed = true;
-      await this.nextImage();
+      if(this.current_task_name!=='covid-annotation'){
+        this.current_image_data.exclusive_label = false;
+        this.current_image_data.labels_changed = true;
+        await this.nextImage();
+      }else{
+        this.current_image_data.labels_changed = true;
+        await this.uploadAnnotation();
+        this.$forceUpdate()
+      }
+      
     },
     async nextImage(){
       this.loadMoreIfNeeded();
       await this.checkNewMask()
-      if(this.current_image_data.labels_changed){
+      if(this.current_image_data.labels_changed&&(this.current_task_name!=='covid-annotation')){
         await this.uploadAnnotation();
       }
+      this.current_image_index = this.cached_image_data.indexOf(this.current_image_data)
       this.current_image_index++;
       if(this.cached_image_data[this.current_image_index])
       await this.showImage(this.cached_image_data[this.current_image_index]);
+    },
+    async previousWell(){
+      await this.checkNewMask()
+      if(this.current_image_data.labels_changed){
+        await this.uploadAnnotation();
+      }
+      this.current_well_index = this.cached_well_data.indexOf(this.current_well_data)
+      if(this.current_well_index<=0){
+        this.current_well_index = 0;
+      }else{
+        this.current_well_index--;
+        const the_well = this.cached_well_data[this.current_well_index]
+        let image_index = 0
+        for (let i=0; i<this.cached_image_data.length; i++){
+          if (this.cached_image_data[i].cell_id.includes(the_well)){
+            image_index = i
+            break
+          }
+        }
+        this.current_image_index = image_index
+      }
+      this.well_timer.start_time = new Date().getTime();
+      this.discard_well = this.cached_image_data[this.current_image_index].discard
+      await this.showImage(this.cached_image_data[this.current_image_index]);
+    },
+    getWellImage(the_well, iteration){
+      this.load_image_index = 0
+      for (let i=0; i<this.cached_image_data.length; i++){
+        if (this.cached_image_data[i].cell_id.includes(the_well)){
+          this.load_image_index = i
+          break
+        }
+      }
+    },
+    async nextWell(){
+      //this.loadMoreIfNeeded();
+      await this.checkNewMask()
+      // adjust this part later
+      if(this.current_image_data.labels_changed){
+        await this.uploadAnnotation();
+      }
+      //this.current_well_index
+      if (this.current_well_index * 2 > this.cached_well_data.length){
+        console.log("loading new wells")
+        await this.getNewImageBatch(this.current_task_name)
+      }
+      console.log("current_well_list length: " + this.current_well_data.length)
+      this.current_well_index = this.cached_well_data.indexOf(this.current_well_data)
+      console.log("current_well_index: ", this.current_well_index)
+      this.current_well_index++;
+      console.log("go to well_index: ", this.current_well_index)
+      const the_well = this.cached_well_data[this.current_well_index]
+      console.log("go to well name: ", the_well)
+      console.log("current cached image data length: ", this.cached_image_data.length)
+      let iteration = 0
+      await this.getWellImage(the_well, iteration)
+      for (let j=0;j<3;j++){
+        this.loading = true
+        if(!this.cached_image_data[this.load_image_index].cell_id.includes(the_well)){
+          iteration++;
+          await this.getWellImage(the_well, iteration)
+        }else{
+          this.loading=false;
+          console.log("current_cell_id: ", this.cached_image_data[this.load_image_index].cell_id)
+          break
+        }
+      }
+      this.loading = false
+      if(!this.cached_image_data[this.load_image_index].cell_id.includes(the_well)){api.showMessage("Data is still loading..., please click Next again")
+      return
+      }
+      const image_index = this.load_image_index
+      this.current_image_index = image_index
+      console.log("image name: ", this.cached_image_data[this.current_image_index].cell_id)
+      if(this.cached_image_data[this.current_image_index]){
+        this.well_timer.start_time = new Date().getTime();
+        this.discard_well = this.cached_image_data[this.current_image_index].discard
+        await this.showImage(this.cached_image_data[this.current_image_index]);
+      }
     },
     async checkNewMask(){
       if(!this.current_image_data.mask_adjusted){
@@ -903,6 +1099,30 @@ const app = new Vue({
       }
       if(!this.isMobile) api.showStatus(imageData.cell_id)
       console.log('current image: ', imageData)
+      if(this.current_task_name==='covid-annotation'){
+        const well_info = imageData.cell_id.split('_')
+        this.current_well_data = well_info.slice(0, 2).join('_')
+        const image_index = this.cached_image_data.indexOf(imageData)
+        //api.alert(image_index)
+        this.same_well_images_indexes = []
+        for (let i=1; i<this.cached_image_data.length; i++){
+          if(!this.cached_image_data[image_index + i])break;
+          if(this.cached_image_data[image_index + i].cell_id.includes(this.current_well_data)){
+            this.same_well_images_indexes.push(image_index + i)
+          }else{
+            break
+          }
+        }
+        for (let i=1; i<image_index+1; i++){
+          if(this.cached_image_data[image_index - i].cell_id.includes(this.current_well_data)){
+            this.same_well_images_indexes.push(image_index - i)
+          }else{
+            break
+          }
+        }
+        this.same_well_images_indexes.sort()
+        console.log("current_well_index " + this.cached_well_data.indexOf(this.current_well_data)+ " image index "+ image_index + ":" + JSON.stringify(this.same_well_images_indexes))
+      }      
       this.current_image_data = imageData;
       imageData.start_time = new Date().getTime();
       // annotation viewer
@@ -953,53 +1173,82 @@ const app = new Vue({
       // Default options are marked with *
       const sendData = {}
       
-      if(this.current_image_data.start_time){
+      if(this.current_image_data.start_time&&(this.current_task_name!=='covid-annotation')){
         this.current_image_data.time_elapsed = new Date().getTime() - this.current_image_data.start_time;
         sendData.start_time = this.current_image_data.start_time;
         sendData.time_elapsed = this.current_image_data.time_elapsed;
       }
-      
-      if (this.current_image_data.labels_changed){
-        if(this.current_image_data.exclusive_label){
-          sendData.labels = this.current_image_data.exclusive_label;
+      if (this.current_task_name==='covid-annotation'){
+        if(this.well_timer.start_time){
+          this.well_timer.time_elapsed = new Date().getTime() - this.well_timer.start_time
+          sendData.start_time = this.well_timer.start_time
+          sendData.time_elapsed = this.well_timer.time_elapsed
+          console.log('I am using the right timing')
         }
-        else{
-          sendData.labels = this.current_image_data.location_labels;
-        }
-        if(typeof sendData.labels === 'object'){
-          let noLabel = true;
-          for (let loc in sendData.labels){
-            if(sendData.labels[loc] === null){
-              sendData.labels[loc] = false
+      // consider about the discard button later
+        if (this.current_image_data.labels_changed&&this.discard_well){
+          sendData.discard = this.discard_well
+        }  
+        if (this.current_image_data.labels_changed&&(!this.discard_well)){
+          sendData.annotation_variation = this.annotation_variation
+          sendData.labels = {}
+          for(let k of Object.keys(this.current_image_data.labels)){
+            sendData.labels[k] = {}
+            sendData.labels[k].labels = {}
+            if(this.current_image_data.labels[k].labels.exclusive_label){
+              sendData.labels[k].labels.exclusive_label = this.current_image_data.labels[k].labels.exclusive_label;
             }
             else{
-              noLabel = false;
+              sendData.labels[k].labels.location_labels = this.current_image_data.labels[k].labels.location_labels;
+              sendData.labels[k].labels.single_cell_variation = this.current_image_data.labels[k].labels.single_cell_variation
             }
           }
-          if (noLabel && this.current_image_data.label_display_mode==='multiple'){
-            const anwser = await api.confirm("No label label selected, is that correct?")
-            if (!anwser){
-              return
-            }
-          };
         }
+      }else{
+        if (this.current_image_data.labels_changed){
+          if(this.current_image_data.exclusive_label){
+            sendData.labels = this.current_image_data.exclusive_label;
+          }
+          else{
+            sendData.labels = this.current_image_data.location_labels;
+          }
+          if(typeof sendData.labels === 'object'){
+            let noLabel = true;
+            for (let loc in sendData.labels){
+              if(sendData.labels[loc] === null){
+                sendData.labels[loc] = false
+              }
+              else{
+                noLabel = false;
+              }
+            }
+            if (noLabel && this.current_image_data.label_display_mode==='multiple'){
+              const anwser = await api.confirm("No label label selected, is that correct?")
+              if (!anwser){
+                return
+              }
+            };
+          }
+        }
+        if (this.current_image_data.mask_adjusted){
+          // sendData
+          sendData.extend = this.current_image_data.extend;
+          sendData.bbox = this.current_image_data.bbox;
+          // set the masks
+          const allFeatures = this.vector_source.getFeatures();
+          const format = new ol.format.GeoJSON();
+          const routeFeatures = format.writeFeaturesObject(allFeatures, {decimals: 1});
+          routeFeatures['bbox'] = this.current_image_data.mask_geojson.bbox;
+          this.current_image_data.mask_geojson = routeFeatures;
+          sendData.mask = this.current_image_data.mask_geojson;
+          sendData.mask_diff = this.getMaskDiff(this.current_image_data);
+        };
       }
-      if (this.current_image_data.mask_adjusted){
-        // sendData
-        sendData.extend = this.current_image_data.extend;
-        sendData.bbox = this.current_image_data.bbox;
-        // set the masks
-        const allFeatures = this.vector_source.getFeatures();
-        const format = new ol.format.GeoJSON();
-        const routeFeatures = format.writeFeaturesObject(allFeatures, {decimals: 1});
-        routeFeatures['bbox'] = this.current_image_data.mask_geojson.bbox;
-        this.current_image_data.mask_geojson = routeFeatures;
-        sendData.mask = this.current_image_data.mask_geojson;
-        sendData.mask_diff = this.getMaskDiff(this.current_image_data);
-      };
-    
+   
       // this is the url to send the current annotation
+      api.alert(JSON.stringify(sendData))
       const sub_url = "/annotations/" + this.current_task_name + "/" + this.current_image_data.cell_id;
+      /*
       const url_post = this.selected_server_url + sub_url;
       const response = await fetch(url_post, {
           method: 'POST',
@@ -1012,11 +1261,16 @@ const app = new Vue({
           body: JSON.stringify(sendData)
         });
       const res= await response.json();
-      if(res.success){
+      if(res.success)*/
+      if(true){
         this.current_image_data.mask_adjusted = false;
         this.current_image_data.labels_changed = false;
-        this.current_image_data.saved_location_label = Object.assign({}, this.current_image_data.location_labels)
-        this.updateSavedCellIdx(this.current_image_data)
+        if(this.current_task_name==='covid-annotation'){
+          this.current_image_data.saved_location_label = Object.assign({}, this.current_image_data.labels)
+        }else{
+          this.current_image_data.saved_location_label = Object.assign({}, this.current_image_data.location_labels)
+          this.updateSavedCellIdx(this.current_image_data)
+        }
       }
       else{
         alert('Failed to upload the annotaiton, error: ' + res.error);
@@ -1054,6 +1308,33 @@ const app = new Vue({
       }
       this.$forceUpdate()
       await this.uploadAnnotation();
+    },
+    async toggleCovidDiscardLabel(){
+      this.current_image_data.labels_changed = true;
+      if (this.discard_well){
+        this.discard_well = false
+      }else{
+        this.discard_well = true;
+        //await this.uploadAnnotation();
+      }
+      console.log("show when toggle discard: ", this.discard_well)
+      this.$forceUpdate()
+    },
+    async toggleCovidExclusiveLabels(annotation_category, type){
+      this.current_image_data.labels_changed = true;
+      if(this.current_image_data.labels[annotation_category].labels.exclusive_label === type){
+        // the order for the following two lines matters
+        //this.current_image_data.labels[annotation_category].labels.location_labels = Object.assign({}, this.current_image_data.saved_location_label[annotation_category].labels.location_labels)
+        this.current_image_data.labels[annotation_category].labels.exclusive_label = false;
+        // here saved_location_label includes all labels
+      }
+      else{
+        this.current_image_data.labels[annotation_category].labels.exclusive_label = type
+        
+      }
+      this.$forceUpdate()
+      // this one is temporarily muted
+      //await this.uploadAnnotation();
     },
     showMaskAnnotation(mask_geojson){
       if(this.current_task_name==='covid-annotation')return;
@@ -1344,6 +1625,26 @@ const app = new Vue({
       this.current_image_data.exclusive_label = false;
       this.current_image_data.labels_changed = true;
     },
+    toggleCovidLabel(annotation_category, k){
+      if(this.current_image_data.labels[annotation_category].labels.location_labels[k]){
+        this.current_image_data.labels[annotation_category].labels.location_labels[k]=false
+      }
+      else{
+        this.current_image_data.labels[annotation_category].labels.location_labels[k]=true
+      }
+      this.current_image_data.labels[annotation_category].labels.exclusive_label = false;
+      this.current_image_data.labels_changed = true;
+    },
+    toggleCovidSCVLabel(annotation_category){
+      if(this.current_image_data.labels[annotation_category].labels.single_cell_variation){
+        this.current_image_data.labels[annotation_category].labels.single_cell_variation=false
+      }
+      else{
+        this.current_image_data.labels[annotation_category].labels.single_cell_variation=true
+      }
+      this.current_image_data.labels[annotation_category].labels.exclusive_label = false;
+      this.current_image_data.labels_changed = true;
+    },
     screenShot(){
       var mapCanvas = document.createElement('canvas');
       var size = this.map.getSize();
@@ -1570,6 +1871,7 @@ api.export(new ImJoyPlugin())
           <input type="checkbox" v-model="draw_mask_mode" @change="drawMaskModeChanged">
           <i class="form-icon"></i> <span class="hide-on-mobile">Redraw Mask</span>
         </label> -->
+        <button style="background-color:transparent" class="btn" title="navigate to well" @click="">&nbsp;Well</button>
         <button style="background-color:transparent" class="btn" title="report" @click="report()"><i class="icon icon-share"></i></button>&nbsp;&nbsp;
         <label class="form-switch " v-show="current_task_name === 'segmentation'">
           <input type="checkbox" v-model="freehand_mode" @change="freehandChanged">
@@ -1594,18 +1896,43 @@ api.export(new ImJoyPlugin())
         <br>
         <div v-if="current_task_name==='covid-annotation'">
           <div class="btn-group" >
-            <button :disabled="current_image_index<=0  || loading" class="btn transparent-btn" @click="previousImage()"><i class="icon icon-back"></i>&nbsp;Back</button>
-            <button :disabled="current_image_data.exclusive_label" class="btn transparent-btn" @click="toggleExclusiveLabels('Discard')">&nbsp;Discard</button>
-            <button :disabled="current_image_index>=cached_image_data.length  || loading" class="btn transparent-btn" @click="nextImage()">Next&nbsp;<i class="icon icon-forward"></i></button>
+            <button :disabled="!previous_well_image_available  || loading" class="btn transparent-image-btn" @click="previousImage()"><i class="icon icon-back"></i>&nbsp;Back (image)</button>
+            <button :disabled="!next_well_image_available  || loading" class="btn transparent-image-btn" @click="nextImage()">Next (image)&nbsp;<i class="icon icon-forward"></i></button>
           </div>
           <br>
           <div class="btn-group">
-            <button style="font-size: 12px;" :disabled="current_image_index<=0  || loading" class="btn transparent-btn" @click="previousImage()"><i class="icon icon-back"></i>&nbsp;<b>Back</b>(well)</button>
-            <button style="font-size: 12px;" :disabled="current_image_data.exclusive_label" class="btn transparent-btn" @click="toggleExclusiveLabels('Discard')">&nbsp;<b>GoTo</b>(well)</button>
-            <button style="font-size: 12px;" :disabled="current_image_index>=cached_image_data.length  || loading" class="btn transparent-btn" @click="nextImage()"><b>Next</b>(well)&nbsp;<i class="icon icon-forward"></i></button>
+            <button :disabled="current_well_index<=0  || loading" class="btn transparent-btn" @click="previousWell()"><i class="icon icon-back"></i>&nbsp;<b>Back</b></button>
+            <button :disabled="discard_well || loading" class="btn transparent-btn" @click="saveAnnotation()">&nbsp;<b>Save</b></button>
+            <button class="btn transparent-btn" :class="{'exclusive-label-btn': discard_well}" :disabled="loading" @click="toggleCovidDiscardLabel()">&nbsp;<b>Discard</b></button>
+            <button :disabled="current_well_index>=cached_well_data.length  || loading" class="btn transparent-btn" @click="nextWell()"><b>Next</b>&nbsp;<i class="icon icon-forward"></i></button>
           </div>
         </div>
       </div>
+      <template v-if="current_task_name==='covid-annotation'">
+        <div v-show="!hide_controls" class="floating-right-btn">
+          <div class="columns is-mobile" v-for="annotation_category in config_data.annotation_categories">
+            <div>
+              <h5>{{annotation_category}}</h5>
+              <template v-for="(label, display_label) in config_data.labels.location_labels">
+                <button :key="label" :disabled="current_image_data.labels[annotation_category].labels.exclusive_label||discard_well || loading" class="column btn covid-label-btn" :class="{'selected-label-btn': current_image_data.labels[annotation_category].labels.location_labels[config_data.labels.location_labels[display_label]]}" @click="toggleCovidLabel(annotation_category, config_data.labels.location_labels[display_label])">{{display_label.slice(0,12)+(display_label.length>12?'.': '')}}</button>
+                <!-- <div class="break hide-on-mobile"></div> -->
+              </template>
+              <br>
+              <template class="btn-group">
+                <button class="btn btn-sm channel-controls scv-label-btn" :disabled="current_image_data.labels[annotation_category].labels.exclusive_label||discard_well||loading" :class="{'selected-scv-label-btn': current_image_data.labels[annotation_category].labels.single_cell_variation}" @click="toggleCovidSCVLabel(annotation_category)">{{config_data.labels.single_cell_variation}}</button>
+              </template>
+              <template class="btn-group">
+                <button v-for="el in config_data.labels.exclusive_labels" :key="el" class="btn btn-sm exclusive-btn channel-controls" :disabled="(current_image_data.labels[annotation_category].labels.exclusive_label&&current_image_data.labels[annotation_category].labels.exclusive_label!==el)||discard_well||loading" :class="{'exclusive-covid-label-btn': current_image_data.labels[annotation_category].labels.exclusive_label ===el}" @click="toggleCovidExclusiveLabels(annotation_category, el)">{{el}}</button>
+              </template>
+            </div>            
+          </div>
+        </div>
+        <span v-show="!hide_controls" class="h3 floating-label">
+          <h4>{{current_image_data.cell_id.split('/')[0]}}</h4>
+          <h5>annotation_variation: {{annotation_variation}}</h5>
+          <h6>{{identify_label}}</h6>
+        </span>
+      </template>
       <template v-if="current_task_name==='precise-annotation'">	
         <div v-show="!hide_controls" class="floating-right-btn">	
           <div class="columns">	
@@ -1632,28 +1959,6 @@ api.export(new ImJoyPlugin())
           </div>	
         </div>
       </template> 
-      <template v-if="current_task_name==='covid-annotation'">
-        <div v-show="!hide_controls" class="floating-right-btn">
-          <div class="columns is-mobile" v-for="annotation_category in config_data.annotation_categories">
-            <div>
-              <h5>{{annotation_category}}</h5>
-              <template v-for="(label, display_label) in config_data.labels.protein_labels">
-                <button :key="label" :disabled="current_image_data.exclusive_label" class="column btn covid-label-btn" :class="{'selected-label-btn': current_image_data.location_labels[LIMS_TO_IF_CSV[label]]}">{{display_label.slice(0,12)+(display_label.length>12?'.': '')}}</button>
-                <!-- <div class="break hide-on-mobile"></div> -->
-              </template>
-              <br>
-              <br>
-              <template class="btn-group" v-if="current_task_name !== 'segmentation'">
-                <button v-for="el in config_data.labels.exclusive_labels"  :key="el" class="btn btn-sm exclusive-btn channel-controls" :disabled="current_image_data.exclusive_label&&current_image_data.exclusive_label!==el" :class="{'exclusive-label-btn': current_image_data.exclusive_label ===el}" @click="toggleExclusiveLabels(el)">{{el}}</button>
-              </template>
-            </div>            
-          </div>
-        </div>
-        <span v-show="!hide_controls" class="h3 floating-label">
-          <h4>Image Name</h4>
-          <h5>Status</h5>
-        </span>
-      </template>
       <template v-if="current_image_data.label_display_mode==='single'">
         <div v-show="!hide_controls" class="btn-group floating-bottom-btn">
           <button :disabled="current_image_index<=0 || loading" class="btn transparent-btn" @click="previousImage()"><i class="icon icon-back"></i>&nbsp;Back</button>
@@ -1822,6 +2127,15 @@ api.export(new ImJoyPlugin())
     width: 110px;
     background-color:#fff3;
   }
+  .scv-label-btn {
+    padding-top: 0px;
+    font-size: 13px;
+    margin-left: 0px;
+    height: 20px;
+    flex: none;
+    width: 110px;
+    background-color:#17202A;
+  }
   .exclusive-btn{
     height: 23px;
     width: 90px;
@@ -1833,14 +2147,21 @@ api.export(new ImJoyPlugin())
   .exclusive-label-btn{
     background-color: rgb(248, 27, 2)!important;
   }
+  .exclusive-covid-label-btn{
+    background-color: rgb(146, 49, 49)!important;
+  }
   .highlight-btn{
     background-color: white!important;
   }
-  .label-btn:hover, .label-btn:focus{
+  .label-btn:hover, .label-btn:focus, .covid-label-btn:hover, .covid-label-btn:focus, .scv-label-btn:hover, .scv-label-btn:focus{
     background-color:rgba(255, 255, 255, 0.42);
   }
   .selected-label-btn{
     background-color: #3580ff7d!important;
+    color: white!important;
+  }
+  .selected-scv-label-btn{
+    background-color: #35ffab7d!important;
     color: white!important;
   }
   .break {
@@ -1852,6 +2173,13 @@ api.export(new ImJoyPlugin())
     background-color:#fff3;
   }
   .transparent-btn:hover {
+    background-color:rgba(255, 255, 255, 0.42);
+  }
+  .transparent-image-btn, .transparent-image-btn:focus {
+    width: 150px;
+    background-color:rgba(87, 100, 29, 0.274);
+  }
+  .transparent-image-btn:hover {
     background-color:rgba(255, 255, 255, 0.42);
   }
   .small-btn{
