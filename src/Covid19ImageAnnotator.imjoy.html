@@ -350,6 +350,7 @@ const app = new Vue({
     previous_well_image_available: null,
     current_image_index: 0,
     current_well_index: 0,
+    discard_well: false,
     load_image_index: 0,
     well_timer: {},
     loading_cache: false,
@@ -530,9 +531,9 @@ const app = new Vue({
       }
     },
     identify_label: function(){
+      this.current_image_data.discard = this.discard_well
       const all_labels = this.current_image_data.labels
       const well_label_changed = this.current_image_data.labels_changed
-      const well_label_discard = this.current_image_data.discard
       //api.alert("Tell me if you are here")
       this.previous_well_image_available = false
       this.next_well_image_available = false
@@ -543,7 +544,7 @@ const app = new Vue({
             this.next_well_image_available = true
             this.cached_image_data[image_index + 1].labels = all_labels
             this.cached_image_data[image_index + 1].labels_changed = well_label_changed
-            this.cached_image_data[image_index + 1].discard = well_label_discard
+            this.cached_image_data[image_index + 1].discard = this.discard_well
           }
         }
         return
@@ -557,7 +558,7 @@ const app = new Vue({
         set_image_index = this.same_well_images_indexes[i]
         this.cached_image_data[set_image_index].labels = all_labels
         this.cached_image_data[set_image_index].labels_changed = well_label_changed
-        this.cached_image_data[set_image_index].discard = well_label_discard
+        this.cached_image_data[set_image_index].discard = this.discard_well
       }
       return
     }
@@ -1006,6 +1007,7 @@ const app = new Vue({
         this.current_image_index = image_index
       }
       this.well_timer.start_time = new Date().getTime();
+      this.discard_well = this.cached_image_data[this.current_image_index].discard
       await this.showImage(this.cached_image_data[this.current_image_index]);
     },
     getWellImage(the_well, iteration){
@@ -1059,6 +1061,7 @@ const app = new Vue({
       console.log("image name: ", this.cached_image_data[this.current_image_index].cell_id)
       if(this.cached_image_data[this.current_image_index]){
         this.well_timer.start_time = new Date().getTime();
+        this.discard_well = this.cached_image_data[this.current_image_index].discard
         await this.showImage(this.cached_image_data[this.current_image_index]);
       }
     },
@@ -1183,10 +1186,10 @@ const app = new Vue({
           console.log('I am using the right timing')
         }
       // consider about the discard button later
-        if (this.current_image_data.labels_changed&&this.current_image_data.discard){
-          sendData.discard = this.current_image_data.discard
+        if (this.current_image_data.labels_changed&&this.discard_well){
+          sendData.discard = this.discard_well
         }  
-        if (this.current_image_data.labels_changed&&(!this.current_image_data.discard)){
+        if (this.current_image_data.labels_changed&&(!this.discard_well)){
           sendData.annotation_variation = this.annotation_variation
           sendData.labels = {}
           for(let k of Object.keys(this.current_image_data.labels)){
@@ -1308,12 +1311,13 @@ const app = new Vue({
     },
     async toggleCovidDiscardLabel(){
       this.current_image_data.labels_changed = true;
-      if (this.current_image_data.discard){
-        delete this.current_image_data.discard
+      if (this.discard_well){
+        this.discard_well = false
       }else{
-        this.current_image_data.discard = true;
-        await this.uploadAnnotation();
+        this.discard_well = true;
+        //await this.uploadAnnotation();
       }
+      console.log("show when toggle discard: ", this.discard_well)
       this.$forceUpdate()
     },
     async toggleCovidExclusiveLabels(annotation_category, type){
@@ -1898,8 +1902,8 @@ api.export(new ImJoyPlugin())
           <br>
           <div class="btn-group">
             <button :disabled="current_well_index<=0  || loading" class="btn transparent-btn" @click="previousWell()"><i class="icon icon-back"></i>&nbsp;<b>Back</b></button>
-            <button :disabled="current_image_data.discard || loading" class="btn transparent-btn" @click="saveAnnotation()">&nbsp;<b>Save</b></button>
-            <button class="btn transparent-btn" :class="{'exclusive-label-btn': current_image_data.discard}" :disabled="loading" @click="toggleCovidDiscardLabel()">&nbsp;<b>Discard</b></button>
+            <button :disabled="discard_well || loading" class="btn transparent-btn" @click="saveAnnotation()">&nbsp;<b>Save</b></button>
+            <button class="btn transparent-btn" :class="{'exclusive-label-btn': discard_well}" :disabled="loading" @click="toggleCovidDiscardLabel()">&nbsp;<b>Discard</b></button>
             <button :disabled="current_well_index>=cached_well_data.length  || loading" class="btn transparent-btn" @click="nextWell()"><b>Next</b>&nbsp;<i class="icon icon-forward"></i></button>
           </div>
         </div>
@@ -1910,15 +1914,15 @@ api.export(new ImJoyPlugin())
             <div>
               <h5>{{annotation_category}}</h5>
               <template v-for="(label, display_label) in config_data.labels.location_labels">
-                <button :key="label" :disabled="current_image_data.labels[annotation_category].labels.exclusive_label||current_image_data.discard || loading" class="column btn covid-label-btn" :class="{'selected-label-btn': current_image_data.labels[annotation_category].labels.location_labels[config_data.labels.location_labels[display_label]]}" @click="toggleCovidLabel(annotation_category, config_data.labels.location_labels[display_label])">{{display_label.slice(0,12)+(display_label.length>12?'.': '')}}</button>
+                <button :key="label" :disabled="current_image_data.labels[annotation_category].labels.exclusive_label||discard_well || loading" class="column btn covid-label-btn" :class="{'selected-label-btn': current_image_data.labels[annotation_category].labels.location_labels[config_data.labels.location_labels[display_label]]}" @click="toggleCovidLabel(annotation_category, config_data.labels.location_labels[display_label])">{{display_label.slice(0,12)+(display_label.length>12?'.': '')}}</button>
                 <!-- <div class="break hide-on-mobile"></div> -->
               </template>
               <br>
               <template class="btn-group">
-                <button class="btn btn-sm channel-controls scv-label-btn" :disabled="current_image_data.labels[annotation_category].labels.exclusive_label||current_image_data.discard||loading" :class="{'selected-scv-label-btn': current_image_data.labels[annotation_category].labels.single_cell_variation}" @click="toggleCovidSCVLabel(annotation_category)">{{config_data.labels.single_cell_variation}}</button>
+                <button class="btn btn-sm channel-controls scv-label-btn" :disabled="current_image_data.labels[annotation_category].labels.exclusive_label||discard_well||loading" :class="{'selected-scv-label-btn': current_image_data.labels[annotation_category].labels.single_cell_variation}" @click="toggleCovidSCVLabel(annotation_category)">{{config_data.labels.single_cell_variation}}</button>
               </template>
               <template class="btn-group">
-                <button v-for="el in config_data.labels.exclusive_labels" :key="el" class="btn btn-sm exclusive-btn channel-controls" :disabled="(current_image_data.labels[annotation_category].labels.exclusive_label&&current_image_data.labels[annotation_category].labels.exclusive_label!==el)||current_image_data.discard||loading" :class="{'exclusive-covid-label-btn': current_image_data.labels[annotation_category].labels.exclusive_label ===el}" @click="toggleCovidExclusiveLabels(annotation_category, el)">{{el}}</button>
+                <button v-for="el in config_data.labels.exclusive_labels" :key="el" class="btn btn-sm exclusive-btn channel-controls" :disabled="(current_image_data.labels[annotation_category].labels.exclusive_label&&current_image_data.labels[annotation_category].labels.exclusive_label!==el)||discard_well||loading" :class="{'exclusive-covid-label-btn': current_image_data.labels[annotation_category].labels.exclusive_label ===el}" @click="toggleCovidExclusiveLabels(annotation_category, el)">{{el}}</button>
               </template>
             </div>            
           </div>
