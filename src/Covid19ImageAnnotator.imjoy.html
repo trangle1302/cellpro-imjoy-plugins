@@ -8,7 +8,7 @@
   "type": "window",
   "tags": [],
   "ui": "",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "api_version": "0.1.7",
   "description": "Annotate images for Covid image classification",
   "icon": "extension",
@@ -1020,7 +1020,7 @@ const app = new Vue({
       }
     },
     async goToWell(){
-      const the_well = await api.prompt('Please type the plate and well you want to go, the format should be like 1672_A2.')
+      const the_well = await api.prompt("Please type the plate and well you want to go, the format should be like '1672_A2'")
       if(!the_well){
         console.log("no well info typed. please try again")
         return}
@@ -1028,8 +1028,7 @@ const app = new Vue({
         await this.uploadAnnotation();
       }
       //const the_well = "1672_A2"
-      const insert_index = Math.min(...this.same_well_images_indexes)
-
+      const insert_index = Math.max(...this.same_well_images_indexes) + 1
       try{
         this.loading_cache = this.current_task_name;
         let url = "/tasks/" + this.current_task_name + "?num=1" + "&well=" + the_well
@@ -1053,7 +1052,7 @@ const app = new Vue({
             api.showProgress(0)
             return
           }
-          this.cached_well_data.push(this.cached_well_data.splice(this.current_well_index, 0, wells[j]))
+          this.cached_well_data.push(this.cached_well_data.splice(this.current_well_index + 1, 0, wells[j]))
         }
         for(let i=0;i< tasks.length; i++){
           if(this.current_task_name !== this.loading_cache){
@@ -1067,7 +1066,7 @@ const app = new Vue({
           const cell_id = tasks[i];
           api.showProgress((i+1)/tasks.length)
           const imageData = await this.fetchCellImage(cell_id)
-          this.cached_image_data.splice(insert_index, 0, imageData)
+          this.cached_image_data.splice(insert_index + i, 0, imageData)
           if(!i && this.current_task_name){
             this.current_image_data = this.cached_image_data[insert_index]
             this.well_timer.start_time = new Date().getTime()
@@ -1172,15 +1171,11 @@ const app = new Vue({
           if(!this.cached_image_data[image_index + i])break;
           if(this.cached_image_data[image_index + i].cell_id.includes(this.current_well_data)){
             this.same_well_images_indexes.push(image_index + i)
-          }else{
-            break
           }
         }
         for (let i=1; i<image_index+1; i++){
           if(this.cached_image_data[image_index - i].cell_id.includes(this.current_well_data)){
             this.same_well_images_indexes.push(image_index - i)
-          }else{
-            break
           }
         }
         this.same_well_images_indexes.sort()
@@ -1964,8 +1959,8 @@ api.export(new ImJoyPlugin())
           </div>
           <br>
           <div class="btn-group">
-            <button :disabled="current_well_index<=0  || loading" class="btn transparent-btn" @click="previousWell()"><i class="icon icon-back"></i>&nbsp;<b>Back</b></button>
-            <button :disabled="discard_well || loading" class="btn transparent-btn" @click="saveAnnotation()">&nbsp;<b>Save</b></button>
+            <button :disabled="current_well_index<0  || loading" class="btn transparent-btn" @click="previousWell()"><i class="icon icon-back"></i>&nbsp;<b>Back</b></button>
+            <button :disabled="loading" class="btn transparent-btn" @click="saveAnnotation()">&nbsp;<b>Save</b></button>
             <button class="btn transparent-btn" :class="{'exclusive-label-btn': discard_well}" :disabled="loading" @click="toggleCovidDiscardLabel()">&nbsp;<b>Discard</b></button>
             <button :disabled="current_well_index>=cached_well_data.length  || loading" class="btn transparent-btn" @click="nextWell()"><b>Next</b>&nbsp;<i class="icon icon-forward"></i></button>
           </div>
