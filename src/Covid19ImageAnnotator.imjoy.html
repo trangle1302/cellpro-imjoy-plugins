@@ -1020,10 +1020,14 @@ const app = new Vue({
       }
     },
     async goToWell(){
+      const the_well = await api.prompt('Please type the plate and well you want to go, the format should be like 1672_A2.')
+      if(!the_well){
+        console.log("no well info typed. please try again")
+        return}
       if(this.current_image_data.labels_changed){
         await this.uploadAnnotation();
       }
-      const the_well = "1672_A2"
+      //const the_well = "1672_A2"
       const insert_index = Math.min(...this.same_well_images_indexes)
 
       try{
