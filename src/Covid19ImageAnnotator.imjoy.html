@@ -346,8 +346,12 @@ const app = new Vue({
     current_image_data: null,
     current_well_data: null,
     same_well_images_indexes: [],
+    next_well_image_available: null,
+    previous_well_image_available: null,
     current_image_index: 0,
     current_well_index: 0,
+    load_image_index: 0,
+    well_timer: {},
     loading_cache: false,
     innerHeight: '100vh',
     isMobile: false,
@@ -527,21 +531,33 @@ const app = new Vue({
     },
     identify_label: function(){
       const all_labels = this.current_image_data.labels
+      const well_label_changed = this.current_image_data.labels_changed
+      const well_label_discard = this.current_image_data.discard
       //api.alert("Tell me if you are here")
+      this.previous_well_image_available = false
+      this.next_well_image_available = false
       const image_index = this.cached_image_data.indexOf(this.current_image_data)
       if(this.same_well_images_indexes.length <=0 ){
-        if(!image_index){
-          if(this.cached_image_data[1]&&this.cached_image_data[1].cell_id.includes(this.current_well_data)){
-            this.cached_image_data[1].labels = all_labels
+        if(this.cached_image_data[image_index + 1]){
+          if(this.cached_image_data[image_index + 1].cell_id.includes(this.current_well_data)){
+            this.next_well_image_available = true
+            this.cached_image_data[image_index + 1].labels = all_labels
+            this.cached_image_data[image_index + 1].labels_changed = well_label_changed
+            this.cached_image_data[image_index + 1].discard = well_label_discard
           }
-        }else{
-          return
         }
+        return
       }
+
       let set_image_index
+      //api.alert(JSON.stringify(this.same_well_images_indexes))
+      if (this.same_well_images_indexes[0] < image_index)this.previous_well_image_available = true
+      if (this.same_well_images_indexes[this.same_well_images_indexes.length -1] > image_index)this.next_well_image_available = true
       for (let i in this.same_well_images_indexes){
         set_image_index = this.same_well_images_indexes[i]
         this.cached_image_data[set_image_index].labels = all_labels
+        this.cached_image_data[set_image_index].labels_changed = well_label_changed
+        this.cached_image_data[set_image_index].discard = well_label_discard
       }
       return
     }
@@ -691,7 +707,7 @@ const app = new Vue({
       }
       this.loading = true;
       this.channel_settings = {};
-      this.getNewImageBatch(this.current_task_name, true);
+      await this.getNewImageBatch(this.current_task_name, true);
     },
     async fetchConfig(config_url){
       const response = await fetch(config_url)
@@ -886,6 +902,7 @@ const app = new Vue({
           this.cached_image_data.push(imageData)
           if(!this.current_image_data && this.current_task_name){
             this.current_image_data = imageData
+            if(this.current_task_name==='covid-annotation')this.well_timer.start_time = new Date().getTime()
             this.showImage(imageData)
             this.$forceUpdate();
           }
@@ -894,6 +911,7 @@ const app = new Vue({
         // for covid-annotation, this.cell_per_batch is actually about well
         if (task_name==='covid-annotation'){
           if(this.cached_well_data.length > this.cell_per_batch*3){
+            console.log("Have you been here?")
             this.cached_well_data = this.cached_well_data.slice(this.cell_per_batch)
             const beggin_well = this.cached_well_data[0]
             let slice_index = 0
@@ -925,7 +943,7 @@ const app = new Vue({
     },
     async previousImage(){
       await this.checkNewMask()
-      if(this.current_image_data.labels_changed){
+      if(this.current_image_data.labels_changed&&(this.current_task_name!=='covid-annotation')){
         await this.uploadAnnotation();
       }
       this.current_image_index = this.cached_image_data.indexOf(this.current_image_data)
@@ -945,15 +963,21 @@ const app = new Vue({
       }
     },
     async saveAnnotation(){
-      if(this.current_task_name!=='covid-annotation')
-      this.current_image_data.exclusive_label = false;
-      this.current_image_data.labels_changed = true;
-      await this.nextImage();
+      if(this.current_task_name!=='covid-annotation'){
+        this.current_image_data.exclusive_label = false;
+        this.current_image_data.labels_changed = true;
+        await this.nextImage();
+      }else{
+        this.current_image_data.labels_changed = true;
+        await this.uploadAnnotation();
+        this.$forceUpdate()
+      }
+      
     },
     async nextImage(){
       this.loadMoreIfNeeded();
       await this.checkNewMask()
-      if(this.current_image_data.labels_changed){
+      if(this.current_image_data.labels_changed&&(this.current_task_name!=='covid-annotation')){
         await this.uploadAnnotation();
       }
       this.current_image_index = this.cached_image_data.indexOf(this.current_image_data)
@@ -981,33 +1005,62 @@ const app = new Vue({
         }
         this.current_image_index = image_index
       }
+      this.well_timer.start_time = new Date().getTime();
       await this.showImage(this.cached_image_data[this.current_image_index]);
     },
+    getWellImage(the_well, iteration){
+      this.load_image_index = 0
+      for (let i=0; i<this.cached_image_data.length; i++){
+        if (this.cached_image_data[i].cell_id.includes(the_well)){
+          this.load_image_index = i
+          break
+        }
+      }
+    },
     async nextWell(){
-      this.loadMoreIfNeeded();
+      //this.loadMoreIfNeeded();
       await this.checkNewMask()
       // adjust this part later
       if(this.current_image_data.labels_changed){
         await this.uploadAnnotation();
       }
       //this.current_well_index
-      if (!this.cached_well_data[this.current_well_index + 1]){
+      if (this.current_well_index * 2 > this.cached_well_data.length){
         console.log("loading new wells")
-        this.getNewImageBatch(this.current_task_name)
+        await this.getNewImageBatch(this.current_task_name)
       }
+      console.log("current_well_list length: " + this.current_well_data.length)
       this.current_well_index = this.cached_well_data.indexOf(this.current_well_data)
+      console.log("current_well_index: ", this.current_well_index)
       this.current_well_index++;
+      console.log("go to well_index: ", this.current_well_index)
       const the_well = this.cached_well_data[this.current_well_index]
-      let image_index = 0
-      for (let i=0; i<this.cached_image_data.length; i++){
-        if (this.cached_image_data[i].cell_id.includes(the_well)){
-          image_index = i
+      console.log("go to well name: ", the_well)
+      console.log("current cached image data length: ", this.cached_image_data.length)
+      let iteration = 0
+      await this.getWellImage(the_well, iteration)
+      for (let j=0;j<3;j++){
+        this.loading = true
+        if(!this.cached_image_data[this.load_image_index].cell_id.includes(the_well)){
+          iteration++;
+          await this.getWellImage(the_well, iteration)
+        }else{
+          this.loading=false;
+          console.log("current_cell_id: ", this.cached_image_data[this.load_image_index].cell_id)
           break
         }
       }
+      this.loading = false
+      if(!this.cached_image_data[this.load_image_index].cell_id.includes(the_well)){api.showMessage("Data is still loading..., please click Next again")
+      return
+      }
+      const image_index = this.load_image_index
       this.current_image_index = image_index
-      if(this.cached_image_data[this.current_image_index])
-      await this.showImage(this.cached_image_data[this.current_image_index]);
+      console.log("image name: ", this.cached_image_data[this.current_image_index].cell_id)
+      if(this.cached_image_data[this.current_image_index]){
+        this.well_timer.start_time = new Date().getTime();
+        await this.showImage(this.cached_image_data[this.current_image_index]);
+      }
     },
     async checkNewMask(){
       if(!this.current_image_data.mask_adjusted){
@@ -1064,7 +1117,8 @@ const app = new Vue({
             break
           }
         }
-        console.log(image_index + ":" + JSON.stringify(this.same_well_images_indexes))
+        this.same_well_images_indexes.sort()
+        console.log("current_well_index " + this.cached_well_data.indexOf(this.current_well_data)+ " image index "+ image_index + ":" + JSON.stringify(this.same_well_images_indexes))
       }      
       this.current_image_data = imageData;
       imageData.start_time = new Date().getTime();
@@ -1116,12 +1170,18 @@ const app = new Vue({
       // Default options are marked with *
       const sendData = {}
       
-      if(this.current_image_data.start_time){
+      if(this.current_image_data.start_time&&(this.current_task_name!=='covid-annotation')){
         this.current_image_data.time_elapsed = new Date().getTime() - this.current_image_data.start_time;
         sendData.start_time = this.current_image_data.start_time;
         sendData.time_elapsed = this.current_image_data.time_elapsed;
       }
       if (this.current_task_name==='covid-annotation'){
+        if(this.well_timer.start_time){
+          this.well_timer.time_elapsed = new Date().getTime() - this.well_timer.start_time
+          sendData.start_time = this.well_timer.start_time
+          sendData.time_elapsed = this.well_timer.time_elapsed
+          console.log('I am using the right timing')
+        }
       // consider about the discard button later
         if (this.current_image_data.labels_changed&&this.current_image_data.discard){
           sendData.discard = this.current_image_data.discard
@@ -1183,7 +1243,7 @@ const app = new Vue({
       }
    
       // this is the url to send the current annotation
-      //api.alert(JSON.stringify(sendData))
+      api.alert(JSON.stringify(sendData))
       const sub_url = "/annotations/" + this.current_task_name + "/" + this.current_image_data.cell_id;
       /*
       const url_post = this.selected_server_url + sub_url;
@@ -1252,6 +1312,7 @@ const app = new Vue({
         delete this.current_image_data.discard
       }else{
         this.current_image_data.discard = true;
+        await this.uploadAnnotation();
       }
       this.$forceUpdate()
     },
@@ -1269,7 +1330,7 @@ const app = new Vue({
       }
       this.$forceUpdate()
       // this one is temporarily muted
-      await this.uploadAnnotation();
+      //await this.uploadAnnotation();
     },
     showMaskAnnotation(mask_geojson){
       if(this.current_task_name==='covid-annotation')return;
@@ -1806,6 +1867,7 @@ api.export(new ImJoyPlugin())
           <input type="checkbox" v-model="draw_mask_mode" @change="drawMaskModeChanged">
           <i class="form-icon"></i> <span class="hide-on-mobile">Redraw Mask</span>
         </label> -->
+        <button style="background-color:transparent" class="btn" title="navigate to well" @click="">&nbsp;Well</button>
         <button style="background-color:transparent" class="btn" title="report" @click="report()"><i class="icon icon-share"></i></button>&nbsp;&nbsp;
         <label class="form-switch " v-show="current_task_name === 'segmentation'">
           <input type="checkbox" v-model="freehand_mode" @change="freehandChanged">
@@ -1830,16 +1892,15 @@ api.export(new ImJoyPlugin())
         <br>
         <div v-if="current_task_name==='covid-annotation'">
           <div class="btn-group" >
-            <button :disabled="current_image_index<=0  || loading" class="btn transparent-btn" @click="previousImage()"><i class="icon icon-back"></i>&nbsp;Back</button>
-            <button class="btn transparent-btn" :class="{'exclusive-label-btn': current_image_data.discard}" @click="toggleCovidDiscardLabel()">&nbsp;Discard</button>
-            <button :disabled="current_image_data.exclusive_label" class="btn transparent-btn" @click="saveAnnotation()">&nbsp;Save</button>
-            <button :disabled="current_image_index>=cached_image_data.length  || loading" class="btn transparent-btn" @click="nextImage()">Next&nbsp;<i class="icon icon-forward"></i></button>
+            <button :disabled="!previous_well_image_available  || loading" class="btn transparent-image-btn" @click="previousImage()"><i class="icon icon-back"></i>&nbsp;Back (image)</button>
+            <button :disabled="!next_well_image_available  || loading" class="btn transparent-image-btn" @click="nextImage()">Next (image)&nbsp;<i class="icon icon-forward"></i></button>
           </div>
           <br>
           <div class="btn-group">
-            <button :disabled="current_well_index<=0  || loading" class="btn transparent-well-btn" @click="previousWell()"><i class="icon icon-back"></i>&nbsp;<b>Back</b>(well)</button>
-            <button :disabled="current_image_data.exclusive_label" class="btn transparent-well-btn" @click="toggleExclusiveLabels('Discard')">&nbsp;<b>GoTo</b>(well)</button>
-            <button :disabled="current_well_index>=cached_well_data.length  || loading" class="btn transparent-well-btn" @click="nextWell()"><b>Next</b>(well)&nbsp;<i class="icon icon-forward"></i></button>
+            <button :disabled="current_well_index<=0  || loading" class="btn transparent-btn" @click="previousWell()"><i class="icon icon-back"></i>&nbsp;<b>Back</b></button>
+            <button :disabled="current_image_data.discard || loading" class="btn transparent-btn" @click="saveAnnotation()">&nbsp;<b>Save</b></button>
+            <button class="btn transparent-btn" :class="{'exclusive-label-btn': current_image_data.discard}" :disabled="loading" @click="toggleCovidDiscardLabel()">&nbsp;<b>Discard</b></button>
+            <button :disabled="current_well_index>=cached_well_data.length  || loading" class="btn transparent-btn" @click="nextWell()"><b>Next</b>&nbsp;<i class="icon icon-forward"></i></button>
           </div>
         </div>
       </div>
@@ -1849,15 +1910,15 @@ api.export(new ImJoyPlugin())
             <div>
               <h5>{{annotation_category}}</h5>
               <template v-for="(label, display_label) in config_data.labels.location_labels">
-                <button :key="label" :disabled="current_image_data.labels[annotation_category].labels.exclusive_label||current_image_data.discard" class="column btn covid-label-btn" :class="{'selected-label-btn': current_image_data.labels[annotation_category].labels.location_labels[config_data.labels.location_labels[display_label]]}" @click="toggleCovidLabel(annotation_category, config_data.labels.location_labels[display_label])">{{display_label.slice(0,12)+(display_label.length>12?'.': '')}}</button>
+                <button :key="label" :disabled="current_image_data.labels[annotation_category].labels.exclusive_label||current_image_data.discard || loading" class="column btn covid-label-btn" :class="{'selected-label-btn': current_image_data.labels[annotation_category].labels.location_labels[config_data.labels.location_labels[display_label]]}" @click="toggleCovidLabel(annotation_category, config_data.labels.location_labels[display_label])">{{display_label.slice(0,12)+(display_label.length>12?'.': '')}}</button>
                 <!-- <div class="break hide-on-mobile"></div> -->
               </template>
               <br>
               <template class="btn-group">
-                <button class="btn btn-sm channel-controls scv-label-btn" :disabled="current_image_data.labels[annotation_category].labels.exclusive_label||current_image_data.discard" :class="{'selected-scv-label-btn': current_image_data.labels[annotation_category].labels.single_cell_variation}" @click="toggleCovidSCVLabel(annotation_category)">{{config_data.labels.single_cell_variation}}</button>
+                <button class="btn btn-sm channel-controls scv-label-btn" :disabled="current_image_data.labels[annotation_category].labels.exclusive_label||current_image_data.discard||loading" :class="{'selected-scv-label-btn': current_image_data.labels[annotation_category].labels.single_cell_variation}" @click="toggleCovidSCVLabel(annotation_category)">{{config_data.labels.single_cell_variation}}</button>
               </template>
               <template class="btn-group">
-                <button v-for="el in config_data.labels.exclusive_labels" :key="el" class="btn btn-sm exclusive-btn channel-controls" :disabled="(current_image_data.labels[annotation_category].labels.exclusive_label&&current_image_data.labels[annotation_category].labels.exclusive_label!==el)||current_image_data.discard" :class="{'exclusive-covid-label-btn': current_image_data.labels[annotation_category].labels.exclusive_label ===el}" @click="toggleCovidExclusiveLabels(annotation_category, el)">{{el}}</button>
+                <button v-for="el in config_data.labels.exclusive_labels" :key="el" class="btn btn-sm exclusive-btn channel-controls" :disabled="(current_image_data.labels[annotation_category].labels.exclusive_label&&current_image_data.labels[annotation_category].labels.exclusive_label!==el)||current_image_data.discard||loading" :class="{'exclusive-covid-label-btn': current_image_data.labels[annotation_category].labels.exclusive_label ===el}" @click="toggleCovidExclusiveLabels(annotation_category, el)">{{el}}</button>
               </template>
             </div>            
           </div>
@@ -2110,11 +2171,11 @@ api.export(new ImJoyPlugin())
   .transparent-btn:hover {
     background-color:rgba(255, 255, 255, 0.42);
   }
-  .transparent-well-btn, .transparent-well-btn:focus {
-    width: 120px;
+  .transparent-image-btn, .transparent-image-btn:focus {
+    width: 150px;
     background-color:rgba(87, 100, 29, 0.274);
   }
-  .transparent-well-btn:hover {
+  .transparent-image-btn:hover {
     background-color:rgba(255, 255, 255, 0.42);
   }
   .small-btn{
