@@ -8,7 +8,7 @@
   "type": "window",
   "tags": [],
   "ui": "",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "api_version": "0.1.7",
   "description": "Annotate images for Covid image classification",
   "icon": "extension",
@@ -35,7 +35,7 @@
 <script lang="javascript">
 const SERVERS = {
   'development': 'https://cuddly-moth-61.telebit.io',
-  'try_this_if_dev_fail': "https://01dc87c5915e.ngrok.io",
+  'try_this_if_dev_fail': "https://5716fcb5b98d.ngrok.io",
 }
 
 const Map = ol.Map;
@@ -786,7 +786,7 @@ const app = new Vue({
             record_label =  this.config_data.labels.location_labels[k]
             imageData.labels[annotation_category].labels.location_labels[record_label] = false
           }
-          imageData.labels[annotation_category].labels.exclusive_label = null
+          imageData.labels[annotation_category].labels.exclusive_label = false
           imageData.labels[annotation_category].labels.single_cell_variation = false
         }
         // should rename here for the saved_location_label @ hao
