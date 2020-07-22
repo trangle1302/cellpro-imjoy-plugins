@@ -35,6 +35,7 @@
 <script lang="javascript">
 const SERVERS = {
   'development': 'https://cuddly-moth-61.telebit.io',
+  'try_this_if_dev_fail': "https://01dc87c5915e.ngrok.io",
 }
 
 const Map = ol.Map;
@@ -351,6 +352,7 @@ const app = new Vue({
     current_image_index: 0,
     current_well_index: 0,
     discard_well: false,
+    well_comment: [],
     load_image_index: 0,
     well_timer: {},
     loading_cache: false,
@@ -1008,6 +1010,7 @@ const app = new Vue({
       }
       this.well_timer.start_time = new Date().getTime();
       this.discard_well = this.cached_image_data[this.current_image_index].discard
+      this.well_comment = []
       await this.showImage(this.cached_image_data[this.current_image_index]);
     },
     getWellImage(the_well, iteration){
@@ -1124,6 +1127,7 @@ const app = new Vue({
       if(this.cached_image_data[this.current_image_index]){
         this.well_timer.start_time = new Date().getTime();
         this.discard_well = this.cached_image_data[this.current_image_index].discard
+        this.well_comment = []
         await this.showImage(this.cached_image_data[this.current_image_index]);
       }
     },
@@ -1241,11 +1245,11 @@ const app = new Vue({
           this.well_timer.time_elapsed = new Date().getTime() - this.well_timer.start_time
           sendData.start_time = this.well_timer.start_time
           sendData.time_elapsed = this.well_timer.time_elapsed
-          console.log('I am using the right timing')
+          if (this.well_comment.length){sendData.comment = this.well_comment}
         }
       // consider about the discard button later
         if (this.current_image_data.labels_changed&&this.discard_well){
-          sendData.discard = this.discard_well
+          sendData.labels = "Discard"
         }  
         if (this.current_image_data.labels_changed&&(!this.discard_well)){
           sendData.annotation_variation = this.annotation_variation
@@ -1305,8 +1309,13 @@ const app = new Vue({
    
       // this is the url to send the current annotation
       console.log(JSON.stringify(sendData))
-      const sub_url = "/annotations/" + this.current_task_name + "/" + this.current_image_data.cell_id;
-      /*
+      let sub_url = "/annotations/" + this.current_task_name + "/"
+      if(this.current_task_name==='covid-annotation'){
+        sub_url = sub_url + this.current_image_data.cell_id.split('/')[0];
+      }else{
+        sub_url = sub_url + this.current_image_data.cell_id;
+      }
+      console.log(sub_url)
       const url_post = this.selected_server_url + sub_url;
       const response = await fetch(url_post, {
           method: 'POST',
@@ -1319,8 +1328,7 @@ const app = new Vue({
           body: JSON.stringify(sendData)
         });
       const res= await response.json();
-      if(res.success)*/
-      if(true){
+      if(res.success){
         this.current_image_data.mask_adjusted = false;
         this.current_image_data.labels_changed = false;
         if(this.current_task_name==='covid-annotation'){
@@ -1375,7 +1383,6 @@ const app = new Vue({
         this.discard_well = true;
         //await this.uploadAnnotation();
       }
-      console.log("show when toggle discard: ", this.discard_well)
       this.$forceUpdate()
     },
     async toggleCovidExclusiveLabels(annotation_category, type){
@@ -1750,20 +1757,57 @@ const app = new Vue({
         throw new Error('Failed to resolve the report.')
       };
     },
+    refineLabels(receivelabels){
+      //this.current_image_data.labels[annotation_category].labels
+      const covidlabels = JSON.parse(JSON.stringify(receivelabels))
+      const category_annotations = {}
+      let protein_annotations = []
+      if(Object.keys(covidlabels).includes("exclusive_label")&&covidlabels.exclusive_label){
+        console.log(covidlabels.exclusive_label)
+        category_annotations.exclusive_label = covidlabels.exclusive_label
+      }else if(Object.keys(covidlabels).includes("location_labels")){
+        if(Object.keys(covidlabels).includes("single_cell_variation")&&covidlabels.single_cell_variation){
+          category_annotations.single_cell_variation = covidlabels.single_cell_variation
+        }
+        for (let k in covidlabels.location_labels){
+          if(covidlabels.location_labels[k]==true){protein_annotations.push(k)}
+        }
+        console.log(JSON.stringify(protein_annotations))
+        if (protein_annotations.length){
+          category_annotations.location_labels = protein_annotations.join("|")
+        }
+      }
+      if (!Object.keys(category_annotations).length){return }
+      return category_annotations
+    },
     async report(){
       const comment = await api.prompt('Please type your comment on this image to follow up. This image will be shared to the cellprofiling slack.')
       if(comment){
         const screenshot = this.screenShot()
-        const response = await fetch( this.selected_server_url + '/reports', {
-          method: 'POST',
-          mode: 'cors',
-          cache: 'no-cache',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${this.user.access_token}`,
-          },
-          body: JSON.stringify({
-            report:{
+        let body_content
+        if(this.current_task_name==='covid-annotation'){
+          this.current_image_data.labels_changed = true
+          this.well_comment.push(comment)
+          const infected_data = this.refineLabels(this.current_image_data.labels.Infected.labels)
+          const non_infected_data = this.refineLabels(this.current_image_data.labels.Non_infected.labels)
+          console.log('Here is data: ' + JSON.stringify(non_infected_data))
+          // add special body content for covid-annotation
+          // temporiraly hard code the Infected and Non_infected
+          body_content = JSON.stringify({
+            report: {
+              comment: comment,
+              task_id: this.current_image_data.cell_id.split('/'[0]),
+              discard_well: this.discard_well,
+              annotation_variation: this.annotation_variation,
+              Infected: infected_data,
+              Non_infected: non_infected_data, 
+            },
+            image: this.current_displayed_image,
+            screenshot: screenshot
+          })
+        }else{
+          body_content = JSON.stringify({
+            report: {
               comment: comment,
               task_id: this.current_image_data.cell_id,
               location_labels: this.current_image_data.location_labels,
@@ -1772,6 +1816,18 @@ const app = new Vue({
             image: this.current_displayed_image,
             screenshot: screenshot
           })
+        }
+        // comment out return in real work
+        //return
+        const response = await fetch( this.selected_server_url + '/reports', {
+          method: 'POST',
+          mode: 'cors',
+          cache: 'no-cache',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${this.user.access_token}`,
+          },
+          body: body_content
         });
         if(response.status !== 200){
           api.alert('Failed to send report: ' + response.status)
