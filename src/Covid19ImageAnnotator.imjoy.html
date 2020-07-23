@@ -8,7 +8,7 @@
   "type": "window",
   "tags": [],
   "ui": "",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "api_version": "0.1.7",
   "description": "Annotate images for Covid image classification",
   "icon": "extension",
@@ -36,7 +36,7 @@
 const SERVERS = {
   'development': 'https://cuddly-moth-61.telebit.io',
   'try_this_if_dev_fail': "https://088fe14a6b47.ngrok.io",
-  'localhost': "http://localhost:8343",
+  'localhost': "http://localhost:8939",
 }
 
 const Map = ol.Map;
@@ -541,10 +541,12 @@ const app = new Vue({
       this.previous_well_image_available = false
       this.next_well_image_available = false
       const image_index = this.cached_image_data.indexOf(this.current_image_data)
+      if(this.cached_image_data[image_index + 1]&&this.cached_image_data[image_index + 1].cell_id.includes(this.current_well_data)){
+        this.next_well_image_available = true
+      }
       if(this.same_well_images_indexes.length <=1 ){
         if(this.cached_image_data[image_index + 1]){
           if(this.cached_image_data[image_index + 1].cell_id.includes(this.current_well_data)){
-            this.next_well_image_available = true
             this.cached_image_data[image_index + 1].labels = all_labels
             this.cached_image_data[image_index + 1].labels_changed = well_label_changed
             this.cached_image_data[image_index + 1].discard = this.discard_well
