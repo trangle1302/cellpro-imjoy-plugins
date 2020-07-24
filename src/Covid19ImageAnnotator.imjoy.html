@@ -8,7 +8,7 @@
   "type": "window",
   "tags": [],
   "ui": "",
-  "version": "0.1.8",
+  "version": "0.1.9",
   "api_version": "0.1.7",
   "description": "Annotate images for Covid image classification",
   "icon": "extension",
@@ -526,7 +526,9 @@ const app = new Vue({
       if (annotation_categories.length !== 2){
         return "Error: should be two categories only"
       }else{
-        if (JSON.stringify(this.current_image_data.labels[annotation_categories[0]])===JSON.stringify(this.current_image_data.labels[annotation_categories[1]])){
+        if (this.current_image_data.labels[annotation_categories[0]].labels.exclusive_label&&(this.current_image_data.labels[annotation_categories[0]].labels.exclusive_label===this.current_image_data.labels[annotation_categories[1]].labels.exclusive_label)){
+          return "Identical"
+        }else if (JSON.stringify(this.current_image_data.labels[annotation_categories[0]])===JSON.stringify(this.current_image_data.labels[annotation_categories[1]])){
           return "Identical"
         }else{return "Different"}
         return "Error: God knows" 
