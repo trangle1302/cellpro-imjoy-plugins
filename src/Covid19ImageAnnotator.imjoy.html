@@ -8,7 +8,7 @@
   "type": "window",
   "tags": [],
   "ui": "",
-  "version": "0.1.9",
+  "version": "0.2.0",
   "api_version": "0.1.7",
   "description": "Annotate images for Covid image classification",
   "icon": "extension",
@@ -399,10 +399,10 @@ const app = new Vue({
             this.selectLabel(false)
           }
         }
-        else if(event.code === 'ArrowRight'){
+        else if((event.code === 'ArrowRight')&&this.next_well_image_available){
           this.nextImage()
         }
-        else if(event.code === 'ArrowLeft'){
+        else if((event.code === 'ArrowLeft')&&this.previous_well_image_available){
           this.previousImage()
         }
         else if(event.code === 'KeyD'){
@@ -918,7 +918,6 @@ const app = new Vue({
         // for covid-annotation, this.cell_per_batch is actually about well
         if (task_name==='covid-annotation'){
           if(this.cached_well_data.length > this.cell_per_batch*3){
-            console.log("Have you been here?")
             this.cached_well_data = this.cached_well_data.slice(this.cell_per_batch)
             const beggin_well = this.cached_well_data[0]
             let slice_index = 0
@@ -1108,7 +1107,6 @@ const app = new Vue({
       console.log("go to well_index: ", this.current_well_index)
       const the_well = this.cached_well_data[this.current_well_index]
       console.log("go to well name: ", the_well)
-      console.log("current cached image data length: ", this.cached_image_data.length)
       let iteration = 0
       await this.getWellImage(the_well, iteration)
       for (let j=0;j<3;j++){
@@ -1169,7 +1167,6 @@ const app = new Vue({
         return
       }
       if(!this.isMobile) api.showStatus(imageData.cell_id)
-      console.log('current image: ', imageData)
       if(this.current_task_name==='covid-annotation'){
         const well_info = imageData.cell_id.split('_')
         this.current_well_data = well_info.slice(0, 2).join('_')
@@ -1801,7 +1798,7 @@ const app = new Vue({
           body_content = JSON.stringify({
             report: {
               comment: comment,
-              task_id: this.current_image_data.cell_id.split('/'[0]),
+              task_id: this.current_image_data.cell_id.split('/')[0],
               discard_well: this.discard_well,
               annotation_variation: this.annotation_variation,
               Infected: infected_data,
