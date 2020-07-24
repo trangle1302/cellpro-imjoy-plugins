@@ -8,7 +8,7 @@
   "type": "window",
   "tags": [],
   "ui": "",
-  "version": "0.1.7",
+  "version": "0.1.8",
   "api_version": "0.1.7",
   "description": "Annotate images for Covid image classification",
   "icon": "extension",
@@ -34,8 +34,7 @@
 
 <script lang="javascript">
 const SERVERS = {
-  'development': 'https://cuddly-moth-61.telebit.io',
-  'try_this_if_dev_fail': "https://088fe14a6b47.ngrok.io",
+  'production': 'https://tasty-mole-100.telebit.io',
   'localhost': "http://localhost:8939",
 }
 
@@ -313,7 +312,7 @@ const app = new Vue({
     selected_feature: null,
     loading: false,
     // develop image parsing
-    selected_server_url: null,
+    selected_server_url: 'production',
     servers: SERVERS,
     select: null,
     current_panel: 'login',
@@ -1913,18 +1912,19 @@ api.export(new ImJoyPlugin())
       <div class="panel-header">
         <div class="panel-title h2">Covid Image Annotator </div> <span>(v{{version}})</span>
         <br>
-        <p>Please choose a task:</p>
+        <p>Please choose a panel:</p>
       </div>
       <div class="panel-body">
         <br>
-        <div v-for="(task, task_name) in tasks" :key="task_name">
+        <!--here only show covid annotation-->
+        <div v-for="(task, task_name) in tasks" v-if="task_name==='covid-annotation'":key="task_name">
           <progress class="progress" style="width: 280px" :value="task.finished" :max="task.total"></progress>
           <br>
           <button class="btn" style="width: 280px" @click="chooseTask(task_name)"><i class="icon icon-edit"></i>&nbsp; {{task_name}}: {{task.finished}}/{{task.total}}</button>
           <br>
           <br>
         </div>
-        <button v-if="user.role === 'admin'" class="btn" style="width: 280px" @click="showStatistics()">Statistics (🚧Under construction)</button>
+        <button v-if="user.role === 'admin'" class="btn" style="width: 280px" @click="showStatistics()">Statistics && Reports(📊🔔)</button>
       </div>
       <div class="panel-footer">
       </div>
