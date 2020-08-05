@@ -8,7 +8,7 @@
   "type": "window",
   "tags": [],
   "ui": "",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "api_version": "0.1.7",
   "description": "Annotate images for Covid image classification",
   "icon": "extension",
@@ -657,7 +657,7 @@ const app = new Vue({
       const modifiedData = Object.assign({}, theData)
       let xyLabels = ['Task', 'Counts']
       if(idName.includes('Average time elasped')){
-        xyLabels = ['Task', 's/image']
+        xyLabels = ['Task', 's/well']
         const keyGroup = Object.keys(theData)
         const valueGroup = Object.values(theData)
         for (let i=0; i<valueGroup.length; i++){modifiedData[keyGroup[i]] = parseFloat(valueGroup[i])}
