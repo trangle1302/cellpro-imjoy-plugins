@@ -1114,7 +1114,7 @@ const app = new Vue({
       }
       //this.current_well_index
       if (this.current_well_index * 2 > this.cached_well_data.length){
-        api.alert("loading new wells, please click again in 3 second")
+        api.showMessage("loading new wells...")
         await this.getNewImageBatch(this.current_task_name)
       }
       console.log("current_well_list length: " + this.current_well_data.length)
